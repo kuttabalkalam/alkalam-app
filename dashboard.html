@@ -49,9 +49,11 @@
         .single();
 
       if (error || !pegawai) {
-        document.getElementById("sapaan").textContent = "Akun tidak terdaftar sebagai pegawai aktif";
-        return;
-      }
+  document.getElementById("sapaan").textContent = "Akun tidak terdaftar sebagai pegawai aktif";
+  document.getElementById("peran").textContent =
+    "Email login: " + session.user.email + " | detail: " + (error ? error.message : "data kosong");
+  return;
+}
 
       document.getElementById("sapaan").textContent = "Assalamu'alaikum, " + pegawai.nama_lengkap;
       document.getElementById("peran").textContent = "Peran: " + pegawai.peran;
