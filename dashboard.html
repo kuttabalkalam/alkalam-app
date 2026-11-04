@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard - Kuttab Al-Kalam</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
+  <style>
+    body { font-family: sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; }
+    .menu a { display: block; padding: 14px; margin: 10px 0; border: 1px solid #ccc;
+              border-radius: 6px; text-decoration: none; color: #111; }
+    .menu a:hover { background: #f3f3f3; }
+    .topbar { display: flex; justify-content: space-between; align-items: center; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div>
+      <h2 id="sapaan">Memuat...</h2>
+      <small id="peran"></small>
+    </div>
+    <button id="keluar">Keluar</button>
+  </div>
+  <div class="menu" id="menu"></div>
+
+  <script>
+    const SUPABASE_URL = "https://epynlmuqxumuwcjsrnsz.supabase.co";
+    const SUPABASE_ANON_KEY = "ISI_ANON_KEY";
+
+    // Isi href sesuai kebutuhan. "#" berarti belum dibuat.
+    const MENU = [
+      { label: "Data Santri",                  href: "#",           roles: ["admin","kepala","staf","guru"] },
+      { label: "Input Nilai",                  href: "#",           roles: ["admin","guru"] },
+      { label: "Rapor",                        href: "#",           roles: ["admin","kepala","guru"] },
+      { label: "Jurnal Tahsin & Tahfidz",      href: "#",           roles: ["admin","guru"] },
+      { label: "Input RKK",                    href: "URL_RKK",     roles: ["admin","guru"] },
+      { label: "Pengajuan Ujian Kenaikan Jilid", href: "URL_JILID", roles: ["admin","guru","staf"] },
+    ];
+
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    async function mulai() {
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) { location.href = "login.html"; return; }
+
+      const { data: pegawai, error } = await sb.from("pegawai")
+        .select("nama_lengkap, peran")
+        .eq("auth_user_id", session.user.id)
+        .single();
+
+      if (error || !pegawai) {
+        document.getElementById("sapaan").textContent = "Akun tidak terdaftar sebagai pegawai aktif";
+        return;
+      }
+
+      document.getElementById("sapaan").textContent = "Assalamu'alaikum, " + pegawai.nama_lengkap;
+      document.getElementById("peran").textContent = "Peran: " + pegawai.peran;
+
+      const menu = document.getElementById("menu");
+      MENU.filter(m => m.roles.includes(pegawai.peran)).forEach(m => {
+        const a = document.createElement("a");
+        a.href = m.href;
+        a.textContent = m.label;
+        if (m.href.startsWith("http")) a.target = "_blank";
+        menu.appendChild(a);
+      });
+    }
+
+    document.getElementById("keluar").addEventListener("click", async () => {
+      await sb.auth.signOut();
+      location.href = "login.html";
+    });
+
+    mulai();
+  </script>
+</body>
+</html>
