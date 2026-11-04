@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Login - Kuttab Al-Kalam</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
+</head>
+<body style="font-family:sans-serif;max-width:380px;margin:60px auto;padding:0 16px">
+  <h2>Login Pegawai</h2>
+  <form id="f">
+    <input id="email" type="email" required placeholder="Email"
+      style="width:100%;padding:8px;margin:8px 0;box-sizing:border-box">
+    <input id="pw" type="password" required placeholder="Password"
+      style="width:100%;padding:8px;margin:8px 0;box-sizing:border-box">
+    <button type="submit" style="padding:8px 16px">Masuk</button>
+  </form>
+  <p id="msg"></p>
+
+  <script>
+    const SUPABASE_URL = "https://epynlmuqxumuwcjsrnsz.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_Oq_to1zgHLnachvWYLV_yA_DoOTGI3s";
+
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const msg = document.getElementById("msg");
+
+    document.getElementById("f").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      msg.textContent = "Memproses...";
+      const { data, error } = await sb.auth.signInWithPassword({
+        email: document.getElementById("email").value.trim().toLowerCase(),
+        password: document.getElementById("pw").value
+      });
+      if (error) {
+        msg.textContent = "Login gagal: " + error.message;
+        return;
+      }
+      msg.textContent = "Login berhasil. Selamat datang, " + data.user.email;
+    });
+  </script>
+</body>
+</html>
