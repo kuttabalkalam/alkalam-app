@@ -282,16 +282,25 @@
     else if ($("alamat_domisili").value.includes("RT/RW")) $("alamat_domisili").value = "";
   }
 
-  async function init() {
-    const { data: ta } = await sb.rpc("tahun_pendaftaran");
-    if (error || !data) {
-      alert("Pendaftaran belum dibuka. Silakan hubungi admin.");
-      $("submitBtn").disabled = true;
-      $("nextBtn").disabled = true;
+    async function init() {
+    const { data: buka, error: e1 } = await sb.rpc("pendaftaran_buka");
+    const { data: ta, error: e2 } = await sb.rpc("tahun_pendaftaran");
+
+    if (e1 || e2 || !buka || !ta) {
+      $("ppdbForm").style.display = "none";
+      $("mainStepper").style.display = "none";
+      $("thankYou").innerHTML =
+        '<h2 style="font-weight:bold;color:#333;">Pendaftaran Ditutup</h2>' +
+        '<p class="text-muted">Saat ini pendaftaran santri baru belum dibuka. ' +
+        'Silakan hubungi admin untuk informasi lebih lanjut.</p>';
+      $("thankYou").style.display = "block";
       return;
     }
-    tahunAjaran = data;
-    $("tahunTampil").value = data.replace("-", "/");
+
+    tahunAjaran = ta;
+    $("tahunTampil").value = ta.replace("-", "/");
+    $("ppdbForm").style.display = "block";
+    $("mainStepper").style.display = "flex";
     updateDomisili();
     tampil(0);
   }
