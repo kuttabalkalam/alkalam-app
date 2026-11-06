@@ -322,15 +322,15 @@
       async function tampilCalon() {
     buka("calon");
     setMsg("Memuat...");
-    const { data, error } = await sb.from("santri")
-      .select("id, nama_lengkap, tingkat_masuk, hp_orang_tua, created_at")
-      .eq("status", "Calon Santri").eq("tahun_ajaran_masuk", ta.kode)
+        const { data, error } = await sb.from("santri")
+      .select("id, nama_lengkap, tingkat_masuk, hp_orang_tua, created_at, tahun_ajaran_masuk")
+      .eq("status", "Calon Santri")
       .order("created_at");
     if (error) return setMsg("Gagal memuat: " + error.message);
 
     calonList = data || [];
     const admin = me.peran === "admin";
-    $("infoCalon").textContent = calonList.length + " calon santri TA " + ta.kode + ".";
+    $("infoCalon").textContent = calonList.length + " calon santri (semua tahun ajaran).";
     $("bulkBar").style.display = admin ? "block" : "none";
 
     $("bulkRombel").innerHTML = "";
@@ -349,7 +349,7 @@
       thCb.appendChild(cbAll);
       hr.appendChild(thCb);
     }
-    const kolom = ["No", "Nama", "Mendaftar untuk", "HP Orang Tua", "Tanggal daftar"];
+        const kolom = ["No", "Nama", "Mendaftar untuk", "TA masuk", "HP Orang Tua", "Tanggal daftar"];
     if (admin) kolom.push("Aksi");
     kolom.forEach(h => { const th = document.createElement("th"); th.textContent = h; hr.appendChild(th); });
     t.appendChild(hr);
@@ -365,7 +365,7 @@
         tr.appendChild(td0);
       }
 
-      [i + 1, s.nama_lengkap, namaTingkat(s.tingkat_masuk), s.hp_orang_tua || "-", (s.created_at || "").slice(0, 10)]
+        [i + 1, s.nama_lengkap, namaTingkat(s.tingkat_masuk), s.tahun_ajaran_masuk, s.hp_orang_tua || "-", (s.created_at || "").slice(0, 10)]
         .forEach(v => { const td = document.createElement("td"); td.textContent = v; tr.appendChild(td); });
 
       if (admin) {
