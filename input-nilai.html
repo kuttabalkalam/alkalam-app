@@ -7,10 +7,11 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
 <style>
   body { font-family: sans-serif; margin: 20px; }
-  select, input, button { padding: 6px; margin: 4px 0; }
+  select, input, textarea, button { padding: 6px; margin: 4px 0; font-family: inherit; }
   table { border-collapse: collapse; margin-top: 12px; font-size: 14px; }
-  th, td { border: 1px solid #bbb; padding: 4px 6px; }
-  td input { width: 70px; }
+  th, td { border: 1px solid #bbb; padding: 4px 6px; vertical-align: top; }
+  td input[type=number] { width: 70px; }
+  textarea { width: 260px; min-height: 60px; }
   .muted { color: #666; font-size: 13px; }
   #msg { margin: 10px 0; font-weight: bold; }
 </style>
@@ -20,14 +21,22 @@
 <h2>Input Nilai</h2>
 
 <div>
+  <label>Mode
+    <select id="mode">
+      <option value="nilai">Nilai</option>
+      <option value="deskripsi">Deskripsi Rapor (semester ganjil)</option>
+    </select>
+  </label>
   <label>Rombel <select id="rombel"></select></label>
   <label>Mapel <select id="mapel"></select></label>
-  <label>Jumlah ujian periodik / tema<input id="jumlahPeriodik" type="number" min="1" max="10" value="4" style="width:60px"></label>
+  <label id="wrapJumlah">Jumlah ujian periodik/tema
+    <input id="jumlahPeriodik" type="number" min="1" max="10" value="4" style="width:60px">
+  </label>
   <button id="muat">Tampilkan</button>
 </div>
 <p class="muted" id="info"></p>
 <div style="overflow-x:auto"><table id="tabel"></table></div>
-<button id="simpan" style="display:none">Simpan Nilai</button>
+<button id="simpan" style="display:none">Simpan</button>
 <p id="msg"></p>
 
 <script>
@@ -39,8 +48,9 @@
   const setMsg = t => $("msg").textContent = t;
   const kunci = (s, k, i) => s + "|" + k + "|" + i;
 
-  let me, semesterId, penugasan = [], santri = [], kolomAktif = [];
-  let nilaiLama = {}, akhir = {};
+  let me = null, semester = null, penugasan = [];
+  let santri = [], kolomAktif = [], nilaiLama = {}, akhir = {};
+  let aspekAktif = [], deskLama = {}, mapelTampil = null;
 
   async function init() {
     const { data: { session } } = await sb.auth.getSession();
@@ -57,84 +67,116 @@
 
     const { data: sem } = await sb.from("semester").select("id, nomor").eq("aktif", true).single();
     if (!sem) { $("info").textContent = "Belum ada semester aktif. Hubungi admin."; return; }
-    semesterId = sem.id;
-    $("info").textContent = "Semester " + sem.nomor + ". Isi nilai dalam skala 0 sampai 100.";
+    semester = sem;
+    $("info").textContent = "Semester " + sem.nomor + (sem.nomor === 1 ? " (ganjil)." : " (genap).");
+
+    if (sem.nomor !== 1) {
+      $("mode").querySelector('option[value="deskripsi"]').disabled = true;
+    }
 
     const { data, error } = await sb.from("penugasan_mapel")
-      .select("rombel_id, mapel_id, pegawai_id, rombel:rombel_id(nama), mapel:mapel_id(kode, nama)");
+      .select("rombel_id, mapel_id, pegawai_id, rombel:rombel_id(nama), mapel:mapel_id(kode, nama, urutan)");
     if (error) { setMsg("Gagal memuat penugasan: " + error.message); return; }
-    penugasan = data.filter(x => me.peran === "admin" || x.pegawai_id === me.id);
+    penugasan = (data || []).filter(x => me.peran === "admin" || x.pegawai_id === me.id);
 
     const rombel = new Map();
     penugasan.forEach(x => rombel.set(x.rombel_id, x.rombel.nama));
-    $("rombel").innerHTML = "";
-    rombel.forEach((nama, id) => $("rombel").add(new Option(nama, id)));
+    [...rombel.entries()]
+      .sort((a, b) => a[1].localeCompare(b[1]))
+      .forEach(([id, nama]) => $("rombel").add(new Option(nama, id)));
+
+    $("mode").addEventListener("change", gantiMode);
+    $("rombel").addEventListener("change", isiMapel);
+    $("muat").addEventListener("click", muat);
+    $("simpan").addEventListener("click", simpan);
+
     isiMapel();
+    gantiMode();
   }
 
   function isiMapel() {
     const r = Number($("rombel").value);
     $("mapel").innerHTML = "";
     penugasan.filter(x => x.rombel_id === r)
+      .sort((a, b) => a.mapel.urutan - b.mapel.urutan)
       .forEach(x => $("mapel").add(new Option(x.mapel.nama, x.mapel_id)));
+  }
+
+  function gantiMode() {
+    const deskripsi = $("mode").value === "deskripsi";
+    $("wrapJumlah").style.display = deskripsi ? "none" : "";
+    $("tabel").innerHTML = "";
+    $("simpan").style.display = "none";
+    setMsg("");
   }
 
   async function muat() {
     const rombelId = Number($("rombel").value);
-    const mapelId = Number($("mapel").value);
-    if (!rombelId || !mapelId) { setMsg("Pilih rombel dan mapel."); return; }
+    mapelTampil = Number($("mapel").value);
+    if (!rombelId || !mapelTampil) { setMsg("Pilih rombel dan mapel."); return; }
     setMsg("Memuat...");
 
-    const { data: kr } = await sb.from("keanggotaan_rombel")
+    const { data: kr, error } = await sb.from("keanggotaan_rombel")
       .select("santri_id, santri:santri_id(nis, nama_lengkap)")
       .eq("rombel_id", rombelId);
-    santri = (kr || []).sort((a, b) => a.santri.nama_lengkap.localeCompare(b.santri.nama_lengkap));
+    if (error) { setMsg("Gagal memuat santri: " + error.message); return; }
 
+    santri = (kr || []).sort((a, b) => a.santri.nama_lengkap.localeCompare(b.santri.nama_lengkap));
+    if (!santri.length) {
+      $("tabel").innerHTML = ""; $("simpan").style.display = "none";
+      setMsg("Belum ada santri di rombel ini.");
+      return;
+    }
+
+    const ids = santri.map(s => s.santri_id);
+    if ($("mode").value === "deskripsi") await tampilDeskripsi(ids);
+    else await tampilNilai(ids);
+
+    $("simpan").style.display = "inline-block";
+    setMsg("");
+  }
+
+  // ===== MODE NILAI =====
+  async function tampilNilai(ids) {
     const { data: bn } = await sb.from("bobot_nilai")
       .select("komponen_id, komponen:komponen_id(kode, nama, urutan)")
-      .eq("mapel_id", mapelId);
+      .eq("mapel_id", mapelTampil);
     const komponen = (bn || [])
       .map(b => ({ id: b.komponen_id, ...b.komponen }))
+      .filter(k => k.kode !== "kehadiran")
       .sort((a, b) => a.urutan - b.urutan);
 
     kolomAktif = [];
-    komponen.filter(k => k.kode !== "kehadiran").forEach(k => {
+    komponen.forEach(k => {
       if (k.kode === "ujian_periodik") {
         const n = Number($("jumlahPeriodik").value) || 1;
         for (let i = 1; i <= n; i++)
-          kolomAktif.push({ komponenId: k.id, item: String(i), label: k.nama + " " + i });
+          kolomAktif.push({ komponenId: k.id, item: String(i), label: "Ujian " + i });
       } else {
         kolomAktif.push({ komponenId: k.id, item: "", label: k.nama });
       }
     });
 
-    nilaiLama = {};
-    akhir = {};
-    const ids = santri.map(s => s.santri_id);
-    if (ids.length) {
-      const { data: nl } = await sb.from("nilai")
-        .select("santri_id, komponen_id, item, nilai")
-        .eq("semester_id", semesterId).eq("mapel_id", mapelId).in("santri_id", ids);
-      (nl || []).forEach(n => nilaiLama[kunci(n.santri_id, n.komponen_id, n.item)] = n.nilai);
+    nilaiLama = {}; akhir = {};
+    const { data: nl } = await sb.from("nilai")
+      .select("santri_id, komponen_id, item, nilai")
+      .eq("semester_id", semester.id).eq("mapel_id", mapelTampil).in("santri_id", ids);
+    (nl || []).forEach(n => nilaiLama[kunci(n.santri_id, n.komponen_id, n.item)] = n.nilai);
 
-      const { data: na } = await sb.from("nilai_akhir")
-        .select("santri_id, nilai_akhir, nilai_rapor")
-        .eq("semester_id", semesterId).eq("mapel_id", mapelId).in("santri_id", ids);
-      (na || []).forEach(a => akhir[a.santri_id] = a);
-    }
+    const { data: na } = await sb.from("nilai_akhir")
+      .select("santri_id, nilai_akhir, nilai_rapor")
+      .eq("semester_id", semester.id).eq("mapel_id", mapelTampil).in("santri_id", ids);
+    (na || []).forEach(a => akhir[a.santri_id] = a);
 
-    render();
-    setMsg("");
+    renderNilai();
   }
 
-  function render() {
-    const t = $("tabel");
-    t.innerHTML = "";
-
-    const head = document.createElement("tr");
+  function renderNilai() {
+    const t = $("tabel"); t.innerHTML = "";
+    const hr = document.createElement("tr");
     ["No", "NIS", "Nama", ...kolomAktif.map(k => k.label), "Nilai Akhir (skala 90)", "Rapor (skala 9)"]
-      .forEach(h => { const th = document.createElement("th"); th.textContent = h; head.appendChild(th); });
-    t.appendChild(head);
+      .forEach(h => { const th = document.createElement("th"); th.textContent = h; hr.appendChild(th); });
+    t.appendChild(hr);
 
     santri.forEach((s, i) => {
       const tr = document.createElement("tr");
@@ -151,8 +193,7 @@
         inp.dataset.item = k.item;
         const v = nilaiLama[kunci(s.santri_id, k.komponenId, k.item)];
         if (v !== undefined) inp.value = v;
-        td.appendChild(inp);
-        tr.appendChild(td);
+        td.appendChild(inp); tr.appendChild(td);
       });
 
       const a = akhir[s.santri_id];
@@ -161,52 +202,132 @@
       });
       t.appendChild(tr);
     });
-
-    $("simpan").style.display = santri.length ? "inline-block" : "none";
   }
 
-  async function simpan() {
-  const mapelId = Number($("mapel").value);
-  const rows = [], salah = [];
+  // ===== MODE DESKRIPSI =====
+  async function tampilDeskripsi(ids) {
+    const { data: asp, error } = await sb.from("aspek_deskripsi")
+      .select("id, kode, nama, urutan")
+      .eq("mapel_id", mapelTampil).eq("aktif", true).order("urutan");
+    if (error) { setMsg("Gagal memuat aspek: " + error.message); return; }
 
-  $("tabel").querySelectorAll("input").forEach(inp => {
-    if (inp.value === "") return;
-    const n = Number(inp.value);
-    if (isNaN(n) || n < 0 || n > 100) { salah.push(inp); return; }
-    rows.push({
-      santri_id: Number(inp.dataset.santri),
-      komponen_id: Number(inp.dataset.komponen),
-      item: inp.dataset.item,
-      nilai: n,
-      semester_id: semesterId,
-      mapel_id: mapelId,
-      diisi_oleh: me.id,
-      updated_at: new Date().toISOString()
+    aspekAktif = asp || [];
+    if (!aspekAktif.length) {
+      $("tabel").innerHTML = ""; $("simpan").style.display = "none";
+      setMsg("Mapel ini tidak memakai deskripsi rapor.");
+      return;
+    }
+
+    const { data: ds } = await sb.from("deskripsi_rapor")
+      .select("santri_id, aspek_id, isi")
+      .eq("semester_id", semester.id)
+      .in("santri_id", ids)
+      .in("aspek_id", aspekAktif.map(a => a.id));
+    deskLama = {};
+    (ds || []).forEach(d => deskLama[d.santri_id + "|" + d.aspek_id] = d.isi);
+
+    renderDeskripsi();
+  }
+
+  function renderDeskripsi() {
+    const t = $("tabel"); t.innerHTML = "";
+    const hr = document.createElement("tr");
+    ["No", "Nama", ...aspekAktif.map(a => a.nama)].forEach(h => {
+      const th = document.createElement("th"); th.textContent = h; hr.appendChild(th);
     });
-  });
+    t.appendChild(hr);
 
-  if (salah.length) {
-    salah.forEach(inp => inp.style.background = "#fdd");
-    salah[0].focus();
-    alert("Ada nilai di luar 0 sampai 100. Sel merah perlu diperbaiki.");
-    return;
+    santri.forEach((s, i) => {
+      const tr = document.createElement("tr");
+      [i + 1, s.santri.nama_lengkap].forEach(v => {
+        const td = document.createElement("td"); td.textContent = v; tr.appendChild(td);
+      });
+
+      aspekAktif.forEach(a => {
+        const td = document.createElement("td");
+        const ta = document.createElement("textarea");
+        ta.value = deskLama[s.santri_id + "|" + a.id] || "";
+        ta.dataset.santri = s.santri_id;
+        ta.dataset.aspek = a.id;
+        td.appendChild(ta); tr.appendChild(td);
+      });
+      t.appendChild(tr);
+    });
   }
-  if (!rows.length) { setMsg("Belum ada nilai yang diisi."); return; }
 
-  $("simpan").disabled = true;
-  setMsg("Menyimpan " + rows.length + " nilai...");
-  const { error } = await sb.from("nilai").upsert(rows,
-    { onConflict: "santri_id,semester_id,mapel_id,komponen_id,item" });
-  $("simpan").disabled = false;
+  // ===== SIMPAN =====
+  async function simpan() {
+    $("simpan").disabled = true;
+    try {
+      if ($("mode").value === "deskripsi") await simpanDeskripsi();
+      else await simpanNilai();
+    } finally {
+      $("simpan").disabled = false;
+    }
+  }
 
-  if (error) { setMsg("Gagal menyimpan: " + error.message); return; }
-  setMsg("Tersimpan " + rows.length + " nilai.");
-  muat();
-}
+  async function simpanNilai() {
+    const rows = [], salah = [];
+    $("tabel").querySelectorAll("input").forEach(inp => {
+      inp.style.background = "";
+      if (inp.value === "") return;
+      const n = Number(inp.value);
+      if (isNaN(n) || n < 0 || n > 100) { salah.push(inp); return; }
+      rows.push({
+        santri_id: Number(inp.dataset.santri),
+        komponen_id: Number(inp.dataset.komponen),
+        item: inp.dataset.item,
+        nilai: n,
+        semester_id: semester.id,
+        mapel_id: mapelTampil,
+        diisi_oleh: me.id,
+        updated_at: new Date().toISOString()
+      });
+    });
 
-  $("rombel").addEventListener("change", isiMapel);
-  $("muat").addEventListener("click", muat);
-  $("simpan").addEventListener("click", simpan);
+    if (salah.length) {
+      salah.forEach(i => i.style.background = "#fdd");
+      salah[0].focus();
+      alert("Ada nilai di luar 0 sampai 100. Sel merah perlu diperbaiki.");
+      return;
+    }
+    if (!rows.length) return setMsg("Belum ada nilai yang diisi.");
+
+    setMsg("Menyimpan " + rows.length + " nilai...");
+    const { error } = await sb.from("nilai").upsert(rows,
+      { onConflict: "santri_id,semester_id,mapel_id,komponen_id,item" });
+    if (error) return setMsg("Gagal menyimpan: " + error.message);
+
+    setMsg("Tersimpan " + rows.length + " nilai.");
+    muat();
+  }
+
+  async function simpanDeskripsi() {
+    const rows = [];
+    $("tabel").querySelectorAll("textarea").forEach(t => {
+      const isi = t.value.trim();
+      if (!isi) return;
+      rows.push({
+        santri_id: Number(t.dataset.santri),
+        aspek_id: Number(t.dataset.aspek),
+        mapel_id: mapelTampil,
+        semester_id: semester.id,
+        isi: isi,
+        diisi_oleh: me.id,
+        updated_at: new Date().toISOString()
+      });
+    });
+    if (!rows.length) return setMsg("Belum ada deskripsi yang diisi.");
+
+    setMsg("Menyimpan " + rows.length + " deskripsi...");
+    const { error } = await sb.from("deskripsi_rapor")
+      .upsert(rows, { onConflict: "santri_id,semester_id,aspek_id" });
+    if (error) return setMsg("Gagal menyimpan: " + error.message);
+
+    setMsg("Tersimpan " + rows.length + " deskripsi.");
+    muat();
+  }
+
   init();
 </script>
 </body>
