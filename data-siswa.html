@@ -40,6 +40,13 @@
 
 <div class="panel" id="p-calon">
   <p class="muted" id="infoCalon"></p>
+  <div id="bulkBar" style="display:none; margin-bottom:8px;">
+    <label>Rombel untuk santri yang dicentang
+      <select id="bulkRombel"></select>
+    </label>
+    <button id="bulkSet">Terapkan rombel</button>
+    <button id="bulkAktif">Aktifkan yang dicentang</button>
+  </div>
   <div style="overflow-x:auto"><table id="tabelCalon"></table></div>
 </div>
 
@@ -313,7 +320,7 @@
   }
 
   // ===== CALON SANTRI =====
-  async function tampilCalon() {
+    async function tampilCalon() {
     buka("calon");
     setMsg("Memuat...");
     const { data, error } = await sb.from("santri")
@@ -323,37 +330,124 @@
     if (error) return setMsg("Gagal memuat: " + error.message);
 
     calonList = data || [];
+    const admin = me.peran === "admin";
     $("infoCalon").textContent = calonList.length + " calon santri TA " + ta.kode + ".";
+    $("bulkBar").style.display = admin ? "block" : "none";
+
+    $("bulkRombel").innerHTML = "";
+    $("bulkRombel").add(new Option("-- pilih rombel --", ""));
+    rombelList.forEach(r => $("bulkRombel").add(new Option(r.nama, r.id)));
 
     const t = $("tabelCalon");
     t.innerHTML = "";
-    const kolom = ["No", "Nama", "Mendaftar untuk", "HP Orang Tua", "Tanggal daftar"];
-    if (me.peran === "admin") kolom.push("Aksi");
 
     const hr = document.createElement("tr");
+    if (admin) {
+      const thCb = document.createElement("th");
+      const cbAll = document.createElement("input");
+      cbAll.type = "checkbox";
+      cbAll.onchange = () => t.querySelectorAll("input[data-calon]").forEach(c => c.checked = cbAll.checked);
+      thCb.appendChild(cbAll);
+      hr.appendChild(thCb);
+    }
+    const kolom = ["No", "Nama", "Mendaftar untuk", "HP Orang Tua", "Tanggal daftar"];
+    if (admin) kolom.push("Rombel", "Aksi");
     kolom.forEach(h => { const th = document.createElement("th"); th.textContent = h; hr.appendChild(th); });
     t.appendChild(hr);
 
     calonList.forEach((s, i) => {
       const tr = document.createElement("tr");
-      [i + 1, s.nama_lengkap, namaTingkat(s.tingkat_masuk), s.hp_orang_tua || "-",
-       (s.created_at || "").slice(0, 10)]
+      if (admin) {
+        const td0 = document.createElement("td");
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.dataset.calon = s.id;
+        td0.appendChild(cb);
+        tr.appendChild(td0);
+      }
+
+      [i + 1, s.nama_lengkap, namaTingkat(s.tingkat_masuk), s.hp_orang_tua || "-", (s.created_at || "").slice(0, 10)]
         .forEach(v => { const td = document.createElement("td"); td.textContent = v; tr.appendChild(td); });
 
-      if (me.peran === "admin") {
-        const td = document.createElement("td");
-        const bA = document.createElement("button");
-        bA.textContent = "Aktifkan";
-        bA.onclick = () => bukaAktivasi(s.id);
-        const bE = document.createElement("button");
-        bE.textContent = "Edit";
-        bE.onclick = () => bukaEdit(s.id);
-        td.append(bA, " ", bE);
-        tr.appendChild(td);
+      if (admin) {
+        const tdR = document.createElement("td");
+        const sel = document.createElement("select");
+        sel.dataset.rombelCalon = s.id;
+        sel.add(new Option("-- pilih --", ""));
+        const cocok = rombelList.filter(r => r.tingkat_kode === s.tingkat_masuk);
+        cocok.forEach(r => sel.add(new Option(r.nama, r.id)));
+        if (cocok.length === 1) sel.value = String(cocok[0].id);
+        tdR.appendChild(sel);
+        tr.appendChild(tdR);
+
+        const tdA = document.createElement("td");
+        const b = document.createElement("button");
+        b.textContent = "Edit";
+        b.onclick = () => bukaEdit(s.id);
+        tdA.appendChild(b);
+        tr.appendChild(tdA);
       }
       t.appendChild(tr);
     });
+
+    $("bulkSet").onclick = terapkanRombel;
+    $("bulkAktif").onclick = aktifkanTerpilih;
     setMsg("");
+  }
+
+  function terapkanRombel() {
+    const rid = Number($("bulkRombel").value);
+    if (!rid) return setMsg("Pilih rombel tujuan terlebih dahulu.");
+    const r = rombelList.find(x => x.id === rid);
+    const dilewati = [];
+    let cocok = 0;
+
+    $("tabelCalon").querySelectorAll("input[data-calon]:checked").forEach(c => {
+      const s = calonList.find(x => String(x.id) === c.dataset.calon);
+      const sel = $("tabelCalon").querySelector('select[data-rombel-calon="' + s.id + '"]');
+      if (r.tingkat_kode === s.tingkat_masuk) {
+        sel.value = String(rid);
+        cocok++;
+      } else {
+        dilewati.push(s.nama_lengkap);
+      }
+    });
+
+    setMsg("Rombel diterapkan ke " + cocok + " santri." +
+      (dilewati.length ? " Dilewati karena tingkat tidak sesuai: " + dilewati.join(", ") + "." : ""));
+  }
+
+  async function aktifkanTerpilih() {
+    if (me.peran !== "admin") return;
+
+    const pilih = [];
+    $("tabelCalon").querySelectorAll("input[data-calon]:checked").forEach(c => {
+      const id = Number(c.dataset.calon);
+      const sel = $("tabelCalon").querySelector('select[data-rombel-calon="' + id + '"]');
+      pilih.push({ id, rombel: Number(sel.value) || null });
+    });
+
+    if (!pilih.length) return setMsg("Centang santri yang akan diaktifkan.");
+    if (pilih.some(p => !p.rombel)) return setMsg("Ada santri yang belum punya rombel. Lengkapi dulu.");
+    if (!confirm("Aktifkan " + pilih.length + " santri?")) return;
+
+    $("bulkAktif").disabled = true;
+    let ok = 0;
+    const gagal = [];
+    for (const p of pilih) {
+      const { error } = await sb.rpc("aktifkan_santri", { p_santri: p.id, p_rombel: p.rombel });
+      if (error) {
+        const nama = (calonList.find(x => x.id === p.id) || {}).nama_lengkap || p.id;
+        gagal.push(nama + ": " + error.message);
+      } else {
+        ok++;
+      }
+    }
+    $("bulkAktif").disabled = false;
+
+    await tampilCalon();
+    setMsg("Berhasil mengaktifkan " + ok + " santri." +
+      (gagal.length ? " Gagal: " + gagal.join("; ") : ""));
   }
 
   // ===== TAMBAH & EDIT =====
