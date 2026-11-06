@@ -42,4 +42,345 @@
 
 <div class="wizard-container">
   <div class="stepper" id="mainStepper" style="display:none;">
-    <div
+    <div class="step-item active"><div class="step-circle"><i class="fa-solid fa-user"></i></div><div class="step-label">Biodata</div></div>
+    <div class="step-item"><div class="step-circle"><i class="fa-solid fa-house-chimney"></i></div><div class="step-label">Alamat</div></div>
+    <div class="step-item"><div class="step-circle"><i class="fa-solid fa-users"></i></div><div class="step-label">Keluarga</div></div>
+    <div class="step-item"><div class="step-circle"><i class="fa-solid fa-graduation-cap"></i></div><div class="step-label">Akademik</div></div>
+  </div>
+
+  <div id="thankYou" style="display:none; text-align:center; padding: 40px 20px;">
+    <div style="font-size: 60px; color: #28a745;"><i class="fa-solid fa-circle-check"></i></div>
+    <h2 class="mt-3" style="font-weight: bold; color: #333;">Alhamdulillah!</h2>
+    <p class="text-muted">Data pendaftaran Ananda telah kami terima.</p>
+    <p class="mb-4">Silakan konfirmasi ke Admin PPDB melalui WhatsApp di bawah ini.</p>
+    <a href="https://wa.me/6285121117095?text=Assalamu'alaikum%20Admin%20PPDB%20Kuttab%20Al-Kalam.%20Saya%20sudah%20mengisi%20formulir%20pendaftaran%20Ananda%20melalui%20website."
+       target="_blank" class="btn btn-success btn-lg px-4 py-2 shadow-sm">
+      <i class="fa-brands fa-whatsapp me-2"></i> Hubungi Admin via WhatsApp
+    </a>
+  </div>
+
+  <form id="ppdbForm" style="display:none;">
+    <input type="text" id="website" name="website" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px;">
+
+    <div class="form-section active">
+      <h5 class="mb-4 text-success"><i class="fa-solid fa-circle-info me-2"></i>Identitas Siswa</h5>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Nama Lengkap (Sesuai Akta)</label>
+          <input type="text" id="nama_lengkap" class="form-control" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Nama Panggilan</label>
+          <input type="text" id="nama_panggilan" class="form-control" placeholder="Contoh: ZAYN" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Jenis Kelamin</label>
+          <select id="jenis_kelamin" class="form-select" required>
+            <option value="">-- Pilih --</option>
+            <option value="L">Laki-laki</option>
+            <option value="P">Perempuan</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">NIK Siswa (16 Digit)</label>
+          <input type="text" id="nik" class="form-control" maxlength="16" pattern="\d{16}" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Tempat Lahir</label>
+          <input type="text" id="tempat_lahir" class="form-control" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Tanggal Lahir</label>
+          <input type="date" id="tanggal_lahir" class="form-control" required>
+        </div>
+        <div class="col-md-12">
+          <label class="form-label">Nomor Registrasi Akta Kelahiran</label>
+          <input type="text" id="no_registrasi_akta" class="form-control" placeholder="Contoh: 3674-LU-21102020-0027" required>
+        </div>
+        <div class="col-md-12">
+          <label class="form-label">NISN (Nomor Induk Siswa Nasional)</label>
+          <input type="text" id="nisn" class="form-control" placeholder="Kosongkan jika belum memiliki NISN">
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h5 class="mb-4 text-success"><i class="fa-solid fa-map-location-dot me-2"></i>Alamat & Domisili</h5>
+      <div class="row g-3">
+        <div class="col-12">
+          <label class="form-label">Alamat Jalan / Perumahan / Kampung (Sesuai KK)</label>
+          <input type="text" id="alamat_kk" class="form-control" required>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">RT</label>
+          <input type="text" id="rt_kk" class="form-control" maxlength="3" pattern="\d{1,3}" placeholder="000" required>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">RW</label>
+          <input type="text" id="rw_kk" class="form-control" maxlength="3" pattern="\d{1,3}" placeholder="000" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Desa / Kelurahan</label>
+          <input type="text" id="desa_kk" class="form-control" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Kecamatan</label>
+          <input type="text" id="kec_kk" class="form-control" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Kode Pos</label>
+          <input type="text" id="pos_kk" class="form-control" maxlength="5" pattern="\d{5}" required>
+        </div>
+        <div class="col-12 mt-4">
+          <label class="form-label" style="color:#155724; background:#d4edda; padding:8px; display:block; border-radius:4px;">
+            Apakah alamat domisili (tempat tinggal sekarang) sama dengan alamat KK?
+          </label>
+          <select id="sama" class="form-select" required>
+            <option value="ya">Ya, sama dengan KK</option>
+            <option value="tidak">Tidak, berbeda dengan KK</option>
+          </select>
+        </div>
+        <div class="col-12" id="domisiliGroup" style="display:none;">
+          <label class="form-label text-danger">Alamat Domisili Sekarang</label>
+          <input type="text" id="alamat_domisili" class="form-control" placeholder="Nama jalan, RT/RW, dan kelurahan saat ini">
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h5 class="mb-4 text-success"><i class="fa-solid fa-people-roof me-2"></i>Data Orang Tua</h5>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Nama Ibu Kandung</label>
+          <input type="text" id="nama_ibu" class="form-control" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">NIK Ibu Kandung</label>
+          <input type="text" id="nik_ibu" class="form-control" maxlength="16" pattern="\d{16}" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Nama Ayah Kandung</label>
+          <input type="text" id="nama_ayah" class="form-control" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">NIK Ayah Kandung</label>
+          <input type="text" id="nik_ayah" class="form-control" maxlength="16" pattern="\d{16}" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Pekerjaan Ayah</label>
+          <select id="pekerjaan_ayah" class="form-select" required>
+            <option value="">-- Pilih --</option>
+            <option value="PNS">PNS / ASN</option>
+            <option value="Swasta">Karyawan Swasta</option>
+            <option value="Wirausaha">Wirausaha / Dagang</option>
+            <option value="Freelance">Pekerja Lepas / Freelance</option>
+            <option value="Tidak Bekerja">Tidak Bekerja</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">No. HP Orang Tua (WhatsApp Aktif)</label>
+          <input type="tel" id="hp_orang_tua" class="form-control" placeholder="08xxxxxxxx" required>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h5 class="mb-4 text-success"><i class="fa-solid fa-school-circle-check me-2"></i>Rencana Akademik</h5>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Mendaftar Untuk Tingkat</label>
+          <select id="tingkat_masuk" class="form-select" required>
+            <option value="">-- Pilih Tingkat --</option>
+            <option value="0">Kuttab Awal 1</option>
+            <option value="1">Kuttab Awal 2</option>
+            <option value="2">Kuttab Awal 3</option>
+            <option value="3">Kuttab Qonuni 1</option>
+            <option value="4">Kuttab Qonuni 2</option>
+            <option value="5">Kuttab Qonuni 3</option>
+            <option value="6">Kuttab Qonuni 4</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Jenis Pendaftaran</label>
+          <select id="jenis_pendaftaran" class="form-select" required>
+            <option value="">-- Pilih Jenis --</option>
+            <option value="Siswa Baru">Siswa Baru</option>
+            <option value="Pindahan">Pindahan</option>
+          </select>
+        </div>
+        <div class="col-md-12">
+          <label class="form-label">Tahun Ajaran</label>
+          <input type="text" id="tahunTampil" class="form-control" readonly>
+        </div>
+      </div>
+    </div>
+
+    <div class="navigation-btns">
+      <button type="button" class="btn-prev" id="prevBtn" style="display:none;">
+        <i class="fa-solid fa-arrow-left me-2"></i> Sebelumnya
+      </button>
+      <button type="button" class="btn-next" id="nextBtn">
+        Lanjut <i class="fa-solid fa-arrow-right ms-2"></i>
+      </button>
+      <button type="submit" class="btn-submit" id="submitBtn" style="display:none;">
+        <i class="fa-solid fa-check me-2"></i> Submit Data Santri
+      </button>
+    </div>
+  </form>
+</div>
+
+<script>
+  const SUPABASE_URL = "https://epynlmuqxumuwcjsrnsz.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_Oq_to1zgHLnachvWYLV_yA_DoOTGI3s";
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+  });
+
+  const $ = id => document.getElementById(id);
+  const sections = [...document.querySelectorAll(".form-section")];
+  const steps = [...document.querySelectorAll(".step-item")];
+  let current = 0, tahunAjaran = null;
+
+  const upper = v => (v || "").trim().toUpperCase();
+  const titleCase = v => (v || "").trim().toLowerCase().replace(/(^|\s)\S/g, m => m.toUpperCase());
+  const kosong = v => { const t = (v || "").trim(); return t === "" ? null : t; };
+
+  function tampil(n) {
+    sections.forEach((s, i) => s.classList.toggle("active", i === n));
+    steps.forEach((s, i) => {
+      s.classList.toggle("active", i === n);
+      s.classList.toggle("completed", i < n);
+    });
+    $("prevBtn").style.display = n === 0 ? "none" : "inline-block";
+    $("nextBtn").style.display = n === sections.length - 1 ? "none" : "inline-block";
+    $("submitBtn").style.display = n === sections.length - 1 ? "inline-block" : "none";
+    window.scrollTo(0, 0);
+  }
+
+  function validasiBagian(i) {
+    const fields = sections[i].querySelectorAll("input, select, textarea");
+    for (const f of fields) {
+      if (!f.checkValidity()) { f.reportValidity(); return false; }
+    }
+    return true;
+  }
+
+  function lanjut(n) {
+    if (n === 1 && !validasiBagian(current)) return;
+    current = Math.min(Math.max(current + n, 0), sections.length - 1);
+    tampil(current);
+  }
+
+  function gabungAlamatKK() {
+    return `${$("alamat_kk").value.trim()} RT/RW ${$("rt_kk").value.trim()}/${$("rw_kk").value.trim()}, ` +
+           `${$("desa_kk").value.trim()}, ${$("kec_kk").value.trim()} ${$("pos_kk").value.trim()}`;
+  }
+
+  function updateDomisili() {
+    const sama = $("sama").value === "ya";
+    $("domisiliGroup").style.display = sama ? "none" : "block";
+    $("alamat_domisili").required = !sama;
+    if (sama) $("alamat_domisili").value = gabungAlamatKK();
+    else if ($("alamat_domisili").value.includes("RT/RW")) $("alamat_domisili").value = "";
+  }
+
+  function tampilTutup() {
+    $("loading").style.display = "none";
+    $("ppdbForm").style.display = "none";
+    $("mainStepper").style.display = "none";
+    $("thankYou").innerHTML =
+      '<h2 style="font-weight:bold;color:#333;">Pendaftaran Ditutup</h2>' +
+      '<p class="text-muted">Saat ini pendaftaran santri baru belum dibuka. Silakan hubungi admin untuk informasi lebih lanjut.</p>' +
+      '<a href="https://wa.me/6285121117095" target="_blank" class="btn btn-success">Hubungi Admin via WhatsApp</a>';
+    $("thankYou").style.display = "block";
+  }
+
+  async function init() {
+    const { data: buka, error: e1 } = await sb.rpc("pendaftaran_buka");
+    const { data: ta, error: e2 } = await sb.rpc("tahun_pendaftaran");
+
+    if (e1 || e2 || !buka || !ta) {
+      tampilTutup();
+      return;
+    }
+
+    tahunAjaran = ta;
+    $("tahunTampil").value = ta.replace("-", "/");
+    $("loading").style.display = "none";
+    $("ppdbForm").style.display = "block";
+    $("mainStepper").style.display = "flex";
+    updateDomisili();
+    tampil(0);
+  }
+
+  async function kirim(e) {
+    e.preventDefault();
+    if ($("website").value) return;
+
+    for (let i = 0; i < sections.length; i++) {
+      if (!validasiBagian(i)) { current = i; tampil(i); validasiBagian(i); return; }
+    }
+    if ($("sama").value === "ya") updateDomisili();
+
+    const btn = $("submitBtn");
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i> Memproses...';
+
+    const tingkat = Number($("tingkat_masuk").value);
+    const row = {
+      nama_lengkap: titleCase($("nama_lengkap").value),
+      nama_panggilan: upper($("nama_panggilan").value),
+      jenis_kelamin: $("jenis_kelamin").value,
+      nik: $("nik").value.trim(),
+      nisn: kosong($("nisn").value),
+      tempat_lahir: upper($("tempat_lahir").value),
+      tanggal_lahir: $("tanggal_lahir").value,
+      no_registrasi_akta: $("no_registrasi_akta").value.trim(),
+      agama: "Islam",
+      alamat_kk: $("alamat_kk").value.trim(),
+      rt_kk: $("rt_kk").value.trim(),
+      rw_kk: $("rw_kk").value.trim(),
+      desa_kelurahan: upper($("desa_kk").value),
+      kecamatan: upper($("kec_kk").value),
+      kode_pos: $("pos_kk").value.trim(),
+      alamat: $("alamat_domisili").value.trim(),
+      nama_ibu: upper($("nama_ibu").value),
+      nik_ibu: $("nik_ibu").value.trim(),
+      nama_ayah: upper($("nama_ayah").value),
+      nik_ayah: $("nik_ayah").value.trim(),
+      pekerjaan_ayah: $("pekerjaan_ayah").value,
+      hp_orang_tua: $("hp_orang_tua").value.trim(),
+      tingkat_masuk: tingkat,
+      tingkat_sekarang: tingkat,
+      tahun_ajaran_masuk: tahunAjaran,
+      status: "Calon Santri",
+      jenis_pendaftaran: $("jenis_pendaftaran").value
+    };
+
+    const { error } = await sb.from("santri").insert(row);
+    if (error) {
+      console.error(error);
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-check me-2"></i> Submit Data Santri';
+      alert("Gagal menyimpan data. Periksa kembali isian Anda, atau hubungi admin.");
+      return;
+    }
+
+    $("ppdbForm").style.display = "none";
+    $("mainStepper").style.display = "none";
+    $("mainHeader").style.display = "none";
+    $("thankYou").style.display = "block";
+    window.scrollTo(0, 0);
+  }
+
+  $("prevBtn").addEventListener("click", () => lanjut(-1));
+  $("nextBtn").addEventListener("click", () => lanjut(1));
+  $("sama").addEventListener("change", updateDomisili);
+  ["alamat_kk", "rt_kk", "rw_kk", "desa_kk", "kec_kk", "pos_kk"].forEach(id =>
+    $(id).addEventListener("input", () => { if ($("sama").value === "ya") updateDomisili(); }));
+  $("ppdbForm").addEventListener("submit", kirim);
+
+  init();
+</script>
+</body>
+</html>
