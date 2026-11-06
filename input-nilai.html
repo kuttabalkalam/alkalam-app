@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Input Nilai - Kuttab Al-Kalam</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
+<style>
+  body { font-family: sans-serif; margin: 20px; }
+  select, input, button { padding: 6px; margin: 4px 0; }
+  table { border-collapse: collapse; margin-top: 12px; font-size: 14px; }
+  th, td { border: 1px solid #bbb; padding: 4px 6px; }
+  td input { width: 70px; }
+  .muted { color: #666; font-size: 13px; }
+  #msg { margin: 10px 0; font-weight: bold; }
+</style>
+</head>
+<body>
+<a href="dashboard.html">← Dashboard</a>
+<h2>Input Nilai</h2>
+
+<div>
+  <label>Rombel <select id="rombel"></select></label>
+  <label>Mapel <select id="mapel"></select></label>
+  <label>Jumlah ujian periodik <input id="jumlahPeriodik" type="number" min="1" max="10" value="4" style="width:60px"></label>
+  <button id="muat">Tampilkan</button>
+</div>
+<p class="muted" id="info"></p>
+<div style="overflow-x:auto"><table id="tabel"></table></div>
+<button id="simpan" style="display:none">Simpan Nilai</button>
+<p id="msg"></p>
+
+<script>
+  const SUPABASE_URL = "https://epynlmuqxumuwcjsrnsz.supabase.co";
+  const SUPABASE_ANON_KEY = "ISI_ANON_KEY";
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const $ = id => document.getElementById(id);
+  const setMsg = t => $("msg").textContent = t;
+  const kunci = (s, k, i) => s + "|" + k + "|" + i;
+
+  let me, semesterId, penugasan = [], santri = [], kolomAktif = [];
+  let nilaiLama = {}, akhir = {};
+
+  async function init() {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { location.href = "login.html"; return; }
+
+    const { data: p } = await sb.from("pegawai")
+      .select("id, peran").eq("auth_user_id", session.user.id).single();
+    if (!p || !["admin", "guru"].includes(p.peran)) {
+      $("info").textContent = "Halaman ini hanya untuk admin dan guru.";
+      $("muat").disabled = true;
+      return;
+    }
+    me = p;
+
+    const { data: sem } = await sb.from("semester").select("id, nomor").eq("aktif", true).single();
+    if (!sem) { $("info").textContent = "Belum ada semester aktif. Hubungi admin."; return; }
+    semesterId = sem.id;
+    $("info").textContent = "Semester " + sem.nomor + ". Isi nilai dalam skala 0 sampai 100.";
+
+    const { data, error } = await sb.from("penugasan_mapel")
+      .select("rombel_id, mapel_id, pegawai_id, rombel:rombel_id(nama), mapel:mapel_id(kode, nama)");
+    if (error) { setMsg("Gagal memuat penugasan: " + error.message); return; }
+    penugasan = data.filter(x => me.peran === "admin" || x.pegawai_id === me.id);
+
+    const rombel = new Map();
+    penugasan.forEach(x => rombel.set(x.rombel_id, x.rombel.nama));
+    $("rombel").innerHTML = "";
+    rombel.forEach((nama, id) => $("rombel").add(new Option(nama, id)));
+    isiMapel();
+  }
+
+  function isiMapel() {
+    const r = Number($("rombel").value);
+    $("mapel").innerHTML = "";
+    penugasan.filter(x => x.rombel_id === r)
+      .forEach(x => $("mapel").add(new Option(x.mapel.nama, x.mapel_id)));
+  }
+
+  async function muat() {
+    const rombelId = Number($("rombel").value);
+    const mapelId = Number($("mapel").value);
+    if (!rombelId || !mapelId) { setMsg("Pilih rombel dan mapel."); return; }
+    setMsg("Memuat...");
+
+    const { data: kr } = await sb.from("keanggotaan_rombel")
+      .select("santri_id, santri:santri_id(nis, nama_lengkap)")
+      .eq("rombel_id", rombelId);
+    santri = (kr || []).sort((a, b) => a.santri.nama_lengkap.localeCompare(b.santri.nama_lengkap));
+
+    const { data: bn } = await sb.from("bobot_nilai")
+      .select("komponen_id, komponen:komponen_id(kode, nama, urutan)")
+      .eq("mapel_id", mapelId);
+    const komponen = (bn || [])
+      .map(b => ({ id: b.komponen_id, ...b.komponen }))
+      .sort((a, b) => a.urutan - b.urutan);
+
+    kolomAktif = [];
+    komponen.forEach(k => {
+      if (k.kode === "ujian_periodik") {
+        const n = Number($("jumlahPeriodik").value) || 1;
+        for (let i = 1; i <= n; i++)
+          kolomAktif.push({ komponenId: k.id, item: String(i), label: k.nama + " " + i });
+      } else {
+        kolomAktif.push({ komponenId: k.id, item: "", label: k.nama });
+      }
+    });
+
+    nilaiLama = {};
+    akhir = {};
+    const ids = santri.map(s => s.santri_id);
+    if (ids.length) {
+      const { data: nl } = await sb.from("nilai")
+        .select("santri_id, komponen_id, item, nilai")
+        .eq("semester_id", semesterId).eq("mapel_id", mapelId).in("santri_id", ids);
+      (nl || []).forEach(n => nilaiLama[kunci(n.santri_id, n.komponen_id, n.item)] = n.nilai);
+
+      const { data: na } = await sb.from("nilai_akhir")
+        .select("santri_id, nilai_akhir, nilai_rapor")
+        .eq("semester_id", semesterId).eq("mapel_id", mapelId).in("santri_id", ids);
+      (na || []).forEach(a => akhir[a.santri_id] = a);
+    }
+
+    render();
+    setMsg("");
+  }
+
+  function render() {
+    const t = $("tabel");
+    t.innerHTML = "";
+
+    const head = document.createElement("tr");
+    ["No", "NIS", "Nama", ...kolomAktif.map(k => k.label), "Nilai Akhir (skala 90)", "Rapor (skala 9)"]
+      .forEach(h => { const th = document.createElement("th"); th.textContent = h; head.appendChild(th); });
+    t.appendChild(head);
+
+    santri.forEach((s, i) => {
+      const tr = document.createElement("tr");
+      [i + 1, s.santri.nis, s.santri.nama_lengkap].forEach(v => {
+        const td = document.createElement("td"); td.textContent = v; tr.appendChild(td);
+      });
+
+      kolomAktif.forEach(k => {
+        const td = document.createElement("td");
+        const inp = document.createElement("input");
+        inp.type = "number"; inp.min = 0; inp.max = 100; inp.step = "0.01";
+        inp.dataset.santri = s.santri_id;
+        inp.dataset.komponen = k.komponenId;
+        inp.dataset.item = k.item;
+        const v = nilaiLama[kunci(s.santri_id, k.komponenId, k.item)];
+        if (v !== undefined) inp.value = v;
+        td.appendChild(inp);
+        tr.appendChild(td);
+      });
+
+      const a = akhir[s.santri_id];
+      [a ? a.nilai_akhir : "-", a ? a.nilai_rapor : "-"].forEach(v => {
+        const td = document.createElement("td"); td.textContent = v; tr.appendChild(td);
+      });
+      t.appendChild(tr);
+    });
+
+    $("simpan").style.display = santri.length ? "inline-block" : "none";
+  }
+
+  async function simpan() {
+    const mapelId = Number($("mapel").value);
+    const rows = [], salah = [];
+
+    $("tabel").querySelectorAll("input").forEach(inp => {
+      if (inp.value === "") return;
+      const n = Number(inp.value);
+      if (isNaN(n) || n < 0 || n > 100) { salah.push(inp); return; }
+      rows.push({
+        santri_id: Number(inp.dataset.santri),
+        komponen_id: Number(inp.dataset.komponen),
+        item: inp.dataset.item,
+        nilai: n,
+        semester_id: semesterId,
+        mapel_id: mapelId,
+        diisi_oleh: me.id,
+        updated_at: new Date().toISOString()
+      });
+    });
+
+    if (salah.length) { salah[0].focus(); setMsg("Ada nilai di luar 0 sampai 100."); return; }
+    if (!rows.length) { setMsg("Belum ada nilai yang diisi."); return; }
+
+    $("simpan").disabled = true;
+    setMsg("Menyimpan " + rows.length + " nilai...");
+    const { error } = await sb.from("nilai").upsert(rows,
+      { onConflict: "santri_id,semester_id,mapel_id,komponen_id,item" });
+    $("simpan").disabled = false;
+
+    if (error) { setMsg("Gagal menyimpan: " + error.message); return; }
+    setMsg("Tersimpan " + rows.length + " nilai.");
+    muat();
+  }
+
+  $("rombel").addEventListener("change", isiMapel);
+  $("muat").addEventListener("click", muat);
+  $("simpan").addEventListener("click", simpan);
+  init();
+</script>
+</body>
+</html>
