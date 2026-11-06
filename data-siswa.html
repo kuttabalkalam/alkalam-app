@@ -40,11 +40,10 @@
 
 <div class="panel" id="p-calon">
   <p class="muted" id="infoCalon"></p>
-  <div id="bulkBar" style="display:none; margin-bottom:8px;">
+    <div id="bulkBar" style="display:none; margin-bottom:8px;">
     <label>Rombel untuk santri yang dicentang
       <select id="bulkRombel"></select>
     </label>
-    <button id="bulkSet">Terapkan rombel</button>
     <button id="bulkAktif">Aktifkan yang dicentang</button>
   </div>
   <div style="overflow-x:auto"><table id="tabelCalon"></table></div>
@@ -320,7 +319,7 @@
   }
 
   // ===== CALON SANTRI =====
-    async function tampilCalon() {
+      async function tampilCalon() {
     buka("calon");
     setMsg("Memuat...");
     const { data, error } = await sb.from("santri")
@@ -336,7 +335,7 @@
 
     $("bulkRombel").innerHTML = "";
     $("bulkRombel").add(new Option("-- pilih rombel --", ""));
-    rombelList.forEach(r => $("bulkRombel").add(new Option(r.nama, r.id)));
+    rombelList.forEach(r => $("bulkRombel").add(new Option(r.nama + " (tingkat " + namaTingkat(r.tingkat_kode) + ")", r.id)));
 
     const t = $("tabelCalon");
     t.innerHTML = "";
@@ -351,7 +350,7 @@
       hr.appendChild(thCb);
     }
     const kolom = ["No", "Nama", "Mendaftar untuk", "HP Orang Tua", "Tanggal daftar"];
-    if (admin) kolom.push("Rombel", "Aksi");
+    if (admin) kolom.push("Aksi");
     kolom.forEach(h => { const th = document.createElement("th"); th.textContent = h; hr.appendChild(th); });
     t.appendChild(hr);
 
@@ -370,16 +369,6 @@
         .forEach(v => { const td = document.createElement("td"); td.textContent = v; tr.appendChild(td); });
 
       if (admin) {
-        const tdR = document.createElement("td");
-        const sel = document.createElement("select");
-        sel.dataset.rombelCalon = s.id;
-        sel.add(new Option("-- pilih --", ""));
-        const cocok = rombelList.filter(r => r.tingkat_kode === s.tingkat_masuk);
-        cocok.forEach(r => sel.add(new Option(r.nama, r.id)));
-        if (cocok.length === 1) sel.value = String(cocok[0].id);
-        tdR.appendChild(sel);
-        tr.appendChild(tdR);
-
         const tdA = document.createElement("td");
         const b = document.createElement("button");
         b.textContent = "Edit";
@@ -390,63 +379,43 @@
       t.appendChild(tr);
     });
 
-    $("bulkSet").onclick = terapkanRombel;
     $("bulkAktif").onclick = aktifkanTerpilih;
     setMsg("");
-  }
-
-  function terapkanRombel() {
-    const rid = Number($("bulkRombel").value);
-    if (!rid) return setMsg("Pilih rombel tujuan terlebih dahulu.");
-    const r = rombelList.find(x => x.id === rid);
-    const dilewati = [];
-    let cocok = 0;
-
-    $("tabelCalon").querySelectorAll("input[data-calon]:checked").forEach(c => {
-      const s = calonList.find(x => String(x.id) === c.dataset.calon);
-      const sel = $("tabelCalon").querySelector('select[data-rombel-calon="' + s.id + '"]');
-      if (r.tingkat_kode === s.tingkat_masuk) {
-        sel.value = String(rid);
-        cocok++;
-      } else {
-        dilewati.push(s.nama_lengkap);
-      }
-    });
-
-    setMsg("Rombel diterapkan ke " + cocok + " santri." +
-      (dilewati.length ? " Dilewati karena tingkat tidak sesuai: " + dilewati.join(", ") + "." : ""));
   }
 
   async function aktifkanTerpilih() {
     if (me.peran !== "admin") return;
 
-    const pilih = [];
-    $("tabelCalon").querySelectorAll("input[data-calon]:checked").forEach(c => {
-      const id = Number(c.dataset.calon);
-      const sel = $("tabelCalon").querySelector('select[data-rombel-calon="' + id + '"]');
-      pilih.push({ id, rombel: Number(sel.value) || null });
-    });
+    const rid = Number($("bulkRombel").value);
+    if (!rid) return setMsg("Pilih rombel tujuan terlebih dahulu.");
+    const rombel = rombelList.find(x => x.id === rid);
 
-    if (!pilih.length) return setMsg("Centang santri yang akan diaktifkan.");
-    if (pilih.some(p => !p.rombel)) return setMsg("Ada santri yang belum punya rombel. Lengkapi dulu.");
-    if (!confirm("Aktifkan " + pilih.length + " santri?")) return;
+    const ids = [...$("tabelCalon").querySelectorAll("input[data-calon]:checked")]
+      .map(c => Number(c.dataset.calon));
+    if (!ids.length) return setMsg("Centang santri yang akan diaktifkan.");
+
+    const pilih = ids.map(id => calonList.find(x => x.id === id)).filter(Boolean);
+    const tidakCocok = pilih.filter(s => s.tingkat_masuk !== rombel.tingkat_kode);
+    if (tidakCocok.length) {
+      return setMsg("Tingkat santri tidak sesuai dengan rombel " + rombel.nama + ": " +
+        tidakCocok.map(s => s.nama_lengkap).join(", ") +
+        ". Hapus centangnya atau pilih rombel lain.");
+    }
+
+    if (!confirm("Aktifkan " + pilih.length + " santri ke " + rombel.nama + "?")) return;
 
     $("bulkAktif").disabled = true;
     let ok = 0;
     const gagal = [];
-    for (const p of pilih) {
-      const { error } = await sb.rpc("aktifkan_santri", { p_santri: p.id, p_rombel: p.rombel });
-      if (error) {
-        const nama = (calonList.find(x => x.id === p.id) || {}).nama_lengkap || p.id;
-        gagal.push(nama + ": " + error.message);
-      } else {
-        ok++;
-      }
+    for (const s of pilih) {
+      const { error } = await sb.rpc("aktifkan_santri", { p_santri: s.id, p_rombel: rid });
+      if (error) gagal.push(s.nama_lengkap + ": " + error.message);
+      else ok++;
     }
     $("bulkAktif").disabled = false;
 
     await tampilCalon();
-    setMsg("Berhasil mengaktifkan " + ok + " santri." +
+    setMsg("Berhasil mengaktifkan " + ok + " santri ke " + rombel.nama + "." +
       (gagal.length ? " Gagal: " + gagal.join("; ") : ""));
   }
 
