@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Data Siswa - Kuttab Al-Kalam</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
+<style>
+  body { font-family: sans-serif; margin: 20px; }
+  select, input, textarea, button { padding: 6px; margin: 4px 0; font-family: inherit; }
+  table { border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+  th, td { border: 1px solid #bbb; padding: 4px 6px; vertical-align: top; }
+  td input[type=number] { width: 70px; }
+  .tabs button { margin-right: 6px; }
+  .tabs button.aktif { font-weight: bold; text-decoration: underline; }
+  .panel { display: none; margin-top: 14px; }
+  .panel.aktif { display: block; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; }
+  .grid label { display: flex; flex-direction: column; font-size: 14px; }
+  .grid input, .grid select, .grid textarea { width: 100%; box-sizing: border-box; }
+  .muted { color: #666; font-size: 13px; }
+  #msg { font-weight: bold; margin: 10px 0; }
+</style>
+</head>
+<body>
+<a href="dashboard.html">← Dashboard</a>
+<h2>Data Siswa</h2>
+<p class="muted" id="info"></p>
+<div class="tabs" id="tabs"></div>
+
+<div class="panel aktif" id="p-daftar">
+  <div id="pilihRombel">
+    <label>Rombel <select id="rombel"></select></label>
+    <button id="tampil">Tampilkan</button>
+  </div>
+  <p class="muted" id="infoDaftar"></p>
+  <div style="overflow-x:auto"><table id="tabel"></table></div>
+  <button id="simpanAbsensi" style="display:none">Simpan Absensi</button>
+</div>
+
+<div class="panel" id="p-calon">
+  <p class="muted" id="infoCalon"></p>
+  <div style="overflow-x:auto"><table id="tabelCalon"></table></div>
+</div>
+
+<div class="panel" id="p-form">
+  <h3 id="judulForm">Tambah Santri Baru</h3>
+  <div class="grid" id="form"></div>
+  <p>
+    <button id="simpanForm">Simpan</button>
+    <button id="batalForm">Batal</button>
+  </p>
+</div>
+
+<div class="panel" id="p-pindah">
+  <div class="grid">
+    <label>Santri <select id="pSantri"></select></label>
+    <label>Status <select id="pStatus">
+      <option>Calon Santri</option><option>Aktif</option><option>Lulus</option>
+      <option>Keluar</option><option>Pindah</option>
+    </select></label>
+    <label>Rombel (tahun ajaran aktif) <select id="pRombel"></select></label>
+  </div>
+  <p><button id="simpanPindah">Simpan Perubahan</button></p>
+  <p class="muted">
+    Status Aktif membuat NIS (jika belum punya) dan memasukkan santri ke rombel yang dipilih.
+    Untuk memindahkan rombel, pilih rombel lain lalu simpan lagi. Daftar rombel hanya menampilkan
+    rombel yang sesuai tingkat santri. Status selain Aktif melepas santri dari rombel tahun ajaran ini.
+  </p>
+</div>
+
+<p id="msg"></p>
+
+<script>
+  const SUPABASE_URL = "https://epynlmuqxumuwcjsrnsz.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_Oq_to1zgHLnachvWYLV_yA_DoOTGI3s";
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const $ = id => document.getElementById(id);
+  const setMsg = t => $("msg").textContent = t;
+  const hariIni = () => new Date().toISOString().slice(0, 10);
+
+  const TINGKAT = [["0","Kuttab Awal 1"],["1","Kuttab Awal 2"],["2","Kuttab Awal 3"],
+    ["3","Kuttab Qonuni 1"],["4","Kuttab Qonuni 2"],["5","Kuttab Qonuni 3"],["6","Kuttab Qonuni 4"]];
+  const namaTingkat = k => { const t = TINGKAT.find(x => x[0] === String(k)); return t ? t[1] : "-"; };
+
+  const FIELD = [
+    ["nama_lengkap", "Nama lengkap (sesuai akta) *", "text"],
+    ["nama_panggilan", "Nama panggilan", "text"],
+    ["jenis_kelamin", "Jenis kelamin *", "select", [["L","Laki-laki"],["P","Perempuan"]]],
+    ["nik", "NIK", "text"],
+    ["nisn", "NISN", "text"],
+    ["tempat_lahir", "Tempat lahir", "text"],
+    ["tanggal_lahir", "Tanggal lahir", "date"],
+    ["no_registrasi_akta", "No. registrasi akta", "text"],
+    ["agama", "Agama", "text"],
+    ["alamat_kk", "Alamat sesuai KK", "textarea"],
+    ["rt_kk", "RT (KK)", "text"],
+    ["rw_kk", "RW (KK)", "text"],
+    ["desa_kelurahan", "Desa/Kelurahan", "text"],
+    ["kecamatan", "Kecamatan", "text"],
+    ["kode_pos", "Kode pos", "text"],
+    ["alamat", "Alamat domisili", "textarea"],
+    ["nama_ayah", "Nama ayah", "text"],
+    ["nik_ayah", "NIK ayah", "text"],
+    ["pekerjaan_ayah", "Pekerjaan ayah", "text"],
+    ["nama_ibu", "Nama ibu kandung", "text"],
+    ["nik_ibu", "NIK ibu", "text"],
+    ["hp_orang_tua", "No. HP orang tua", "text"],
+    ["tingkat_masuk", "Mendaftar untuk tingkat *", "select", TINGKAT],
+    ["jenis_pendaftaran", "Jenis pendaftaran", "select",
+      [["Siswa Baru","Siswa Baru"],["Pindahan","Pindahan"]]]
+  ];
+
+  const upper = v => (v || "").trim().toUpperCase();
+  const titleCase = v => (v || "").trim().toLowerCase().replace(/(^|\s)\S/g, m => m.toUpperCase());
+
+  let me = null, ta = null, semesterId = null;
+  let rombelList = [], rombelTampil = [], bisaAbsen = new Set();
+  let daftar = [], calonList = [], absensiLama = {}, editId = null;
+
+  async function init() {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { location.href = "login.html"; return; }
+
+    const { data: p } = await sb.from("pegawai")
+      .select("id, peran").eq("auth_user_id", session.user.id).single();
+    if (!p) { $("info").textContent = "Akun tidak terdaftar sebagai pegawai aktif."; return; }
+    me = p;
+
+    const { data: sem } = await sb.from("semester")
+      .select("id, nomor, tahun_ajaran_id, tahun_ajaran:tahun_ajaran_id(kode)")
+      .eq("aktif", true).single();
+    if (!sem) { $("info").textContent = "Belum ada semester aktif."; return; }
+    semesterId = sem.id;
+    ta = { id: sem.tahun_ajaran_id, kode: sem.tahun_ajaran.kode };
+    $("info").textContent = "Tahun ajaran " + ta.kode + ", semester " + sem.nomor + ".";
+
+    const { data: r } = await sb.from("rombel")
+      .select("id, nama, wali_kelas_id, tingkat_kode")
+      .eq("tahun_ajaran_id", ta.id).order("nama");
+    rombelList = r || [];
+
+    const { data: pm } = await sb.from("penugasan_mapel").select("rombel_id, pegawai_id");
+    const rombelSaya = new Set([
+      ...rombelList.filter(x => x.wali_kelas_id === me.id).map(x => x.id),
+      ...(pm || []).filter(x => x.pegawai_id === me.id).map(x => x.rombel_id)
+    ]);
+    bisaAbsen = new Set(rombelList.filter(x => x.wali_kelas_id === me.id).map(x => x.id));
+    rombelTampil = (me.peran === "admin" || me.peran === "kepala")
+      ? rombelList : rombelList.filter(x => rombelSaya.has(x.id));
+
+    if (me.peran === "staf") {
+      $("pilihRombel").style.display = "none";
+    } else {
+      rombelTampil.forEach(x => $("rombel").add(new Option(x.nama, x.id)));
+    }
+
+    buatTab();
+    buatForm();
+    $("tampil").onclick = tampilDaftar;
+    $("simpanAbsensi").onclick = simpanAbsensi;
+    $("simpanForm").onclick = simpanForm;
+    $("batalForm").onclick = () => buka("daftar");
+    $("simpanPindah").onclick = simpanPindah;
+    $("pSantri").onchange = muatStatusSantri;
+
+    if (me.peran === "staf" || rombelTampil.length) tampilDaftar();
+    else setMsg("Anda belum punya rombel di tahun ajaran ini.");
+  }
+
+  function buatTab() {
+    const tabs = [["daftar", "Daftar Santri", () => buka("daftar")]];
+    if (["admin", "staf"].includes(me.peran)) {
+      tabs.push(["calon", "Calon Santri", tampilCalon]);
+      tabs.push(["form", "Tambah Santri", bukaTambah]);
+    }
+    if (me.peran === "admin") tabs.push(["pindah", "Aktivasi & Pindah", muatPindah]);
+
+    $("tabs").innerHTML = "";
+    tabs.forEach(([kode, label, aksi]) => {
+      const b = document.createElement("button");
+      b.textContent = label;
+      b.dataset.tab = kode;
+      b.onclick = aksi;
+      $("tabs").appendChild(b);
+    });
+  }
+
+  function buka(kode) {
+    document.querySelectorAll(".panel").forEach(p => p.classList.toggle("aktif", p.id === "p-" + kode));
+    document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("aktif", b.dataset.tab === kode));
+    setMsg("");
+  }
+
+  // ===== DAFTAR SANTRI =====
+  async function tampilDaftar() {
+    buka("daftar");
+    const rid = Number($("rombel").value) || null;
+    $("tabel").innerHTML = "";
+    $("simpanAbsensi").style.display = "none";
+    setMsg("Memuat...");
+
+    if (me.peran === "staf") {
+      const { data, error } = await sb.from("santri")
+        .select("id, nis, nama_lengkap, jenis_kelamin, hp_orang_tua, status")
+        .order("nama_lengkap");
+      if (error) return setMsg("Gagal memuat: " + error.message);
+      daftar = data || [];
+      $("infoDaftar").textContent = daftar.length + " santri (semua status).";
+    } else {
+      if (!rid) return setMsg("Pilih rombel.");
+      const { data, error } = await sb.from("keanggotaan_rombel")
+        .select("santri:santri_id(id, nis, nama_lengkap, jenis_kelamin, hp_orang_tua, status)")
+        .eq("rombel_id", rid).eq("tahun_ajaran_id", ta.id);
+      if (error) return setMsg("Gagal memuat: " + error.message);
+      daftar = (data || []).map(x => x.santri).filter(s => s && s.status === "Aktif")
+        .sort((a, b) => a.nama_lengkap.localeCompare(b.nama_lengkap));
+      $("infoDaftar").textContent = daftar.length + " santri aktif.";
+    }
+
+    const bolehAbsen = me.peran === "admin" || (rid !== null && bisaAbsen.has(rid));
+    absensiLama = {};
+    if (bolehAbsen && daftar.length) {
+      const { data: ab } = await sb.from("absensi_rapor")
+        .select("santri_id, sakit, izin, tanpa_uzur")
+        .eq("semester_id", semesterId).in("santri_id", daftar.map(s => s.id));
+      (ab || []).forEach(a => absensiLama[a.santri_id] = a);
+    }
+    renderTabel(bolehAbsen);
+    setMsg("");
+  }
+
+  function renderTabel(bolehAbsen) {
+    const t = $("tabel");
+    t.innerHTML = "";
+    const kolom = ["No", "NIS", "Nama", "JK", "HP Orang Tua", "Status"];
+    if (bolehAbsen) kolom.push("Sakit", "Izin", "Tanpa Uzur Syar'i");
+    if (me.peran === "admin") kolom.push("Aksi");
+
+    const hr = document.createElement("tr");
+    kolom.forEach(h => { const th = document.createElement("th"); th.textContent = h; hr.appendChild(th); });
+    t.appendChild(hr);
+
+    daftar.forEach((s, i) => {
+      const tr = document.createElement("tr");
+      [i + 1, s.nis || "-", s.nama_lengkap, s.jenis_kelamin || "-", s.hp_orang_tua || "-", s.status]
+        .forEach(v => { const td = document.createElement("td"); td.textContent = v; tr.appendChild(td); });
+
+      if (bolehAbsen) {
+        ["sakit", "izin", "tanpa_uzur"].forEach(k => {
+          const td = document.createElement("td");
+          const inp = document.createElement("input");
+          inp.type = "number"; inp.min = 0; inp.step = 1;
+          inp.value = absensiLama[s.id] ? absensiLama[s.id][k] : "";
+          inp.dataset.santri = s.id;
+          inp.dataset.kolom = k;
+          td.appendChild(inp);
+          tr.appendChild(td);
+        });
+      }
+
+      if (me.peran === "admin") {
+        const td = document.createElement("td");
+        const b = document.createElement("button");
+        b.textContent = "Edit";
+        b.onclick = () => bukaEdit(s.id);
+        td.appendChild(b);
+        tr.appendChild(td);
+      }
+      t.appendChild(tr);
+    });
+
+    $("simpanAbsensi").style.display = bolehAbsen && daftar.length ? "inline-block" : "none";
+  }
+
+  async function simpanAbsensi() {
+    const rows = [], salah = [];
+    daftar.forEach(s => {
+      const inputs = [...$("tabel").querySelectorAll('input[data-santri="' + s.id + '"]')];
+      if (!inputs.length) return;
+      const isi = {};
+      let ada = false;
+      inputs.forEach(inp => {
+        inp.style.background = "";
+        const v = inp.value.trim();
+        if (v !== "") ada = true;
+        const n = v === "" ? 0 : Number(v);
+        if (!Number.isInteger(n) || n < 0) salah.push(inp);
+        isi[inp.dataset.kolom] = n;
+      });
+      if (!ada) return;
+      rows.push({
+        santri_id: s.id, semester_id: semesterId,
+        sakit: isi.sakit, izin: isi.izin, tanpa_uzur: isi.tanpa_uzur,
+        sumber: "manual", diisi_oleh: me.id, updated_at: new Date().toISOString()
+      });
+    });
+
+    if (salah.length) {
+      salah.forEach(i => i.style.background = "#fdd");
+      salah[0].focus();
+      alert("Jumlah hari harus bilangan bulat minimal 0. Sel merah perlu diperbaiki.");
+      return;
+    }
+    if (!rows.length) return setMsg("Belum ada absensi yang diisi.");
+
+    const { error } = await sb.from("absensi_rapor").upsert(rows, { onConflict: "santri_id,semester_id" });
+    if (error) return setMsg("Gagal menyimpan: " + error.message);
+
+    await tampilDaftar();
+    setMsg("Tersimpan " + rows.length + " data absensi.");
+  }
+
+  // ===== CALON SANTRI =====
+  async function tampilCalon() {
+    buka("calon");
+    setMsg("Memuat...");
+    const { data, error } = await sb.from("santri")
+      .select("id, nama_lengkap, tingkat_masuk, hp_orang_tua, created_at")
+      .eq("status", "Calon Santri").eq("tahun_ajaran_masuk", ta.kode)
+      .order("created_at");
+    if (error) return setMsg("Gagal memuat: " + error.message);
+
+    calonList = data || [];
+    $("infoCalon").textContent = calonList.length + " calon santri TA " + ta.kode + ".";
+
+    const t = $("tabelCalon");
+    t.innerHTML = "";
+    const kolom = ["No", "Nama", "Mendaftar untuk", "HP Orang Tua", "Tanggal daftar"];
+    if (me.peran === "admin") kolom.push("Aksi");
+
+    const hr = document.createElement("tr");
+    kolom.forEach(h => { const th = document.createElement("th"); th.textContent = h; hr.appendChild(th); });
+    t.appendChild(hr);
+
+    calonList.forEach((s, i) => {
+      const tr = document.createElement("tr");
+      [i + 1, s.nama_lengkap, namaTingkat(s.tingkat_masuk), s.hp_orang_tua || "-",
+       (s.created_at || "").slice(0, 10)]
+        .forEach(v => { const td = document.createElement("td"); td.textContent = v; tr.appendChild(td); });
+
+      if (me.peran === "admin") {
+        const td = document.createElement("td");
+        const bA = document.createElement("button");
+        bA.textContent = "Aktifkan";
+        bA.onclick = () => bukaAktivasi(s.id);
+        const bE = document.createElement("button");
+        bE.textContent = "Edit";
+        bE.onclick = () => bukaEdit(s.id);
+        td.append(bA, " ", bE);
+        tr.appendChild(td);
+      }
+      t.appendChild(tr);
+    });
+    setMsg("");
+  }
+
+  // ===== TAMBAH & EDIT =====
+  function buatForm() {
+    $("form").innerHTML = "";
+    FIELD.forEach(([k, label, tipe, opts]) => {
+      const l = document.createElement("label");
+      l.textContent = label;
+      let el;
+      if (tipe === "select") {
+        el = document.createElement("select");
+        el.add(new Option("-- pilih --", ""));
+        opts.forEach(([v, t]) => el.add(new Option(t, v)));
+      } else if (tipe === "textarea") {
+        el = document.createElement("textarea");
+        el.rows = 2;
+      } else {
+        el = document.createElement("input");
+        el.type = tipe;
+      }
+      el.id = "f_" + k;
+      l.appendChild(el);
+      $("form").appendChild(l);
+    });
+  }
+
+  function isiForm(row) {
+    FIELD.forEach(([k]) => {
+      $("f_" + k).value = row && row[k] != null ? row[k] : "";
+    });
+    if (!row) $("f_agama").value = "Islam";
+  }
+
+  function bacaForm() {
+    const d = {};
+    FIELD.forEach(([k]) => {
+      const v = $("f_" + k).value.trim();
+      d[k] = v === "" ? null : v;
+    });
+    if (d.nama_lengkap) d.nama_lengkap = titleCase(d.nama_lengkap);
+    ["nama_panggilan", "tempat_lahir", "desa_kelurahan", "kecamatan", "nama_ibu", "nama_ayah"]
+      .forEach(k => { if (d[k]) d[k] = upper(d[k]); });
+    if (d.tingkat_masuk !== null) d.tingkat_masuk = Number(d.tingkat_masuk);
+    return d;
+  }
+
+  function bukaTambah() {
+    editId = null;
+    isiForm(null);
+    $("judulForm").textContent = "Tambah Santri Baru";
+    buka("form");
+  }
+
+  async function bukaEdit(id) {
+    if (me.peran !== "admin") return;
+    const { data, error } = await sb.from("santri").select("*").eq("id", id).single();
+    if (error) { buka("daftar"); return setMsg("Gagal memuat data: " + error.message); }
+    editId = id;
+    isiForm(data);
+    $("judulForm").textContent = "Edit Data: " + data.nama_lengkap;
+    buka("form");
+  }
+
+  async function simpanForm() {
+    const d = bacaForm();
+    if (!d.nama_lengkap || !d.jenis_kelamin) return setMsg("Nama lengkap dan jenis kelamin wajib diisi.");
+    if (d.tingkat_masuk === null) return setMsg("Tingkat masuk wajib diisi.");
+
+    $("simpanForm").disabled = true;
+    try {
+      if (editId) {
+        // NIS, status, dan tingkat sekarang tidak diubah dari form ini
+        const { error } = await sb.from("santri").update(d).eq("id", editId);
+        if (error) return setMsg("Gagal menyimpan: " + error.message);
+        editId = null;
+        $("judulForm").textContent = "Tambah Santri Baru";
+        buka("daftar");
+        setMsg("Data santri diperbarui. Tekan Tampilkan untuk memuat ulang daftar.");
+      } else {
+        d.nis = null;
+        d.status = "Calon Santri";
+        d.tanggal_aktif = null;
+        d.tingkat_sekarang = d.tingkat_masuk;
+        d.tahun_ajaran_masuk = ta.kode;
+
+        const { error } = await sb.from("santri").insert(d);
+        if (error) return setMsg("Gagal menyimpan: " + error.message);
+        isiForm(null);
+        setMsg("Calon santri tersimpan. Aktifkan dari tab Calon Santri.");
+      }
+    } finally {
+      $("simpanForm").disabled = false;
+    }
+  }
+
+  // ===== AKTIVASI & PINDAH (ADMIN) =====
+  async function muatPindah() {
+    buka("pindah");
+    const { data } = await sb.from("santri").select("id, nis, nama_lengkap").order("nama_lengkap");
+    $("pSantri").innerHTML = "";
+    $("pSantri").add(new Option("-- pilih santri --", ""));
+    (data || []).forEach(s =>
+      $("pSantri").add(new Option((s.nis || "belum ber-NIS") + " - " + s.nama_lengkap, s.id)));
+    $("pRombel").innerHTML = "";
+    $("pRombel").add(new Option("(tidak di rombel)", ""));
+  }
+
+  async function bukaAktivasi(id) {
+    if (me.peran !== "admin") return;
+    await muatPindah();
+    $("pSantri").value = String(id);
+    await muatStatusSantri();
+    $("pStatus").value = "Aktif";
+    if (!$("pRombel").value && $("pRombel").options.length > 1) $("pRombel").selectedIndex = 1;
+    setMsg("Periksa rombel lalu tekan Simpan Perubahan.");
+  }
+
+  async function muatStatusSantri() {
+    const id = Number($("pSantri").value);
+    $("pRombel").innerHTML = "";
+    $("pRombel").add(new Option("(tidak di rombel)", ""));
+    if (!id) return;
+
+    const { data: s } = await sb.from("santri")
+      .select("status, tingkat_sekarang, tingkat_masuk").eq("id", id).single();
+    const { data: kr } = await sb.from("keanggotaan_rombel").select("rombel_id")
+      .eq("santri_id", id).eq("tahun_ajaran_id", ta.id).maybeSingle();
+    if (!s) return;
+
+    const tingkat = s.tingkat_sekarang ?? s.tingkat_masuk;
+    rombelList.filter(r => r.tingkat_kode === tingkat)
+      .forEach(r => $("pRombel").add(new Option(r.nama, r.id)));
+    $("pStatus").value = s.status;
+    $("pRombel").value = kr ? String(kr.rombel_id) : "";
+  }
+
+  async function simpanPindah() {
+    const id = Number($("pSantri").value);
+    if (!id) return setMsg("Pilih santri terlebih dahulu.");
+    const status = $("pStatus").value;
+    const rid = Number($("pRombel").value) || null;
+
+    if (status === "Aktif") {
+      if (!rid) return setMsg("Santri aktif harus dimasukkan ke rombel.");
+      $("simpanPindah").disabled = true;
+      const { data: nis, error } = await sb.rpc("aktifkan_santri", { p_santri: id, p_rombel: rid });
+      $("simpanPindah").disabled = false;
+      if (error) return setMsg("Gagal: " + error.message);
+      await muatStatusSantri();
+      return setMsg("Tersimpan. NIS santri: " + nis + ".");
+    }
+
+    const { error: e1 } = await sb.from("santri").update({ status }).eq("id", id);
+    if (e1) return setMsg("Gagal mengubah status: " + e1.message);
+
+    const { error: e2 } = await sb.from("keanggotaan_rombel").delete()
+      .eq("santri_id", id).eq("tahun_ajaran_id", ta.id);
+    if (e2) return setMsg("Status tersimpan, tetapi gagal melepas rombel: " + e2.message);
+
+    await muatStatusSantri();
+    setMsg("Status tersimpan.");
+  }
+
+  init();
+</script>
+</body>
+</html>
