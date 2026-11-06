@@ -283,7 +283,7 @@
   }
 
   async function init() {
-    const { data, error } = await sb.rpc("ta_aktif");
+    const { data: ta } = await sb.rpc("tahun_pendaftaran");
     if (error || !data) {
       alert("Pendaftaran belum dibuka. Silakan hubungi admin.");
       $("submitBtn").disabled = true;
