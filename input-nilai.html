@@ -166,38 +166,43 @@
   }
 
   async function simpan() {
-    const mapelId = Number($("mapel").value);
-    const rows = [], salah = [];
+  const mapelId = Number($("mapel").value);
+  const rows = [], salah = [];
 
-    $("tabel").querySelectorAll("input").forEach(inp => {
-      if (inp.value === "") return;
-      const n = Number(inp.value);
-      if (isNaN(n) || n < 0 || n > 100) { salah.push(inp); return; }
-      rows.push({
-        santri_id: Number(inp.dataset.santri),
-        komponen_id: Number(inp.dataset.komponen),
-        item: inp.dataset.item,
-        nilai: n,
-        semester_id: semesterId,
-        mapel_id: mapelId,
-        diisi_oleh: me.id,
-        updated_at: new Date().toISOString()
-      });
+  $("tabel").querySelectorAll("input").forEach(inp => {
+    if (inp.value === "") return;
+    const n = Number(inp.value);
+    if (isNaN(n) || n < 0 || n > 100) { salah.push(inp); return; }
+    rows.push({
+      santri_id: Number(inp.dataset.santri),
+      komponen_id: Number(inp.dataset.komponen),
+      item: inp.dataset.item,
+      nilai: n,
+      semester_id: semesterId,
+      mapel_id: mapelId,
+      diisi_oleh: me.id,
+      updated_at: new Date().toISOString()
     });
+  });
 
-    if (salah.length) { salah[0].focus(); setMsg("Ada nilai di luar 0 sampai 100."); return; }
-    if (!rows.length) { setMsg("Belum ada nilai yang diisi."); return; }
-
-    $("simpan").disabled = true;
-    setMsg("Menyimpan " + rows.length + " nilai...");
-    const { error } = await sb.from("nilai").upsert(rows,
-      { onConflict: "santri_id,semester_id,mapel_id,komponen_id,item" });
-    $("simpan").disabled = false;
-
-    if (error) { setMsg("Gagal menyimpan: " + error.message); return; }
-    setMsg("Tersimpan " + rows.length + " nilai.");
-    muat();
+  if (salah.length) {
+    salah.forEach(inp => inp.style.background = "#fdd");
+    salah[0].focus();
+    alert("Ada nilai di luar 0 sampai 100. Sel merah perlu diperbaiki.");
+    return;
   }
+  if (!rows.length) { setMsg("Belum ada nilai yang diisi."); return; }
+
+  $("simpan").disabled = true;
+  setMsg("Menyimpan " + rows.length + " nilai...");
+  const { error } = await sb.from("nilai").upsert(rows,
+    { onConflict: "santri_id,semester_id,mapel_id,komponen_id,item" });
+  $("simpan").disabled = false;
+
+  if (error) { setMsg("Gagal menyimpan: " + error.message); return; }
+  setMsg("Tersimpan " + rows.length + " nilai.");
+  muat();
+}
 
   $("rombel").addEventListener("change", isiMapel);
   $("muat").addEventListener("click", muat);
