@@ -98,7 +98,7 @@
       .sort((a, b) => a.urutan - b.urutan);
 
     kolomAktif = [];
-    komponen.forEach(k => {
+    komponen.filter(k => k.kode !== "kehadiran").forEach(k => {
       if (k.kode === "ujian_periodik") {
         const n = Number($("jumlahPeriodik").value) || 1;
         for (let i = 1; i <= n; i++)
