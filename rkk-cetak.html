@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cetak RKK - Kuttab Al-Kalam</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
+<style>
+  body { font-family: Arial, sans-serif; font-size: 12px; color: #111; margin: 0; }
+  .controls { max-width: 900px; margin: 16px auto; padding: 12px; }
+  .controls a { display: inline-block; margin-bottom: 8px; }
+  .controls label { display: inline-block; margin: 4px 12px 4px 0; }
+  .controls select, .controls input[type=date] { padding: 4px; }
+  .controls button { padding: 6px 12px; margin: 4px 6px 4px 0; }
+  #pesan { font-weight: bold; min-height: 18px; }
+
+  .page { width: 210mm; margin: 0 auto 10mm; padding-bottom: 8mm; box-sizing: border-box; background: #fff; }
+  .kop { display: block; width: 100%; margin: 0; }
+  .isi { padding: 0 12mm; }
+  h3.judul { text-align: center; font-size: 14px; font-weight: bold; margin: 8mm 0 5mm; }
+
+  .ident { display: grid; grid-template-columns: 130px 1fr; row-gap: 3px; font-size: 12px; margin-bottom: 5mm; }
+
+  table.t { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
+  table.t th, table.t td { border: 1px solid #000; padding: 6px; vertical-align: top; text-align: left; word-wrap: break-word; }
+  table.t th { text-align: center; background: #fff; font-weight: bold; }
+  table.t td.l { width: 26%; font-weight: bold; text-align: center; vertical-align: middle; }
+  .pre { white-space: pre-line; line-height: 1.5; }
+
+  @media print {
+    @page { size: A4; margin: 0; }
+    body { margin: 0; }
+    .no-print { display: none !important; }
+    .page { width: 210mm; margin: 0; padding-bottom: 8mm; border: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="controls no-print">
+  <a href="dashboard.html">← Dashboard</a> &nbsp; <a href="rkk.html">Input RKK</a>
+  <h2>Cetak RKK</h2>
+  <label>Kelas <select id="rombel"></select></label>
+  <label>Tanggal <input type="date" id="tanggal"></label>
+  <button id="tampil">Tampilkan</button>
+  <button id="cetak">Cetak / Simpan PDF</button>
+  <p id="pesan"></p>
+</div>
+
+<div id="cetak"></div>
+
+<script>
+  const SUPABASE_URL = "https://epynlmuqxumuwcjsrnsz.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_Oq_to1zgHLnachvWYLV_yA_DoOTGI3s";
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const $ = id => document.getElementById(id);
+  const pesan = t => $("pesan").textContent = t;
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const fmt = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  const BULAN = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+  const tglIndo = iso => { const d = new Date(iso + "T00:00:00"); return d.getDate() + " " + BULAN[d.getMonth()] + " " + d.getFullYear(); };
+  const teks = v => v ? esc(v) : "-";
+
+  let semesterAktif = null;
+
+  async function init() {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { location.href = "login.html"; return; }
+
+    const { data: p } = await sb.from("pegawai").select("id, peran").eq("auth_user_id", session.user.id).maybeSingle();
+    if (!p || !["admin","kepala","guru"].includes(p.peran)) return pesan("Halaman ini tidak tersedia untuk akun Anda.");
+
+    const { data: s } = await sb.from("semester").select("id, nomor, tahun_ajaran_id").eq("aktif", true).maybeSingle();
+    if (!s) return pesan("Belum ada semester aktif.");
+    semesterAktif = s;
+
+    // RLS membatasi kelas sesuai peran
+    const { data: r } = await sb.from("rombel").select("id, nama").eq("tahun_ajaran_id", s.tahun_ajaran_id).order("nama");
+    $("rombel").innerHTML = (r || []).map(x => `<option value="${x.id}">${esc(x.nama)}</option>`).join("");
+    $("tanggal").value = fmt(new Date());
+    $("tampil").onclick = tampilkan;
+    $("cetak").onclick = () => window.print();
+    if (!(r || []).length) pesan("Belum ada kelas yang bisa Anda lihat.");
+  }
+
+  async function tampilkan() {
+    const rid = Number($("rombel").value), tgl = $("tanggal").value;
+    if (!rid || !tgl) return pesan("Pilih kelas dan tanggal.");
+    pesan("Memuat...");
+    $("cetak").innerHTML = "";
+
+    const { data: rk, error } = await sb.from("rkk_pertemuan").select("*").eq("rombel_id", rid).eq("tanggal", tgl).maybeSingle();
+    if (error) return pesan("Gagal memuat: " + error.message);
+    if (!rk) return pesan("RKK untuk kelas dan tanggal ini belum dibuat.");
+
+    const [a, b, c, nama, rombel] = await Promise.all([
+      sb.from("rkk_iman").select("*").eq("rkk_id", rk.id).maybeSingle(),
+      sb.from("rkk_murofaqot").select("*").eq("rkk_id", rk.id).maybeSingle(),
+      sb.from("rkk_quran").select("*").eq("rkk_id", rk.id).maybeSingle(),
+      sb.rpc("nama_pengajar_rkk", { p_rkk: rk.id }),
+      sb.from("rombel").select("nama").eq("id", rid).maybeSingle()
+    ]);
+
+    $("cetak").innerHTML = halaman({
+      rk, iman: a.data || {}, murofaqot: b.data || {}, quran: c.data || {},
+      pengajar: nama.data || "-", kelas: rombel.data ? rombel.data.nama : "-"
+    });
+    pesan("");
+  }
+
+  function halaman(d) {
+    const i = d.iman, m = d.murofaqot, q = d.quran;
+    return `<section class="page">
+      <img class="kop" src="kop.png" alt="Kop Kuttab Al-Kalam">
+      <div class="isi">
+        <h3 class="judul">RENCANA KEGIATAN KUTTAB</h3>
+        <div class="ident">
+          <div>Nama Pengajar</div><div>: ${esc(d.pengajar)}</div>
+          <div>Kelas</div><div>: ${esc(d.kelas)}</div>
+          <div>Tanggal</div><div>: ${tglIndo(d.rk.tanggal)}</div>
+          <div>Alokasi Waktu</div><div>: ${teks(d.rk.alokasi_waktu)} menit</div>
+        </div>
+
+        <table class="t">
+          <colgroup><col style="width:26%"><col style="width:74%"></colgroup>
+          <tr><th colspan="2">Materi Iman (Alokasi Waktu: ${teks(i.alokasi_waktu)} menit)</th></tr>
+          <tr><td class="l">Ayat</td><td>
+            ${i.surat_ayat ? `<b>${esc(i.surat_ayat)}</b><br>` : ""}
+            <span class="pre">${teks(i.ayat)}</span>
+            ${i.terjemahan ? `<br><i>${esc(i.terjemahan)}</i>` : ""}
+          </td></tr>
+          <tr><td class="l">Poin Pembahasan</td><td class="pre">${teks(i.poin_pembahasan)}</td></tr>
+          <tr><td class="l">Kisah</td><td class="pre">${teks(i.kisah)}</td></tr>
+          <tr><td class="l">Amtsal</td><td class="pre">${teks(i.amtsal)}</td></tr>
+
+          <tr><th colspan="2">Murofaqot (Alokasi Waktu: ${teks(m.alokasi_waktu)} menit)</th></tr>
+          <tr><td class="l">Bahasa Indonesia</td><td class="pre">${teks(m.bahasa_indonesia)}</td></tr>
+          <tr><td class="l">Matematika</td><td class="pre">${teks(m.matematika)}</td></tr>
+          <tr><td class="l">IPA</td><td class="pre">${teks(m.ipa)}</td></tr>
+          <tr><td class="l">IPS</td><td class="pre">${teks(m.ips)}</td></tr>
+
+          <tr><th colspan="2">Asesmen</th></tr>
+          <tr><td colspan="2" class="pre">${teks(i.asesmen)}</td></tr>
+
+          <tr><th colspan="2">Materi Al Quran (Alokasi Waktu: ${teks(q.alokasi_waktu)} menit)</th></tr>
+          <tr><td class="l">Tahfidz</td><td class="pre">${teks(q.tahfidz)}</td></tr>
+          <tr><td class="l">Tilawah</td><td class="pre">${teks(q.tilawah)}</td></tr>
+          <tr><td class="l">Kitabah</td><td class="pre">${teks(q.kitabah)}</td></tr>
+          <tr><td class="l">Pojok Pengaman</td><td class="pre">${teks(q.pojok_pengaman)}</td></tr>
+
+          <tr><th colspan="2">Asesmen</th></tr>
+          <tr><td colspan="2" class="pre">${teks(q.asesmen)}</td></tr>
+        </table>
+      </div>
+    </section>`;
+  }
+
+  init();
+</script>
+</body>
+</html>
