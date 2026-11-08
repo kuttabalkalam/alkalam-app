@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RKK - Kuttab Al-Kalam</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; font-size: 15px; margin: 0; padding-bottom: 30px; background: #f7f7f7; color: #111; }
+  header { background: #222; color: #f2c94c; padding: 12px 16px; }
+  header a { color: #f2c94c; text-decoration: none; }
+  main { max-width: 720px; margin: 0 auto; padding: 12px; }
+  .box { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+  label { display: block; font-size: 13px; color: #444; margin-bottom: 10px; }
+  select, input, textarea { width: 100%; padding: 9px; font-size: 15px; border: 1px solid #bbb; border-radius: 6px; margin-top: 4px; font-family: inherit; }
+  textarea { min-height: 64px; }
+  .btn { padding: 11px; font-size: 15px; border: none; border-radius: 6px; background: #28a745; color: #fff; width: 100%; }
+  .btn.kecil { width: auto; padding: 9px 14px; margin-top: 8px; }
+  .btn:disabled { background: #aaa; }
+  .seksi { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+  .seksi h3 { margin: 0 0 8px; font-size: 16px; }
+  .badge { display: inline-block; font-size: 12px; padding: 3px 8px; border-radius: 10px; margin: 2px 4px 2px 0; background: #eee; color: #555; }
+  .badge.ok { background: #28a745; color: #fff; }
+  .badge.kosong { background: #f0ad4e; color: #fff; }
+  .dua { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 480px) { .dua { grid-template-columns: 1fr; } }
+  #pesan { font-weight: bold; min-height: 20px; margin: 8px 0; }
+  .muted { color: #666; font-size: 13px; }
+</style>
+</head>
+<body>
+<header><a href="dashboard.html">← Dashboard</a> &nbsp; <strong>RKK</strong></header>
+
+<main>
+  <p class="muted" id="info"></p>
+  <div class="box">
+    <label>Kelas <select id="rombel"></select></label>
+    <label>Tanggal <input type="date" id="tanggal"></label>
+    <button class="btn" id="bukaBtn">Buka RKK</button>
+  </div>
+  <p id="pesan"></p>
+  <div id="badges"></div>
+  <div id="seksi"></div>
+</main>
+
+<script>
+  const SUPABASE_URL = "https://epynlmuqxumuwcjsrnsz.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_Oq_to1zgHLnachvWYLV_yA_DoOTGI3s";
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const $ = id => document.getElementById(id);
+  const pesan = t => $("pesan").textContent = t;
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const fmt = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+
+  // Setiap bagian: tabel, kode mapel yang boleh mengisi, dan daftar kolom
+  const SEKSI = [
+    { key: "iman", judul: "Muatan Iman", tabel: "rkk_iman", kodes: ["iman"], fields: [
+      ["alokasi_waktu", "Alokasi Waktu (Iman)"], ["surat_ayat", "Nama Surat dan Ayat"], ["ayat", "Ayat"],
+      ["terjemahan", "Terjemahan"], ["poin_pembahasan", "Poin Pembahasan"], ["kisah", "Kisah"],
+      ["amtsal", "Amtsal"], ["asesmen", "Asesmen Iman"]
+    ]},
+    { key: "murofaqot", judul: "Muatan Murofaqot", tabel: "rkk_murofaqot", kodes: ["bindo","mtk","ipa","ips"], fields: [
+      ["alokasi_waktu", "Alokasi Waktu (Murofaqot)"], ["bahasa_indonesia", "Bahasa Indonesia"],
+      ["matematika", "Matematika"], ["ipa", "IPA"], ["ips", "IPS"]
+    ]},
+    { key: "quran", judul: "Muatan Quran", tabel: "rkk_quran", kodes: ["tilawah","tahfidz","kitabah"], fields: [
+      ["alokasi_waktu", "Alokasi Waktu (Quran)"], ["tahfidz", "Tahfidz"], ["tilawah", "Tilawah"],
+      ["kitabah", "Kitabah"], ["asesmen", "Asesmen Quran"]
+    ]},
+    { key: "umum", judul: "Umum (Wali Kelas)", tabel: "rkk_pertemuan", kodes: [], fields: [
+      ["alokasi_waktu", "Alokasi Waktu"], ["materi_umum", "Materi yang dibawakan"],
+      ["pojok_pengaman", "Pojok Pengaman"], ["ukuran_pojok", "Ukuran dan jumlah cetak (pojok)"],
+      ["file_pojok", "Link file pojok pengaman"], ["file_gambar", "Link file gambar untuk dicetak"],
+      ["ukuran_gambar", "Ukuran dan jumlah cetak (gambar)"]
+    ]}
+  ];
+
+  let me = null, sem = null, rombelList = [];
+  let kodeSaya = {}, waliSet = new Set();
+  let rkkRow = null, data = {};
+
+  const kodeRombel = rid => kodeSaya[rid] || new Set();
+
+  async function init() {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { location.href = "login.html"; return; }
+
+    const { data: p, error: eP } = await sb.from("pegawai")
+      .select("id, nama_lengkap, peran").eq("auth_user_id", session.user.id).maybeSingle();
+    if (eP) return pesan("Gagal memuat akun: " + eP.message);
+    if (!p || !["admin","kepala","guru"].includes(p.peran)) return pesan("Halaman ini tidak tersedia untuk akun Anda.");
+    me = p;
+
+    const { data: s } = await sb.from("semester")
+      .select("id, nomor, tahun_ajaran_id, tahun_ajaran:tahun_ajaran_id(kode)")
+      .eq("aktif", true).maybeSingle();
+    if (!s) return pesan("Belum ada semester aktif.");
+    sem = s;
+
+    const [{ data: r }, { data: pm }] = await Promise.all([
+      sb.from("rombel").select("id, nama, wali_kelas_id").eq("tahun_ajaran_id", s.tahun_ajaran_id).order("nama"),
+      sb.from("penugasan_mapel").select("rombel_id, pegawai_id, mapel:mapel_id(kode)")
+    ]);
+    rombelList = r || [];
+    (pm || []).filter(x => x.pegawai_id === me.id).forEach(x => {
+      (kodeSaya[x.rombel_id] ||= new Set()).add(x.mapel.kode);
+    });
+    rombelList.forEach(x => { if (x.wali_kelas_id === me.id) waliSet.add(x.id); });
+
+    const bisa = (me.peran === "admin" || me.peran === "kepala")
+      ? rombelList
+      : rombelList.filter(x => kodeRombel(x.id).size || waliSet.has(x.id));
+
+    $("info").textContent = "TA " + s.tahun_ajaran.kode + " · Semester " + (s.nomor === 1 ? "Ganjil" : "Genap")
+      + (me.peran === "kepala" ? " · mode lihat" : "");
+    $("rombel").innerHTML = bisa.map(x => `<option value="${x.id}">${esc(x.nama)}</option>`).join("");
+    if (!bisa.length) pesan("Anda belum punya kelas di tahun ajaran ini.");
+    $("tanggal").value = fmt(new Date());
+    $("bukaBtn").onclick = bukaRkk;
+    $("rombel").onchange = () => { rkkRow = null; data = {}; $("badges").innerHTML = ""; $("seksi").innerHTML = ""; pesan("Klik Buka RKK untuk memuat."); };
+  }
+
+  function canEdit(sec) {
+    if (me.peran === "kepala") return false;
+    if (me.peran === "admin") return true;
+    const rid = Number($("rombel").value);
+    if (sec.key === "umum") return waliSet.has(rid);
+    return sec.kodes.some(k => kodeRombel(rid).has(k));
+  }
+
+  async function bukaRkk() {
+    const rid = Number($("rombel").value), tgl = $("tanggal").value;
+    if (!rid || !tgl) return pesan("Pilih kelas dan tanggal.");
+    pesan("Memuat...");
+
+    const { data: rk, error } = await sb.from("rkk_pertemuan").select("*")
+      .eq("rombel_id", rid).eq("tanggal", tgl).maybeSingle();
+    if (error) return pesan("Gagal memuat: " + error.message);
+
+    let baris = rk;
+    if (!baris) {
+      const bisaBuat = me.peran === "admin" || (me.peran !== "kepala" && (kodeRombel(rid).size || waliSet.has(rid)));
+      if (!bisaBuat) {
+        rkkRow = null; data = {};
+        $("badges").innerHTML = ""; $("seksi").innerHTML = "";
+        return pesan("RKK untuk tanggal ini belum dibuat.");
+      }
+      const { data: baru, error: e2 } = await sb.from("rkk_pertemuan")
+        .insert({ rombel_id: rid, semester_id: sem.id, tanggal: tgl, dibuat_oleh: me.id })
+        .select().single();
+      if (e2) return pesan("Gagal membuat RKK: " + e2.message);
+      baris = baru;
+    }
+    await muatBagian(baris);
+    pesan("");
+  }
+
+  async function muatBagian(baris) {
+    rkkRow = baris;
+    const [a, b, c] = await Promise.all([
+      sb.from("rkk_iman").select("*").eq("rkk_id", baris.id).maybeSingle(),
+      sb.from("rkk_murofaqot").select("*").eq("rkk_id", baris.id).maybeSingle(),
+      sb.from("rkk_quran").select("*").eq("rkk_id", baris.id).maybeSingle()
+    ]);
+    data = { umum: baris, iman: a.data || {}, murofaqot: b.data || {}, quran: c.data || {} };
+    render();
+  }
+
+  function render() {
+    const iman = data.iman.id, murofaqot = data.murofaqot.id, quran = data.quran.id;
+    const lengkap = iman && murofaqot && quran;
+    $("badges").innerHTML =
+      `<span class="badge ${iman ? "ok" : "kosong"}">Iman ${iman ? "✓" : "belum"}</span>` +
+      `<span class="badge ${murofaqot ? "ok" : "kosong"}">Murofaqot ${murofaqot ? "✓" : "belum"}</span>` +
+      `<span class="badge ${quran ? "ok" : "kosong"}">Quran ${quran ? "✓" : "belum"}</span>` +
+      (lengkap ? ` <span class="badge ok">RKK utuh</span>` : "");
+
+    const box = $("seksi");
+    box.innerHTML = "";
+    SEKSI.forEach(sec => {
+      const src = data[sec.key] || {};
+      const ed = canEdit(sec);
+      const wrap = document.createElement("div");
+      wrap.className = "seksi";
+      wrap.innerHTML = `<h3>${esc(sec.judul)}${ed ? "" : ' <span class="badge">hanya lihat</span>'}</h3>
+        <div class="dua">${sec.fields.map(([f, l]) =>
+          `<label>${esc(l)}<textarea data-f="${f}" ${ed ? "" : "disabled"}>${esc(src[f] || "")}</textarea></label>`).join("")}
+        </div>
+        ${ed ? `<button class="btn kecil" data-sec="${sec.key}">Simpan ${esc(sec.judul)}</button>` : ""}`;
+      box.appendChild(wrap);
+    });
+    box.querySelectorAll("button[data-sec]").forEach(b => b.onclick = () => simpanSeksi(b.dataset.sec));
+  }
+
+  async function simpanSeksi(key) {
+    const sec = SEKSI.find(s => s.key === key);
+    const wrap = [...document.querySelectorAll(".seksi")].find(w => w.querySelector(`button[data-sec="${key}"]`));
+    const isi = {};
+    wrap.querySelectorAll("textarea").forEach(t => isi[t.dataset.f] = t.value.trim() || null);
+    const btn = wrap.querySelector("button");
+    btn.disabled = true;
+    pesan("Menyimpan...");
+
+    let error;
+    const now = new Date().toISOString();
+    if (key === "umum") {
+      ({ error } = await sb.from("rkk_pertemuan").update({ ...isi, updated_at: now }).eq("id", rkkRow.id));
+    } else {
+      ({ error } = await sb.from(sec.tabel).upsert(
+        { rkk_id: rkkRow.id, ...isi, diisi_oleh: me.id, updated_at: now },
+        { onConflict: "rkk_id" }));
+    }
+    btn.disabled = false;
+    if (error) return pesan("Gagal menyimpan " + sec.judul + ": " + error.message);
+
+    const { data: baru } = await sb.from("rkk_pertemuan").select("*").eq("id", rkkRow.id).single();
+    await muatBagian(baru);
+    pesan("Tersimpan: " + sec.judul);
+  }
+
+  init();
+</script>
+</body>
+</html>
