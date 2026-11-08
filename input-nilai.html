@@ -65,7 +65,7 @@
     }
     me = p;
 
-    const { data: sem } = await sb.from("semester").select("id, nomor").eq("aktif", true).single();
+    const { data: sem } = await sb.from("semester").select("id, nomor, tahun_ajaran_id").eq("aktif", true).single();
     if (!sem) { $("info").textContent = "Belum ada semester aktif. Hubungi admin."; return; }
     semester = sem;
     $("info").textContent = "Semester " + sem.nomor + (sem.nomor === 1 ? " (ganjil)." : " (genap).");
@@ -77,6 +77,11 @@
     const { data, error } = await sb.from("penugasan_mapel")
       .select("rombel_id, mapel_id, pegawai_id, rombel:rombel_id(nama), mapel:mapel_id(kode, nama, urutan)");
     if (error) { setMsg("Gagal memuat penugasan: " + error.message); return; }
+        const { data: rb } = await sb.from("rombel")
+      .select("id").eq("tahun_ajaran_id", sem.tahun_ajaran_id);
+    const rombelAktif = new Set((rb || []).map(r => r.id));
+    penugasan = (data || []).filter(x => rombelAktif.has(x.rombel_id)
+      && (me.peran === "admin" || x.pegawai_id === me.id));
     penugasan = (data || []).filter(x => me.peran === "admin" || x.pegawai_id === me.id);
 
     const rombel = new Map();
