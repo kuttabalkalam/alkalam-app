@@ -46,7 +46,7 @@
       if (!session) { location.href = "login.html"; return; }
 
       const { data: pegawai, error } = await sb.from("pegawai")
-        .select("nama_lengkap, peran")
+        .select("id, nama_lengkap, peran")
         .eq("auth_user_id", session.user.id)
         .single();
 
@@ -61,13 +61,18 @@
       document.getElementById("peran").textContent = "Peran: " + pegawai.peran;
 
       const menu = document.getElementById("menu");
-      MENU.filter(m => m.roles.includes(pegawai.peran)).forEach(m => {
-        const a = document.createElement("a");
-        a.href = m.href;
-        a.textContent = m.label;
-        if (m.href.startsWith("http")) a.target = "_blank";
-        menu.appendChild(a);
-      });
+      const { data: pm } = await sb.from("penugasan_mapel")
+      .select("mapel:mapel_id(kode)").eq("pegawai_id", pegawai.id);
+      const adaQuran = (pm || []).some(x => ["tilawah","tahfidz","kitabah"].includes(x.mapel?.kode));
+      MENU.filter(m => m.roles.includes(pegawai.peran)
+    && (!m.quranSaja || pegawai.peran !== "guru" || adaQuran))
+  .forEach(m => {
+    const a = document.createElement("a");
+    a.href = m.href;
+    a.textContent = m.label;
+    if (m.href.startsWith("http")) a.target = "_blank";
+    menu.appendChild(a);
+  });
     }
 
     document.getElementById("keluar").addEventListener("click", async () => {
