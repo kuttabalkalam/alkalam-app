@@ -1,86 +1,41 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Dashboard - Kuttab Al-Kalam</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
-  <style>
-    body { font-family: sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; }
-    .menu a { display: block; padding: 14px; margin: 10px 0; border: 1px solid #ccc;
-              border-radius: 6px; text-decoration: none; color: #111; }
-    .menu a:hover { background: #f3f3f3; }
-    .topbar { display: flex; justify-content: space-between; align-items: center; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Beranda - Kuttab Al-Kalam</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.4/css/all.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2.0/dist/css/adminlte.min.css">
+<link rel="stylesheet" href="ui.css">
 </head>
-<body>
-  <div class="topbar">
-    <div>
-      <h2 id="sapaan">Memuat...</h2>
-      <small id="peran"></small>
-    </div>
-    <button id="keluar">Keluar</button>
-  </div>
-  <div class="menu" id="menu"></div>
+<body class="hold-transition sidebar-mini">
 
-  <script>
-    const SUPABASE_URL = "https://epynlmuqxumuwcjsrnsz.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVweW5sbXVxeHVtdXdjanNybnN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxNjc5MTcsImV4cCI6MjEwODc0MzkxN30.9WNiASpdWVQBtaC1hnOZuujzOGCpl4i8m_E5cVZFBKY";
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/admin-lte@3.2.0/dist/js/adminlte.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="ui.js"></script>
 
-    // Isi href sesuai kebutuhan. "#" berarti belum dibuat.
-    const MENU = [
-      { label: "Data Santri", href: "data-siswa.html", roles: ["admin","kepala","staf","guru"] },
-      { label: "Input Nilai", href: "input-nilai.html", roles: ["admin","guru"] },
-      { label: "Rapor", href: "rapor.html", roles: ["admin","kepala","guru"] },
-      { label: "Jurnal Tahsin", href: "jurnal-tahsin.html", roles: ["admin","guru"] },
-      { label: "Grafik Jurnal", href: "jurnal-grafik.html", roles: ["admin","kepala","guru"] },
-      { label: "Input RKK", href: "rkk.html", roles: ["admin","kepala","guru"] },
-      { label: "Pengajuan Ujian Kenaikan Jilid", href: "pengajuan-jilid.html", roles: ["admin","kepala","guru"], quranSaja: true },
-      { label: "Profil", href: "profil.html", roles: ["admin","kepala","staf","guru"] },
-    ];
-
-    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-    async function mulai() {
-      const { data: { session } } = await sb.auth.getSession();
-      if (!session) { location.href = "login.html"; return; }
-
-      const { data: pegawai, error } = await sb.from("pegawai")
-        .select("id, nama_lengkap, peran")
-        .eq("auth_user_id", session.user.id)
-        .single();
-
-      if (error || !pegawai) {
-  document.getElementById("sapaan").textContent = "Akun tidak terdaftar sebagai pegawai aktif";
-  document.getElementById("peran").textContent =
-    "Email login: " + session.user.email + " | detail: " + (error ? error.message : "data kosong");
-  return;
-}
-
-      document.getElementById("sapaan").textContent = "Assalamu'alaikum, " + pegawai.nama_lengkap;
-      document.getElementById("peran").textContent = "Peran: " + pegawai.peran;
-
-      const menu = document.getElementById("menu");
-      const { data: pm } = await sb.from("penugasan_mapel")
-      .select("mapel:mapel_id(kode)").eq("pegawai_id", pegawai.id);
-      const adaQuran = (pm || []).some(x => ["tilawah","tahfidz","kitabah"].includes(x.mapel?.kode));
-      MENU.filter(m => m.roles.includes(pegawai.peran)
-    && (!m.quranSaja || pegawai.peran !== "guru" || adaQuran))
-  .forEach(m => {
-    const a = document.createElement("a");
-    a.href = m.href;
-    a.textContent = m.label;
-    if (m.href.startsWith("http")) a.target = "_blank";
-    menu.appendChild(a);
-  });
+<script>
+  KUTTAB.halaman({
+    aktif: "dashboard",
+    judul: "Beranda",
+    render: async ({ menu, konten }) => {
+      const item = menu.filter(m => m.key !== "dashboard");
+      konten.innerHTML = item.length
+        ? `<div class="row">${item.map(m => `
+            <div class="col-6 col-md-4 mb-3">
+              <a class="menu-tile" href="${m.href}">
+                <i class="fas ${m.icon}"></i>
+                <div class="judul">${KUTTAB.esc(m.label)}</div>
+              </a>
+            </div>`).join("")}
+          </div>`
+        : `<p>Belum ada menu untuk akun Anda.</p>`;
     }
-
-    document.getElementById("keluar").addEventListener("click", async () => {
-      await sb.auth.signOut();
-      location.href = "login.html";
-    });
-
-    mulai();
-  </script>
+  });
+</script>
 </body>
 </html>
