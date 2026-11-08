@@ -116,7 +116,7 @@ const KUTTAB = (() => {
           </ul>
             <ul class="navbar-nav ml-auto align-items-center">
             <li class="nav-item">
-              <a class="nav-link d-flex align-items-center btn btn-outline-light" href="profil.html" title="Profil saya">
+              <a class="nav-link d-flex align-items-center btn btn-outline-primary" href="profil.html" title="Profil saya">
                 <span class="profil-ikon mr-2"><i class="fas fa-user-circle"></i></span>
                 <span class="d-none d-sm-inline">${esc(me.nama_lengkap)}</span>
               </a>
