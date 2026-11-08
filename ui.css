@@ -46,3 +46,6 @@
   .menu-tile { padding: 16px 8px; }
   .menu-tile i { font-size: 24px; }
 }
+/* Tombol profil di navbar */
+.main-header .profil-ikon i { font-size: 1.4rem; color: var(--kuning); vertical-align: middle; }
+.main-header .nav-link:hover .profil-ikon i { color: #fff; }
