@@ -14,6 +14,7 @@
   .tabs { display: flex; gap: 6px; margin-bottom: 12px; }
   .tabs button { flex: 1; padding: 10px; border: 1px solid #bbb; background: #fff; border-radius: 6px; font-size: 14px; }
   .tabs button.aktif { background: #f2c94c; border-color: #d4a52a; font-weight: bold; }
+  .tabs button[hidden] { display: none; }
   .panel { display: none; }
   .panel.aktif { display: block; }
   .box { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
@@ -31,7 +32,7 @@
   .status.Diajukan { background: #f0ad4e; color: #fff; }
   .status.Dijadwalkan { background: #2a6fdb; color: #fff; }
   .status.Lulus { background: #28a745; color: #fff; }
-  .status.Belum-Lulus, .status.BelumLulus { background: #dc3545; color: #fff; }
+  .status.BelumLulus { background: #dc3545; color: #fff; }
   .status.Dibatalkan { background: #888; color: #fff; }
   .baris { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
   .baris input[type=checkbox] { width: auto; margin: 0; }
@@ -61,7 +62,7 @@
           <option value="Quran">Quran</option>
         </select>
       </label>
-      <label>Jilid / Juz <input id="aJilid" type="text" placeholder="contoh: Jilid 3 atau Juz 30"></label>
+      <label>Jilid / Juz <select id="aJilid"></select></label>
       <button class="btn" id="aKirim">Ajukan</button>
     </div>
   </section>
@@ -98,10 +99,27 @@
   const $ = id => document.getElementById(id);
   const pesan = t => $("pesan").textContent = t;
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  const fmt = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
   const BULAN = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
   const tglIndo = iso => { const d = new Date(iso + "T00:00:00"); return d.getDate() + " " + BULAN[d.getMonth()] + " " + d.getFullYear(); };
   const KODE_QURAN = ["tilawah", "tahfidz", "kitabah"];
+
+  // Pilihan jilid dan juz (tetap, tidak diketik bebas)
+  const PILIHAN = {
+    Tilawati: Array.from({ length: 4 }, (_, i) => "Jilid " + (i + 1)),
+    Quran: Array.from({ length: 30 }, (_, i) => "Juz " + (i + 1))
+  };
+
+  // Slot jam ujian: 07.30 sampai 11.30, interval 30 menit
+  const JAM_UJIAN = (() => {
+    const out = [];
+    for (let m = 7 * 60 + 30; m <= 11 * 60 + 30; m += 30) {
+      const h = Math.floor(m / 60), mm = m % 60;
+      out.push(String(h).padStart(2, "0") + ":" + String(mm).padStart(2, "0"));
+    }
+    return out;
+  })();
+
+  const STATUS_KELAS = { "Diajukan": "Diajukan", "Dijadwalkan": "Dijadwalkan", "Lulus": "Lulus", "Belum Lulus": "BelumLulus", "Dibatalkan": "Dibatalkan" };
 
   let me = null, sem = null, rombelAll = [], rombelQuran = [];
   let rows = [], penguji = [];
@@ -133,30 +151,39 @@
       .map(x => x.rombel_id));
     rombelQuran = me.peran === "admin" ? rombelAll : rombelAll.filter(x => quranSet.has(x.id));
 
-    $("tAjukan").style.display = (me.peran === "admin" || rombelQuran.length) ? "" : "none";
-    $("tPenguji").style.display = me.peran === "admin" ? "" : "none";
+    const bisaAjukan = me.peran === "admin" || rombelQuran.length > 0;
+    $("tAjukan").hidden = !bisaAjukan;
+    $("tPenguji").hidden = me.peran !== "admin";
 
     $("aRombel").innerHTML = rombelQuran.map(x => `<option value="${x.id}">${esc(x.nama)}</option>`).join("");
     $("aRombel").onchange = isiSantriAjukan;
+    $("aJenis").onchange = isiJilid;
     $("aKirim").onclick = ajukan;
     $("fStatus").onchange = muatDaftar;
     $("tAjukan").onclick = () => bukaTab("ajukan");
     $("tDaftar").onclick = () => bukaTab("daftar");
     $("tPenguji").onclick = () => bukaTab("penguji");
 
+    isiJilid();
     await isiSantriAjukan();
     await muatPenguji();
     bukaTab("daftar");
   }
 
   function bukaTab(nama) {
-    ["ajukan","daftar","penguji"].forEach(n => {
-      $("t" + n[0].toUpperCase() + n.slice(1)).classList.toggle("aktif", n === nama);
-      $("p" + n[0].toUpperCase() + n.slice(1)).classList.toggle("aktif", n === nama);
+    ["ajukan", "daftar", "penguji"].forEach(n => {
+      const cap = n[0].toUpperCase() + n.slice(1);
+      $("t" + cap).classList.toggle("aktif", n === nama);
+      $("p" + cap).classList.toggle("aktif", n === nama);
     });
     pesan("");
     if (nama === "daftar") muatDaftar();
     if (nama === "penguji") muatPengujiTab();
+  }
+
+  function isiJilid() {
+    const jenis = $("aJenis").value;
+    $("aJilid").innerHTML = PILIHAN[jenis].map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join("");
   }
 
   // ===== AJUKAN =====
@@ -166,7 +193,7 @@
     const [{ data: kr }, { data: pend }] = await Promise.all([
       sb.from("keanggotaan_rombel").select("santri:santri_id(id, nis, nama_lengkap)")
         .eq("rombel_id", rid).eq("tahun_ajaran_id", sem.tahun_ajaran_id),
-      sb.from("pengajuan_jilid").select("santri_id").in("status", ["Diajukan","Dijadwalkan"])
+      sb.from("pengajuan_jilid").select("santri_id").in("status", ["Diajukan", "Dijadwalkan"])
     ]);
     const sibuk = new Set((pend || []).map(x => x.santri_id));
     const list = (kr || []).map(x => x.santri).filter(s => s && !sibuk.has(s.id))
@@ -177,9 +204,9 @@
 
   async function ajukan() {
     const sid = Number($("aSantri").value), rid = Number($("aRombel").value);
-    const jilid = $("aJilid").value.trim(), jenis = $("aJenis").value;
+    const jilid = $("aJilid").value, jenis = $("aJenis").value;
     if (!sid || !rid) return pesan("Pilih kelas dan santri.");
-    if (!jilid) return pesan("Isi jilid atau juz.");
+    if (!jilid) return pesan("Pilih jilid atau juz.");
 
     $("aKirim").disabled = true;
     const { error } = await sb.from("pengajuan_jilid").insert({
@@ -189,7 +216,6 @@
     $("aKirim").disabled = false;
     if (error) return pesan("Gagal mengajukan: " + error.message);
 
-    $("aJilid").value = "";
     pesan("Pengajuan tersimpan.");
     await isiSantriAjukan();
     muatDaftar();
@@ -218,7 +244,8 @@
     const admin = me.peran === "admin";
     const sayaPenguji = p.penguji_id === me.id;
     const a = [];
-    if (admin && ["Diajukan","Dijadwalkan"].includes(p.status)) a.push(["jadwal", p.status === "Diajukan" ? "Jadwalkan" : "Ubah jadwal"]);
+    if (admin && ["Diajukan", "Dijadwalkan"].includes(p.status))
+      a.push(["jadwal", p.status === "Diajukan" ? "Jadwalkan" : "Ubah jadwal"]);
     if ((admin || sayaPenguji) && p.status === "Dijadwalkan") a.push(["hasil", "Isi hasil"]);
     if (admin && p.status === "Diajukan") a.push(["batal", "Batalkan"]);
     return a;
@@ -228,12 +255,11 @@
     const box = $("dList");
     if (!rows.length) { box.innerHTML = `<p class="muted">Belum ada pengajuan.</p>`; return; }
     box.innerHTML = rows.map(p => {
-      const kelas = p.status.replace(" ", "-").replace("-", "");
       const aksi = aksiUntuk(p);
       return `<div class="kartu" data-id="${p.id}">
         <div class="judul">${esc(p.santri?.nama_lengkap || "-")} <span class="muted">(${esc(p.santri?.nis || "-")})</span></div>
         <div class="detail">${esc(p.rombel?.nama || "-")} · ${esc(p.jenis)} · ${esc(p.jilid_juz)}</div>
-        <div class="detail"><span class="status ${kelas}">${esc(p.status)}</span>
+        <div class="detail"><span class="status ${STATUS_KELAS[p.status] || ""}">${esc(p.status)}</span>
           ${p.tanggal_ujian ? " · Ujian " + tglIndo(p.tanggal_ujian) + (p.jam_ujian ? " pukul " + p.jam_ujian.slice(0, 5) : "") : ""}</div>
         ${p.penguji?.nama_lengkap ? `<div class="detail">Penguji: ${esc(p.penguji.nama_lengkap)}</div>` : ""}
         ${p.tanggal_final ? `<div class="detail">Tanggal final: ${tglIndo(p.tanggal_final)}${p.catatan ? " · " + esc(p.catatan) : ""}</div>` : ""}
@@ -251,17 +277,22 @@
     if (!p) return;
     if (act === "batal") return batalkan(id);
     const box = $("form-" + id);
+
     if (act === "jadwal") {
       if (!penguji.length) return pesan("Belum ada penguji. Tambahkan dulu di tab Penguji.");
+      const jamTerpilih = p.jam_ujian ? p.jam_ujian.slice(0, 5) : "08:00";
       box.innerHTML = `
         <label>Penguji
           <select class="penguji">${penguji.map(x => `<option value="${x.id}" ${x.id === p.penguji_id ? "selected" : ""}>${esc(x.nama)}</option>`).join("")}</select>
         </label>
-        <label>Tanggal ujian <input type="date" class="tgl" value="${p.tanggal_ujian || fmt(new Date())}"></label>
-        <label>Jam ujian <input type="time" class="jam" value="${p.jam_ujian ? p.jam_ujian.slice(0, 5) : "08:00"}"></label>
+        <label>Tanggal ujian <input type="date" class="tgl" value="${p.tanggal_ujian || ""}"></label>
+        <label>Jam ujian
+          <select class="jam">${JAM_UJIAN.map(j => `<option value="${j}" ${j === jamTerpilih ? "selected" : ""}>${j}</option>`).join("")}</select>
+        </label>
         <button class="btn kecil" data-simpan="jadwal">Simpan jadwal</button>`;
       box.querySelector("[data-simpan]").onclick = () => simpanJadwal(id);
     }
+
     if (act === "hasil") {
       box.innerHTML = `
         <label>Hasil
@@ -270,7 +301,7 @@
             <option value="Belum Lulus">Belum Lulus</option>
           </select>
         </label>
-        <label>Tanggal final <input type="date" class="tglFinal" value="${fmt(new Date())}"></label>
+        <label>Tanggal final <input type="date" class="tglFinal" value=""></label>
         <label>Catatan <textarea class="catatan"></textarea></label>
         <button class="btn kecil" data-simpan="hasil">Simpan hasil</button>`;
       box.querySelector("[data-simpan]").onclick = () => simpanHasil(id);
