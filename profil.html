@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Profil - Kuttab Al-Kalam</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; font-size: 15px; margin: 0; padding-bottom: 30px; background: #f7f7f7; color: #111; }
+  header { background: #222; color: #f2c94c; padding: 12px 16px; }
+  header a { color: #f2c94c; text-decoration: none; }
+  main { max-width: 560px; margin: 0 auto; padding: 12px; }
+  .box { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+  .box h3 { margin: 0 0 10px; font-size: 16px; }
+  .baris { display: grid; grid-template-columns: 120px 1fr; gap: 6px; font-size: 14px; padding: 4px 0; }
+  .baris .k { color: #666; }
+  label { display: block; font-size: 13px; color: #444; margin-bottom: 10px; }
+  input { width: 100%; padding: 10px; font-size: 15px; border: 1px solid #bbb; border-radius: 6px; margin-top: 4px; font-family: inherit; }
+  .btn { padding: 11px; font-size: 15px; border: none; border-radius: 6px; background: #28a745; color: #fff; width: 100%; }
+  .btn.abu { background: #6c757d; }
+  .btn:disabled { background: #aaa; }
+  #pesan { font-weight: bold; min-height: 20px; margin: 8px 0; }
+  .muted { color: #666; font-size: 13px; }
+</style>
+</head>
+<body>
+<header><a href="dashboard.html">← Dashboard</a> &nbsp; <strong>Profil</strong></header>
+
+<main>
+  <p id="pesan"></p>
+
+  <div class="box" id="dataBox">
+    <h3>Data Saya</h3>
+    <div class="baris"><div class="k">Nama</div><div id="vNama">-</div></div>
+    <div class="baris"><div class="k">Email</div><div id="vEmail">-</div></div>
+    <div class="baris"><div class="k">Peran</div><div id="vPeran">-</div></div>
+    <p class="muted">Nama, email, dan peran diubah oleh admin.</p>
+  </div>
+
+  <div class="box">
+    <h3>Nomor HP</h3>
+    <label>Nomor HP (WhatsApp aktif)
+      <input id="hp" type="tel" inputmode="tel" placeholder="08xxxxxxxxxx">
+    </label>
+    <button class="btn" id="simpanHp">Simpan Nomor HP</button>
+  </div>
+
+  <div class="box">
+    <h3>Ganti Password</h3>
+    <label>Password lama
+      <input id="pwLama" type="password" autocomplete="current-password">
+    </label>
+    <label>Password baru (minimal 8 karakter)
+      <input id="pwBaru" type="password" autocomplete="new-password" minlength="8">
+    </label>
+    <label>Ulangi password baru
+      <input id="pwUlang" type="password" autocomplete="new-password" minlength="8">
+    </label>
+    <button class="btn" id="gantiPw">Ganti Password</button>
+    <p class="muted">Password lama diperiksa dulu, lalu password baru disimpan.</p>
+  </div>
+
+  <div class="box">
+    <button class="btn abu" id="keluar">Keluar</button>
+  </div>
+</main>
+
+<script>
+  const SUPABASE_URL = "https://epynlmuqxumuwcjsrnsz.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_Oq_to1zgHLnachvWYLV_yA_DoOTGI3s";
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const $ = id => document.getElementById(id);
+  const pesan = (t, ok = true) => {
+    $("pesan").textContent = t;
+    $("pesan").style.color = ok ? "#111" : "#dc3545";
+  };
+  const PERAN = { admin: "Admin", kepala: "Kepala", guru: "Guru", staf: "Staf" };
+
+  let me = null, session = null;
+
+  async function init() {
+    const { data } = await sb.auth.getSession();
+    session = data.session;
+    if (!session) { location.href = "login.html"; return; }
+
+    const { data: p, error } = await sb.from("pegawai")
+      .select("id, nama_lengkap, email, nomor_hp, peran")
+      .eq("auth_user_id", session.user.id).maybeSingle();
+    if (error) return pesan("Gagal memuat profil: " + error.message, false);
+    if (!p) return pesan("Akun Anda belum terhubung ke data pegawai.", false);
+
+    me = p;
+    $("vNama").textContent = p.nama_lengkap;
+    $("vEmail").textContent = p.email;
+    $("vPeran").textContent = PERAN[p.peran] || p.peran;
+    $("hp").value = p.nomor_hp || "";
+
+    $("simpanHp").onclick = simpanHp;
+    $("gantiPw").onclick = gantiPassword;
+    $("keluar").onclick = keluar;
+  }
+
+  function normalisasiHp(v) {
+    const bersih = v.replace(/[\s\-()]/g, "");
+    if (!/^(\+?62|0)[0-9]{8,13}$/.test(bersih)) return null;
+    return bersih.replace(/^\+/, "").replace(/^0/, "62");
+  }
+
+  async function simpanHp() {
+    const hp = normalisasiHp($("hp").value.trim());
+    if (!hp) return pesan("Nomor HP tidak valid. Contoh: 081234567890", false);
+
+    $("simpanHp").disabled = true;
+    const { error } = await sb.from("pegawai").update({ nomor_hp: hp }).eq("id", me.id);
+    $("simpanHp").disabled = false;
+    if (error) return pesan("Gagal menyimpan nomor HP: " + error.message, false);
+
+    me.nomor_hp = hp;
+    $("hp").value = hp;
+    pesan("Nomor HP tersimpan.");
+  }
+
+  async function gantiPassword() {
+    const lama = $("pwLama").value;
+    const baru = $("pwBaru").value;
+    const ulang = $("pwUlang").value;
+
+    if (!lama || !baru || !ulang) return pesan("Lengkapi ketiga kolom password.", false);
+    if (baru.length < 8) return pesan("Password baru minimal 8 karakter.", false);
+    if (baru !== ulang) return pesan("Password baru dan ulangannya tidak sama.", false);
+    if (baru === lama) return pesan("Password baru harus berbeda dari password lama.", false);
+
+    $("gantiPw").disabled = true;
+    pesan("Memeriksa password lama...");
+
+    // Pastikan password lama benar sebelum mengganti
+    const { error: eLogin } = await sb.auth.signInWithPassword({
+      email: session.user.email,
+      password: lama
+    });
+    if (eLogin) {
+      $("gantiPw").disabled = false;
+      return pesan("Password lama tidak sesuai.", false);
+    }
+
+    const { error } = await sb.auth.updateUser({ password: baru });
+    $("gantiPw").disabled = false;
+    if (error) return pesan("Gagal mengganti password: " + error.message, false);
+
+    $("pwLama").value = "";
+    $("pwBaru").value = "";
+    $("pwUlang").value = "";
+    pesan("Password berhasil diganti.");
+  }
+
+  async function keluar() {
+    await sb.auth.signOut();
+    location.href = "login.html";
+  }
+
+  init();
+</script>
+</body>
+</html>
