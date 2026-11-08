@@ -15,6 +15,7 @@
   label { display: block; font-size: 13px; color: #444; margin-bottom: 10px; }
   select, input, textarea { width: 100%; padding: 9px; font-size: 15px; border: 1px solid #bbb; border-radius: 6px; margin-top: 4px; font-family: inherit; }
   textarea { min-height: 64px; }
+  textarea:disabled { background: #f3f3f3; color: #555; }
   .btn { padding: 11px; font-size: 15px; border: none; border-radius: 6px; background: #28a745; color: #fff; width: 100%; }
   .btn.kecil { width: auto; padding: 9px 14px; margin-top: 8px; }
   .btn:disabled { background: #aaa; }
@@ -23,6 +24,7 @@
   .badge { display: inline-block; font-size: 12px; padding: 3px 8px; border-radius: 10px; margin: 2px 4px 2px 0; background: #eee; color: #555; }
   .badge.ok { background: #28a745; color: #fff; }
   .badge.kosong { background: #f0ad4e; color: #fff; }
+  .badge.revisi { background: #2a6fdb; color: #fff; }
   .dua { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   @media (max-width: 480px) { .dua { grid-template-columns: 1fr; } }
   #pesan { font-weight: bold; min-height: 20px; margin: 8px 0; }
@@ -54,32 +56,41 @@
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const fmt = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 
-  // Setiap bagian: tabel, kode mapel yang boleh mengisi, dan daftar kolom
+  // Susunan mengikuti formulir RKK cetak
   const SEKSI = [
-    { key: "iman", judul: "Muatan Iman", tabel: "rkk_iman", kodes: ["iman"], fields: [
-      ["alokasi_waktu", "Alokasi Waktu (Iman)"], ["surat_ayat", "Nama Surat dan Ayat"], ["ayat", "Ayat"],
-      ["terjemahan", "Terjemahan"], ["poin_pembahasan", "Poin Pembahasan"], ["kisah", "Kisah"],
-      ["amtsal", "Amtsal"], ["asesmen", "Asesmen Iman"]
+    { key: "iman", judul: "Materi Iman", tabel: "rkk_iman", kodes: ["iman"], fields: [
+      ["alokasi_waktu", "Alokasi Waktu (menit)"],
+      ["surat_ayat", "Nama Surat dan Ayat"],
+      ["ayat", "Ayat"],
+      ["terjemahan", "Terjemahan"],
+      ["poin_pembahasan", "Poin Pembahasan (1, 2, 3)"],
+      ["kisah", "Kisah"],
+      ["amtsal", "Amtsal"],
+      ["asesmen", "Asesmen Iman"]
     ]},
-    { key: "murofaqot", judul: "Muatan Murofaqot", tabel: "rkk_murofaqot", kodes: ["bindo","mtk","ipa","ips"], fields: [
-      ["alokasi_waktu", "Alokasi Waktu (Murofaqot)"], ["bahasa_indonesia", "Bahasa Indonesia"],
-      ["matematika", "Matematika"], ["ipa", "IPA"], ["ips", "IPS"]
+    { key: "murofaqot", judul: "Murofaqot", tabel: "rkk_murofaqot", kodes: ["bindo","mtk","ipa","ips"], fields: [
+      ["alokasi_waktu", "Alokasi Waktu (menit)"],
+      ["bahasa_indonesia", "Bahasa Indonesia"],
+      ["matematika", "Matematika"],
+      ["ipa", "IPA"],
+      ["ips", "IPS"]
     ]},
-    { key: "quran", judul: "Muatan Quran", tabel: "rkk_quran", kodes: ["tilawah","tahfidz","kitabah"], fields: [
-      ["alokasi_waktu", "Alokasi Waktu (Quran)"], ["tahfidz", "Tahfidz"], ["tilawah", "Tilawah"],
-      ["kitabah", "Kitabah"], ["asesmen", "Asesmen Quran"]
+    { key: "quran", judul: "Materi Al Quran", tabel: "rkk_quran", kodes: ["tilawah","tahfidz","kitabah"], fields: [
+      ["alokasi_waktu", "Alokasi Waktu (menit)"],
+      ["tahfidz", "Tahfidz"],
+      ["tilawah", "Tilawah"],
+      ["kitabah", "Kitabah"],
+      ["pojok_pengaman", "Pojok Pengaman"],
+      ["asesmen", "Asesmen Quran"]
     ]},
-    { key: "umum", judul: "Umum (Wali Kelas)", tabel: "rkk_pertemuan", kodes: [], fields: [
-      ["alokasi_waktu", "Alokasi Waktu"], ["materi_umum", "Materi yang dibawakan"],
-      ["pojok_pengaman", "Pojok Pengaman"], ["ukuran_pojok", "Ukuran dan jumlah cetak (pojok)"],
-      ["file_pojok", "Link file pojok pengaman"], ["file_gambar", "Link file gambar untuk dicetak"],
-      ["ukuran_gambar", "Ukuran dan jumlah cetak (gambar)"]
+    { key: "umum", judul: "Alokasi Waktu Total", tabel: "rkk_pertemuan", kodes: [], fields: [
+      ["alokasi_waktu", "Alokasi Waktu total (menit)"]
     ]}
   ];
 
   let me = null, sem = null, rombelList = [];
   let kodeSaya = {}, waliSet = new Set();
-  let rkkRow = null, data = {};
+  let rkkRow = null, data = {}, jumlahRevisi = 0;
 
   const kodeRombel = rid => kodeSaya[rid] || new Set();
 
@@ -119,7 +130,11 @@
     if (!bisa.length) pesan("Anda belum punya kelas di tahun ajaran ini.");
     $("tanggal").value = fmt(new Date());
     $("bukaBtn").onclick = bukaRkk;
-    $("rombel").onchange = () => { rkkRow = null; data = {}; $("badges").innerHTML = ""; $("seksi").innerHTML = ""; pesan("Klik Buka RKK untuk memuat."); };
+    $("rombel").onchange = () => {
+      rkkRow = null; data = {};
+      $("badges").innerHTML = ""; $("seksi").innerHTML = "";
+      pesan("Klik Buka RKK untuk memuat.");
+    };
   }
 
   function canEdit(sec) {
@@ -165,6 +180,13 @@
       sb.from("rkk_quran").select("*").eq("rkk_id", baris.id).maybeSingle()
     ]);
     data = { umum: baris, iman: a.data || {}, murofaqot: b.data || {}, quran: c.data || {} };
+
+    jumlahRevisi = 0;
+    if (me.peran !== "guru") {
+      const { count } = await sb.from("rkk_riwayat")
+        .select("id", { count: "exact", head: true }).eq("rkk_id", baris.id);
+      jumlahRevisi = count || 0;
+    }
     render();
   }
 
@@ -175,7 +197,8 @@
       `<span class="badge ${iman ? "ok" : "kosong"}">Iman ${iman ? "✓" : "belum"}</span>` +
       `<span class="badge ${murofaqot ? "ok" : "kosong"}">Murofaqot ${murofaqot ? "✓" : "belum"}</span>` +
       `<span class="badge ${quran ? "ok" : "kosong"}">Quran ${quran ? "✓" : "belum"}</span>` +
-      (lengkap ? ` <span class="badge ok">RKK utuh</span>` : "");
+      (lengkap ? ` <span class="badge ok">RKK utuh</span>` : "") +
+      (me.peran !== "guru" && jumlahRevisi ? ` <span class="badge revisi">Direvisi ${jumlahRevisi}x</span>` : "");
 
     const box = $("seksi");
     box.innerHTML = "";
