@@ -114,8 +114,13 @@ const KUTTAB = (() => {
               <a class="nav-link" data-widget="pushmenu" href="#" role="button"><i class="fas fa-bars"></i></a>
             </li>
           </ul>
-          <ul class="navbar-nav ml-auto">
-            <li class="nav-item"><span class="nav-link d-none d-md-inline">${esc(me.nama_lengkap)}</span></li>
+            <ul class="navbar-nav ml-auto align-items-center">
+            <li class="nav-item">
+              <a class="nav-link d-flex align-items-center" href="profil.html" title="Profil saya">
+                <span class="profil-ikon mr-2"><i class="fas fa-user-circle"></i></span>
+                <span class="d-none d-sm-inline">${esc(me.nama_lengkap)}</span>
+              </a>
+            </li>
             <li class="nav-item"><a class="nav-link" href="#" id="btnKeluar" title="Keluar"><i class="fas fa-sign-out-alt"></i></a></li>
           </ul>
         </nav>
