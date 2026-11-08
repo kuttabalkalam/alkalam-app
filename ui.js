@@ -19,7 +19,7 @@ const KUTTAB = (() => {
     { key: "rkk", label: "RKK", href: "rkk.html", icon: "fa-clipboard-list", roles: ["admin","kepala","guru"] },
     { key: "rkk-cetak", label: "Cetak RKK", href: "rkk-cetak.html", icon: "fa-print", roles: ["admin","kepala","guru"] },
     { key: "pengajuan-jilid", label: "Pengajuan Ujian Jilid", href: "pengajuan-jilid.html", icon: "fa-certificate", roles: ["admin","kepala","guru"], quranSaja: true },
-    { key: "profil", label: "Profil", href: "profil.html", icon: "fa-user-cog", roles: ["admin","kepala","staf","guru"] }
+    /*{ key: "profil", label: "Profil", href: "profil.html", icon: "fa-user-cog", roles: ["admin","kepala","staf","guru"] }*/
   ];
 
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -116,7 +116,7 @@ const KUTTAB = (() => {
           </ul>
             <ul class="navbar-nav ml-auto align-items-center">
             <li class="nav-item">
-              <a class="nav-link d-flex align-items-center" href="profil.html" title="Profil saya">
+              <a class="nav-link d-flex align-items-center btn btn-outline-light" href="profil.html" title="Profil saya">
                 <span class="profil-ikon mr-2"><i class="fas fa-user-circle"></i></span>
                 <span class="d-none d-sm-inline">${esc(me.nama_lengkap)}</span>
               </a>
