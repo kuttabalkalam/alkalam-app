@@ -1,0 +1,48 @@
+:root { --kuning: #f2c94c; --hitam: #1a1a1a; --biru: #e6f4fb; --biru-tua: #bfe3f5; }
+
+/* Navbar */
+.main-header.navbar { background: var(--hitam) !important; border-bottom: 3px solid var(--kuning); }
+.main-header .nav-link, .main-header .navbar-nav .nav-link { color: var(--kuning) !important; }
+.main-header .navbar-nav span.nav-link { color: var(--kuning) !important; }
+
+/* Sidebar */
+.main-sidebar { background: var(--hitam) !important; }
+.brand-link { border-bottom: 1px solid #333 !important; }
+.brand-text { color: var(--kuning) !important; font-weight: 700; }
+.nav-sidebar > .nav-item > .nav-link { color: #eee; }
+.nav-sidebar > .nav-item > .nav-link:hover { background: #333; color: var(--kuning); }
+.nav-sidebar > .nav-item > .nav-link.active { background: var(--kuning) !important; color: var(--hitam) !important; }
+.nav-sidebar > .nav-item > .nav-link.active .nav-icon { color: var(--hitam) !important; }
+.nav-sidebar .nav-icon { color: var(--kuning); }
+
+/* Konten */
+.content-wrapper { background: var(--biru); }
+.content-header h1 { color: var(--hitam); font-size: 1.5rem; font-weight: 700; }
+.content-header small { font-size: 0.85rem; }
+.card { border-top: 3px solid var(--kuning); }
+.card-header { background: var(--biru-tua); color: var(--hitam); font-weight: 600; }
+.main-footer { font-size: 0.8rem; }
+
+/* Tombol */
+.btn-kuning { background: var(--kuning); color: var(--hitam); border: none; font-weight: 600; }
+.btn-kuning:hover, .btn-kuning:focus { background: #e0b53a; color: var(--hitam); }
+.btn-hitam { background: var(--hitam); color: var(--kuning); border: none; }
+.btn-hitam:hover { background: #333; color: var(--kuning); }
+
+/* Kartu menu di beranda */
+.menu-tile {
+  display: block; height: 100%; background: #fff; border-radius: 10px;
+  padding: 20px 12px; text-align: center; color: var(--hitam);
+  border-bottom: 4px solid var(--kuning); box-shadow: 0 2px 6px rgba(0,0,0,.08);
+  transition: transform .15s ease;
+}
+.menu-tile:hover { text-decoration: none; color: var(--hitam); transform: translateY(-2px); }
+.menu-tile i { font-size: 28px; color: var(--hitam); margin-bottom: 8px; }
+.menu-tile .judul { font-weight: 600; font-size: 0.95rem; }
+
+/* Mobile */
+@media (max-width: 576px) {
+  .content-header h1 { font-size: 1.25rem; }
+  .menu-tile { padding: 16px 8px; }
+  .menu-tile i { font-size: 24px; }
+}
