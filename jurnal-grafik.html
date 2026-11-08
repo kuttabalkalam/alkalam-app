@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grafik Jurnal Tahsin - Kuttab Al-Kalam</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  body { font-family: Arial, sans-serif; margin: 0; background: #f7f7f7; color: #111; font-size: 15px; }
+  header { background: #222; color: #f2c94c; padding: 12px 16px; }
+  header a { color: #f2c94c; text-decoration: none; }
+  main { max-width: 900px; margin: 0 auto; padding: 12px; }
+  .box { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+  .filter { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+  label { font-size: 13px; color: #444; display: block; }
+  select { width: 100%; padding: 8px; font-size: 15px; margin-top: 4px; border: 1px solid #bbb; border-radius: 6px; }
+  .ringkas { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .kartu { border: 1px solid #ddd; border-radius: 8px; padding: 10px; text-align: center; background: #fafafa; }
+  .kartu .judul { font-size: 13px; color: #666; }
+  .kartu .angka { font-size: 20px; font-weight: bold; margin-top: 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
+  th { background: #f3f3f3; }
+  #pesan { font-weight: bold; min-height: 20px; }
+</style>
+</head>
+<body>
+<header><a href="dashboard.html">← Dashboard</a> &nbsp; <strong>Grafik Jurnal Tahsin</strong></header>
+
+<main>
+  <p id="info"></p>
+  <div class="box filter">
+    <label>Kelas <select id="rombel"></select></label>
+    <label>Kitab
+      <select id="kitab">
+        <option value="tilawati">Tilawati</option>
+        <option value="quran">Quran</option>
+      </select>
+    </label>
+    <label>Tampilan
+      <select id="mode">
+        <option value="kelas">Seluruh kelas</option>
+        <option value="santri">Per santri</option>
+      </select>
+    </label>
+    <label id="wrapSantri" style="display:none">Santri <select id="santri"></select></label>
+    <label>Periode
+      <select id="jenis">
+        <option value="pekan">Pekanan</option>
+        <option value="bulan">Bulanan</option>
+      </select>
+    </label>
+  </div>
+
+  <p id="pesan"></p>
+  <div class="box ringkas" id="ringkas"></div>
+  <div class="box"><canvas id="cKet"></canvas></div>
+  <div class="box"><canvas id="cHal"></canvas></div>
+  <div class="box" style="overflow-x:auto"><table id="tabel"></table></div>
+</main>
+
+<script>
+  const SUPABASE_URL = "https://epynlmuqxumuwcjsrnsz.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_Oq_to1zgHLnachvWYLV_yA_DoOTGI3s";
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const $ = id => document.getElementById(id);
+  const pesan = t => $("pesan").textContent = t;
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const fmt = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  const BULAN = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+  const BULAN_S = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
+
+  let sem = null, chartKet = null, chartHal = null;
+
+  // Kunci periode: pekan = tanggal Senin, bulan = yyyy-mm
+  function kunciPeriode(iso, jenis) {
+    if (jenis === "bulan") return iso.slice(0, 7);
+    const d = new Date(iso + "T00:00:00");
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    return fmt(d);
+  }
+
+  function labelPeriode(k, jenis) {
+    if (jenis === "bulan") {
+      const [y, m] = k.split("-");
+      return BULAN[Number(m) - 1] + " " + y;
+    }
+    const d = new Date(k + "T00:00:00");
+    return "Pekan " + d.getDate() + " " + BULAN_S[d.getMonth()];
+  }
+
+  function agregat(rows, jenis) {
+    const map = {};
+    rows.forEach(r => {
+      const k = kunciPeriode(r.tanggal, jenis);
+      const m = map[k] ||= { k, pertemuan: 0, total: 0, L: 0, CL: 0, TL: 0 };
+      m.pertemuan++;
+      m.total += r.halaman;
+      m[r.keterangan]++;
+    });
+    return Object.values(map)
+      .sort((a, b) => a.k.localeCompare(b.k))
+      .map(m => ({ ...m, rata: m.pertemuan ? +(m.total / m.pertemuan).toFixed(2) : 0 }));
+  }
+
+  function tampilRingkas(rows) {
+    const n = rows.length;
+    const total = rows.reduce((a, r) => a + r.halaman, 0);
+    const cnt = { L: 0, CL: 0, TL: 0 };
+    rows.forEach(r => cnt[r.keterangan]++);
+    const pct = k => n ? Math.round(cnt[k] / n * 100) : 0;
+    $("ringkas").innerHTML = [
+      ["Pertemuan", n],
+      ["Total halaman", total],
+      ["Rata-rata halaman", n ? (total / n).toFixed(2) : "-"],
+      ["Lancar (L)", cnt.L + " (" + pct("L") + "%)"],
+      ["Cukup Lancar (CL)", cnt.CL + " (" + pct("CL") + "%)"],
+      ["Tidak Lancar (TL)", cnt.TL + " (" + pct("TL") + "%)"]
+    ].map(([j, a]) => `<div class="kartu"><div class="judul">${j}</div><div class="angka">${a}</div></div>`).join("");
+  }
+
+  function gambar(data, jenis) {
+    const labels = data.map(d => labelPeriode(d.k, jenis));
+    if (chartKet) chartKet.destroy();
+    if (chartHal) chartHal.destroy();
+
+    chartKet = new Chart($("cKet"), {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [
+          { label: "Lancar (L)", data: data.map(d => d.L), backgroundColor: "#28a745" },
+          { label: "Cukup Lancar (CL)", data: data.map(d => d.CL), backgroundColor: "#f0ad4e" },
+          { label: "Tidak Lancar (TL)", data: data.map(d => d.TL), backgroundColor: "#dc3545" }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: { title: { display: true, text: "Jumlah pertemuan per kategori" } },
+        scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }
+      }
+    });
+
+    chartHal = new Chart($("cHal"), {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          { label: "Rata-rata halaman per pertemuan", data: data.map(d => d.rata), borderColor: "#2a6fdb", tension: 0.2 },
+          { label: "Total halaman", data: data.map(d => d.total), borderColor: "#999", borderDash: [5, 5], tension: 0.2 }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: { title: { display: true, text: "Perkembangan halaman" } },
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+  }
+
+  function tampilTabel(data, jenis) {
+    const t = $("tabel");
+    t.innerHTML = `<tr><th>Periode</th><th>Pertemuan</th><th>Total halaman</th><th>Rata-rata halaman</th><th>L</th><th>CL</th><th>TL</th></tr>` +
+      data.map(d => `<tr><td>${labelPeriode(d.k, jenis)}</td><td>${d.pertemuan}</td><td>${d.total}</td><td>${d.rata}</td><td>${d.L}</td><td>${d.CL}</td><td>${d.TL}</td></tr>`).join("");
+  }
+
+  async function init() {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { location.href = "login.html"; return; }
+
+    const { data: p, error: eP } = await sb.from("pegawai")
+      .select("id, peran").eq("auth_user_id", session.user.id).maybeSingle();
+    if (eP) return pesan("Gagal memuat akun: " + eP.message);
+    if (!p || !["admin", "kepala", "guru"].includes(p.peran)) return pesan("Halaman ini tidak tersedia untuk akun Anda.");
+
+    const { data: s } = await sb.from("semester")
+      .select("id, nomor, tahun_ajaran_id, tahun_ajaran:tahun_ajaran_id(kode)")
+      .eq("aktif", true).maybeSingle();
+    if (!s) return pesan("Belum ada semester aktif.");
+    sem = s;
+    $("info").textContent = "TA " + s.tahun_ajaran.kode + " · Semester " + (s.nomor === 1 ? "Ganjil" : "Genap");
+
+    // RLS membatasi kelas yang muncul sesuai peran
+    const { data: r } = await sb.from("rombel")
+      .select("id, nama").eq("tahun_ajaran_id", s.tahun_ajaran_id).order("nama");
+    $("rombel").innerHTML = (r || []).map(x => `<option value="${x.id}">${esc(x.nama)}</option>`).join("");
+    if (!(r || []).length) return pesan("Belum ada kelas yang bisa Anda lihat.");
+
+    $("rombel").onchange = async () => { await isiSantri(); muat(); };
+    $("mode").onchange = async () => {
+      $("wrapSantri").style.display = $("mode").value === "santri" ? "block" : "none";
+      if ($("mode").value === "santri") await isiSantri();
+      muat();
+    };
+    $("santri").onchange = muat;
+    $("kitab").onchange = muat;
+    $("jenis").onchange = muat;
+
+    await isiSantri();
+    muat();
+  }
+
+  async function isiSantri() {
+    const rid = Number($("rombel").value);
+    const { data } = await sb.from("keanggotaan_rombel")
+      .select("santri:santri_id(id, nama_lengkap)")
+      .eq("rombel_id", rid).eq("tahun_ajaran_id", sem.tahun_ajaran_id);
+    const list = (data || []).map(x => x.santri).filter(Boolean)
+      .sort((a, b) => a.nama_lengkap.localeCompare(b.nama_lengkap));
+    $("santri").innerHTML = list.map(x => `<option value="${x.id}">${esc(x.nama_lengkap)}</option>`).join("");
+  }
+
+  async function muat() {
+    const rid = Number($("rombel").value), kit = $("kitab").value, jenis = $("jenis").value, mode = $("mode").value;
+    if (!rid) return pesan("Pilih kelas.");
+    if (mode === "santri" && !$("santri").value) return pesan("Pilih santri.");
+
+    pesan("Memuat...");
+    let q = sb.from("jurnal_tahsin")
+      .select("santri_id, tanggal, halaman, keterangan")
+      .eq("rombel_id", rid).eq("kitab", kit).eq("semester_id", sem.id);
+    if (mode === "santri") q = q.eq("santri_id", Number($("santri").value));
+
+    const { data, error } = await q;
+    if (error) return pesan("Gagal memuat: " + error.message);
+
+    const rows = data || [];
+    pesan(rows.length ? "" : "Belum ada jurnal untuk pilihan ini.");
+    tampilRingkas(rows);
+    const agg = agregat(rows, jenis);
+    gambar(agg, jenis);
+    tampilTabel(agg, jenis);
+  }
+
+  init();
+</script>
+</body>
+</html>
