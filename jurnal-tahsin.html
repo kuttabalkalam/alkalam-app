@@ -7,7 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
 <style>
   * { box-sizing: border-box; }
-  body { font-family: Arial, sans-serif; font-size: 16px; margin: 0; padding: 0 0 90px; background: #f7f7f7; color: #111; }
+  body { font-family: Arial, sans-serif; font-size: 16px; margin: 0; padding: 0 0 20px; background: #f7f7f7; color: #111; }
   header { background: #222; color: #f2c94c; padding: 12px 16px; }
   header a { color: #f2c94c; text-decoration: none; }
   main { max-width: 640px; margin: 0 auto; padding: 12px; }
@@ -20,22 +20,25 @@
   label { display: block; margin-bottom: 10px; font-size: 14px; color: #444; }
   select, input, textarea { width: 100%; padding: 10px; font-size: 16px; border: 1px solid #bbb; border-radius: 6px; margin-top: 4px; font-family: inherit; }
   .btn { padding: 12px; font-size: 16px; border: none; border-radius: 6px; background: #28a745; color: #fff; width: 100%; }
+  .btn:disabled { background: #aaa; }
   .kitab { display: flex; gap: 6px; margin-bottom: 10px; }
   .kitab button { flex: 1; padding: 10px; border: 1px solid #bbb; background: #fff; border-radius: 6px; font-size: 15px; }
   .kitab button.aktif { background: #28a745; color: #fff; border-color: #28a745; }
-  .santri { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
-  .santri .nama { font-weight: bold; }
-  .santri .nis { font-size: 13px; color: #666; margin-bottom: 8px; }
-  .baris { display: flex; gap: 8px; align-items: center; }
-  .baris input.halaman { width: 84px; margin-top: 0; }
-  .ket { display: flex; gap: 6px; flex: 1; }
-  .ket button { flex: 1; padding: 10px 4px; border: 1px solid #bbb; background: #fff; border-radius: 6px; font-size: 15px; }
+  .dua { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 480px) { .dua { grid-template-columns: 1fr; } }
+  .ket { display: flex; gap: 8px; margin: 6px 0 12px; }
+  .ket button { flex: 1; padding: 12px 4px; border: 1px solid #bbb; background: #fff; border-radius: 6px; font-size: 16px; font-weight: bold; }
   .ket button.L.aktif { background: #28a745; color: #fff; border-color: #28a745; }
   .ket button.CL.aktif { background: #f0ad4e; color: #fff; border-color: #f0ad4e; }
   .ket button.TL.aktif { background: #dc3545; color: #fff; border-color: #dc3545; }
+  .progres { font-weight: bold; margin-bottom: 10px; }
+  .sudah { border-bottom: 1px solid #eee; padding: 8px 0; font-size: 15px; }
+  .sudah .nama { font-weight: bold; }
+  .sudah .detail { color: #555; font-size: 14px; }
+  .santri { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+  .santri .nama { font-weight: bold; }
+  .santri .nis { font-size: 13px; color: #666; margin-bottom: 8px; }
   .santri textarea { min-height: 80px; font-size: 15px; }
-  .bawah { display: none; position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid #ddd; padding: 10px; }
-  .bawah .btn { max-width: 640px; margin: 0 auto; display: block; }
   #pesan { font-weight: bold; min-height: 20px; margin: 8px 0; }
   .muted { color: #666; font-size: 14px; }
 </style>
@@ -53,50 +56,67 @@
 
   <section class="panel aktif" id="pJurnal">
     <div class="box">
-      <label>Kelas
-        <select id="jRombel"></select>
-      </label>
-      <label>Tanggal
-        <input type="date" id="jTanggal">
-      </label>
+      <label>Kelas <select id="jRombel"></select></label>
+      <label>Tanggal <input type="date" id="jTanggal"></label>
       <label>Kitab</label>
       <div class="kitab" id="jKitab">
         <button type="button" data-k="tilawati" class="aktif">Tilawati</button>
         <button type="button" data-k="quran">Quran</button>
+        <button type="button" data-k="tahfidz">Tahfidz</button>
       </div>
-      <button class="btn" id="jMuat">Tampilkan Santri</button>
+      <button class="btn" id="jMulai">Mulai Mengisi</button>
     </div>
-    <div id="jDaftar"></div>
+
+    <div class="box" id="formBox" style="display:none">
+      <div class="progres" id="progres"></div>
+      <label>Santri <select id="fSantri"></select></label>
+      <div class="dua">
+        <label><span id="lblUnit">Jilid</span>
+          <input id="fUnit" type="text" autocomplete="off">
+        </label>
+        <label><span id="lblAngka">Halaman</span>
+          <input id="fAngka" type="number" inputmode="numeric" min="0">
+        </label>
+      </div>
+      <label>Keterangan</label>
+      <div class="ket">
+        <button type="button" class="L" data-v="L">L</button>
+        <button type="button" class="CL" data-v="CL">CL</button>
+        <button type="button" class="TL" data-v="TL">TL</button>
+      </div>
+      <button class="btn" id="fSimpan">Simpan dan Lanjut</button>
+    </div>
+
+    <div class="box" id="sudahBox" style="display:none">
+      <strong>Sudah diisi hari ini</strong>
+      <div id="sudahList"></div>
+      <p class="muted">Koreksi data yang keliru dilakukan oleh admin.</p>
+    </div>
   </section>
 
   <section class="panel" id="pCatatan">
     <div class="box">
-      <label>Kelas
-        <select id="cRombel"></select>
-      </label>
+      <label>Kelas <select id="cRombel"></select></label>
       <label>Jenis
         <select id="cJenis">
           <option value="pekan">Pekanan</option>
           <option value="bulan">Bulanan</option>
         </select>
       </label>
-      <label>Tanggal dalam periode
-        <input type="date" id="cTanggal">
-      </label>
+      <label>Tanggal dalam periode <input type="date" id="cTanggal"></label>
       <p class="muted" id="cPeriode"></p>
       <button class="btn" id="cMuat">Tampilkan Santri</button>
     </div>
     <div id="cDaftar"></div>
+    <div id="cSimpanWrap" style="display:none">
+      <button class="btn" id="cSimpan">Simpan Catatan</button>
+    </div>
   </section>
 </main>
 
-<div class="bawah" id="bawahBar">
-  <button class="btn" id="simpanBtn">Simpan</button>
-</div>
-
 <script>
   const SUPABASE_URL = "https://epynlmuqxumuwcjsrnsz.supabase.co";
-  const SUPABASE_ANON_KEY = "sb_publishable_Oq_to1zgHLnachvWYLV_yA_DoOTGI3s";
+  const SUPABASE_ANON_KEY = "ISI_ANON_KEY";
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   const $ = id => document.getElementById(id);
@@ -106,6 +126,13 @@
   const BULAN = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
   const tglIndo = iso => { const d = new Date(iso + "T00:00:00"); return d.getDate() + " " + BULAN[d.getMonth()] + " " + d.getFullYear(); };
   const KODE_QURAN = ["tilawah", "tahfidz", "kitabah"];
+
+  // Label kolom per kitab
+  const UNIT = {
+    tilawati: { unit: "Jilid", angka: "Halaman" },
+    quran:    { unit: "Juz",   angka: "Halaman" },
+    tahfidz:  { unit: "Surat", angka: "Ayat" }
+  };
 
   // Pekan = Senin s.d. Minggu. Bulan = tanggal 1 s.d. akhir bulan.
   function batasPeriode(jenis, iso) {
@@ -124,10 +151,11 @@
   }
 
   let me = null, sem = null, rombelJurnal = [], rombelCatatan = [];
-  let daftar = [], existing = {}, existingCatatan = {}, rombelAktif = null;
-  let kitab = "tilawati", modeAktif = "jurnal";
+  let modeAktif = "jurnal", kitab = "tilawati";
+  let sesi = null, santriList = [], existing = {}, fKet = "";
+  let daftarCatatan = [], existingCatatan = {};
 
-  function setBar(on) { $("bawahBar").style.display = on ? "block" : "none"; }
+  function setBarCatatan(on) { $("cSimpanWrap").style.display = on ? "block" : "none"; }
 
   function isiSelect(id, list) {
     $(id).innerHTML = list.map(r => `<option value="${r.id}">${esc(r.nama)}</option>`).join("");
@@ -181,10 +209,11 @@
     $("tabCatatan").classList.toggle("aktif", mode === "catatan");
     $("pJurnal").classList.toggle("aktif", mode === "jurnal");
     $("pCatatan").classList.toggle("aktif", mode === "catatan");
-    daftar = [];
-    $("jDaftar").innerHTML = "";
+    sesi = null;
+    $("formBox").style.display = "none";
+    $("sudahBox").style.display = "none";
     $("cDaftar").innerHTML = "";
-    setBar(false);
+    setBarCatatan(false);
     pesan("");
   }
 
@@ -197,106 +226,103 @@
       .sort((a, b) => a.nama_lengkap.localeCompare(b.nama_lengkap));
   }
 
-  // ===== JURNAL HARIAN =====
-  async function jurnalMuat() {
+  // ===== JURNAL: satu santri per isian =====
+  async function mulai() {
     const rid = Number($("jRombel").value), tgl = $("jTanggal").value;
     if (!rid || !tgl) return pesan("Pilih kelas dan tanggal.");
     pesan("Memuat...");
     try {
-      rombelAktif = rid;
-      daftar = await ambilSantri(rid);
-      const ids = daftar.map(s => s.id);
+      santriList = await ambilSantri(rid);
+      const ids = santriList.map(s => s.id);
       existing = {};
       if (ids.length) {
         const { data, error } = await sb.from("jurnal_tahsin")
-          .select("santri_id, kitab, halaman, keterangan")
-          .eq("tanggal", tgl).in("santri_id", ids);
+          .select("santri_id, unit, halaman, keterangan")
+          .eq("tanggal", tgl).eq("kitab", kitab).in("santri_id", ids);
         if (error) throw new Error(error.message);
-        (data || []).forEach(j => existing[j.santri_id + "|" + j.kitab] = j);
+        (data || []).forEach(j => existing[j.santri_id] = j);
       }
-      renderJurnal();
-      pesan(daftar.length ? "" : "Belum ada santri di kelas ini.");
+      sesi = { rid, tgl };
+      $("formBox").style.display = "block";
+      $("sudahBox").style.display = "block";
+      resetForm(false);
+      renderAll();
+      pesan(santriList.length ? "" : "Belum ada santri di kelas ini.");
     } catch (e) {
       pesan("Gagal memuat: " + e.message);
     }
   }
 
-  function renderJurnal() {
-    const box = $("jDaftar");
-    box.innerHTML = "";
-    daftar.forEach(s => {
-      const ex = existing[s.id + "|" + kitab] || {};
-      const div = document.createElement("div");
-      div.className = "santri";
-      div.dataset.santri = s.id;
-      div.innerHTML = `
-        <div class="nama">${esc(s.nama_lengkap)}</div>
-        <div class="nis">${esc(s.nis || "-")}</div>
-        <div class="baris">
-          <input class="halaman" type="number" inputmode="numeric" min="0" placeholder="Hal" value="${ex.halaman ?? ""}">
-          <div class="ket">
-            <button type="button" class="L ${ex.keterangan === "L" ? "aktif" : ""}" data-v="L">L</button>
-            <button type="button" class="CL ${ex.keterangan === "CL" ? "aktif" : ""}" data-v="CL">CL</button>
-            <button type="button" class="TL ${ex.keterangan === "TL" ? "aktif" : ""}" data-v="TL">TL</button>
-          </div>
-        </div>`;
-      div.querySelectorAll(".ket button").forEach(b => b.onclick = () => {
-        const sudah = b.classList.contains("aktif");
-        div.querySelectorAll(".ket button").forEach(x => x.classList.remove("aktif"));
-        if (!sudah) b.classList.add("aktif");
-      });
-      box.appendChild(div);
-    });
-    setBar(daftar.length > 0);
+  function renderAll() {
+    const label = UNIT[kitab];
+    $("lblUnit").textContent = label.unit;
+    $("lblAngka").textContent = label.angka;
+    $("fUnit").placeholder = kitab === "tahfidz" ? "contoh: An-Naba" : (kitab === "quran" ? "contoh: 3" : "contoh: 2");
+    renderOptions();
+    renderSudah();
+    renderProgres();
   }
 
-  async function simpanJurnal() {
-    const tgl = $("jTanggal").value;
-    const cards = [...document.querySelectorAll("#jDaftar .santri")];
-    const rows = [], hapus = [], salah = [];
-    cards.forEach(c => c.style.borderColor = "");
+  function renderOptions() {
+    const sisa = santriList.filter(s => !existing[s.id]);
+    $("fSantri").innerHTML = `<option value="">-- pilih santri --</option>` +
+      sisa.map(s => `<option value="${s.id}">${esc(s.nama_lengkap)}</option>`).join("");
+    $("fSimpan").disabled = sisa.length === 0;
+  }
 
-    cards.forEach(card => {
-      const sid = Number(card.dataset.santri);
-      const hal = card.querySelector(".halaman").value.trim();
-      const ket = card.querySelector(".ket button.aktif")?.dataset.v || "";
-      const ex = existing[sid + "|" + kitab];
+  function renderSudah() {
+    const label = UNIT[kitab];
+    const list = santriList.filter(s => existing[s.id]);
+    $("sudahList").innerHTML = list.length ? list.map(s => {
+      const e = existing[s.id];
+      return `<div class="sudah"><div class="nama">${esc(s.nama_lengkap)}</div>
+        <div class="detail">${label.unit} ${esc(e.unit)} · ${label.angka} ${e.halaman} · ${e.keterangan}</div></div>`;
+    }).join("") : `<p class="muted">Belum ada yang diisi.</p>`;
+  }
 
-      if (hal === "" && ket === "") {
-        if (ex) hapus.push(sid);
-        return;
-      }
-      const h = Number(hal);
-      if (hal === "" || ket === "" || !Number.isInteger(h) || h < 0) {
-        salah.push(card);
-        return;
-      }
-      rows.push({
-        santri_id: sid, rombel_id: rombelAktif, semester_id: sem.id,
-        tanggal: tgl, kitab, halaman: h, keterangan: ket,
-        diisi_oleh: me.id, updated_at: new Date().toISOString()
-      });
-    });
+  function renderProgres() {
+    const n = santriList.filter(s => existing[s.id]).length;
+    const total = santriList.length;
+    $("progres").textContent = n === total && total > 0
+      ? `Semua ${total} santri sudah diisi.`
+      : `Sudah ${n} dari ${total} santri`;
+  }
 
-    if (salah.length) {
-      salah.forEach(c => c.style.borderColor = "#dc3545");
-      salah[0].scrollIntoView({ behavior: "smooth", block: "center" });
-      return pesan("Santri bertanda merah perlu halaman dan keterangan (L/CL/TL) yang lengkap.");
-    }
-    if (!rows.length && !hapus.length) return pesan("Belum ada data yang diisi.");
+  function resetForm(keepUnit) {
+    $("fAngka").value = "";
+    if (!keepUnit) $("fUnit").value = "";
+    fKet = "";
+    document.querySelectorAll("#formBox .ket button").forEach(b => b.classList.remove("aktif"));
+  }
 
-    pesan("Menyimpan...");
-    if (rows.length) {
-      const { error } = await sb.from("jurnal_tahsin").upsert(rows, { onConflict: "santri_id,tanggal,kitab" });
-      if (error) return pesan("Gagal menyimpan: " + error.message);
-    }
-    if (hapus.length) {
-      const { error } = await sb.from("jurnal_tahsin").delete()
-        .eq("tanggal", tgl).eq("kitab", kitab).in("santri_id", hapus);
-      if (error) return pesan("Gagal menghapus: " + error.message);
-    }
-    await jurnalMuat();
-    pesan("Tersimpan " + rows.length + " jurnal.");
+  async function simpanSatu() {
+    const sid = Number($("fSantri").value);
+    const unit = $("fUnit").value.trim();
+    const angkaStr = $("fAngka").value.trim();
+    const angka = Number(angkaStr);
+    const label = UNIT[kitab];
+
+    if (!sid) return pesan("Pilih santri.");
+    if (!unit) return pesan("Isi " + label.unit + ".");
+    if (angkaStr === "" || !Number.isInteger(angka) || angka < 0)
+      return pesan("Isi " + label.angka + " dengan angka 0 atau lebih.");
+    if (!fKet) return pesan("Pilih L, CL, atau TL.");
+
+    $("fSimpan").disabled = true;
+    const row = {
+      santri_id: sid, rombel_id: sesi.rid, semester_id: sem.id,
+      tanggal: sesi.tgl, kitab, unit, halaman: angka, keterangan: fKet,
+      diisi_oleh: me.id, updated_at: new Date().toISOString()
+    };
+    const { error } = await sb.from("jurnal_tahsin").upsert(row, { onConflict: "santri_id,tanggal,kitab" });
+    $("fSimpan").disabled = false;
+    if (error) return pesan("Gagal menyimpan: " + error.message);
+
+    const nama = (santriList.find(s => s.id === sid) || {}).nama_lengkap || "";
+    existing[sid] = { santri_id: sid, unit, halaman: angka, keterangan: fKet };
+    resetForm(true);
+    renderAll();
+    pesan("Tersimpan: " + nama);
   }
 
   // ===== CATATAN PEKANAN / BULANAN =====
@@ -307,9 +333,8 @@
     updatePeriode();
     pesan("Memuat...");
     try {
-      rombelAktif = rid;
-      daftar = await ambilSantri(rid);
-      const ids = daftar.map(s => s.id);
+      daftarCatatan = await ambilSantri(rid);
+      const ids = daftarCatatan.map(s => s.id);
       existingCatatan = {};
       if (ids.length) {
         const { data, error } = await sb.from("catatan_periodik")
@@ -319,25 +344,24 @@
         (data || []).forEach(c => existingCatatan[c.santri_id] = c.catatan);
       }
       renderCatatan();
-      pesan(daftar.length ? "" : "Belum ada santri di kelas ini.");
+      pesan(daftarCatatan.length ? "" : "Belum ada santri di kelas ini.");
     } catch (e) {
       pesan("Gagal memuat: " + e.message);
     }
   }
 
   function renderCatatan() {
-    const box = $("cDaftar");
-    box.innerHTML = "";
-    daftar.forEach(s => {
+    $("cDaftar").innerHTML = "";
+    daftarCatatan.forEach(s => {
       const div = document.createElement("div");
       div.className = "santri";
       div.innerHTML = `
         <div class="nama">${esc(s.nama_lengkap)}</div>
         <div class="nis">${esc(s.nis || "-")}</div>
         <textarea data-santri="${s.id}" placeholder="Catatan perkembangan periode ini...">${esc(existingCatatan[s.id] || "")}</textarea>`;
-      box.appendChild(div);
+      $("cDaftar").appendChild(div);
     });
-    setBar(daftar.length > 0);
+    setBarCatatan(daftarCatatan.length > 0);
   }
 
   async function simpanCatatan() {
@@ -377,15 +401,22 @@
   // ===== EVENT =====
   $("tabJurnal").onclick = () => bukaTab("jurnal");
   $("tabCatatan").onclick = () => bukaTab("catatan");
-  $("jMuat").onclick = jurnalMuat;
+  $("jMulai").onclick = mulai;
+  $("fSimpan").onclick = simpanSatu;
   $("cMuat").onclick = catatanMuat;
+  $("cSimpan").onclick = simpanCatatan;
   $("cJenis").onchange = updatePeriode;
   $("cTanggal").onchange = updatePeriode;
-  $("simpanBtn").onclick = () => modeAktif === "jurnal" ? simpanJurnal() : simpanCatatan();
+
   document.querySelectorAll("#jKitab button").forEach(b => b.onclick = () => {
     kitab = b.dataset.k;
     document.querySelectorAll("#jKitab button").forEach(x => x.classList.toggle("aktif", x === b));
-    if (daftar.length && modeAktif === "jurnal") renderJurnal();
+    if (sesi) mulai();
+  });
+
+  document.querySelectorAll("#formBox .ket button").forEach(b => b.onclick = () => {
+    fKet = b.dataset.v;
+    document.querySelectorAll("#formBox .ket button").forEach(x => x.classList.toggle("aktif", x === b));
   });
 
   init();
