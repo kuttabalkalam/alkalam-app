@@ -3,17 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Input Nilai - Kuttab Al-Kalam</title>
+<title>Rekap Nilai - Kuttab Al-Kalam</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.4/css/all.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2.0/dist/css/adminlte.min.css">
 <link rel="stylesheet" href="ui.css">
 <style>
   .tabel-wrap { overflow-x: auto; }
-  .tabel-wrap input[type=number] { width: 80px; }
-  .tabel-wrap td, .tabel-wrap th { white-space: nowrap; vertical-align: middle; }
+  .tabel-wrap th, .tabel-wrap td { white-space: nowrap; vertical-align: middle; }
   .tabel-wrap td.nama { white-space: normal; min-width: 170px; }
-  .tabel-wrap textarea.isi { min-width: 240px; min-height: 72px; font-size: 14px; }
+  .rumus { font-size: 13px; color: #444; background: #fff; border-left: 4px solid #f2c94c; padding: 10px 12px; }
 </style>
 </head>
 <body class="hold-transition sidebar-mini">
@@ -27,337 +26,182 @@
 
 <script>
   KUTTAB.halaman({
-    aktif: "input-nilai",
-    judul: "Input Nilai",
-    roles: ["admin", "guru"],
-    render: async ({ sb, me, sem, konten, toast, gagal, peringatan, esc }) => {
+    aktif: "rekap-nilai",
+    judul: "Rekap Nilai",
+    roles: ["admin", "kepala", "guru"],
+    render: async ({ sb, me, sem, konten, gagal, peringatan, esc }) => {
       if (!sem) {
         konten.innerHTML = '<div class="alert alert-warning">Belum ada semester aktif.</div>';
         return;
       }
-      const ganjil = sem.nomor === 1;
 
-      const { data: pm, error } = await sb.from("penugasan_mapel")
-        .select("rombel_id, pegawai_id, rombel:rombel_id(id, nama, tahun_ajaran_id), mapel:mapel_id(id, kode, nama, urutan)");
-      if (error) { gagal(error); return; }
+      const [rb, pm, pg] = await Promise.all([
+        sb.from("rombel").select("id, nama, wali_kelas_id").eq("tahun_ajaran_id", sem.tahun_ajaran_id).order("nama"),
+        sb.from("penugasan_mapel").select("rombel_id, pegawai_id, mapel:mapel_id(id, kode, nama, urutan)"),
+        sb.from("pengaturan").select("kunci, nilai").in("kunci", ["faktor_nilai_akhir", "pembagi_rapor"])
+      ]);
+      if (rb.error) return gagal(rb.error);
+      if (pm.error) return gagal(pm.error);
 
-      const penugasan = (pm || []).filter(x =>
-        x.rombel && x.mapel &&
-        x.rombel.tahun_ajaran_id === sem.tahun_ajaran_id &&
-        (me.peran === "admin" || x.pegawai_id === me.id));
+      const faktor = Number((pg.data || []).find(x => x.kunci === "faktor_nilai_akhir")?.nilai ?? 0.9);
+      const pembagi = Number((pg.data || []).find(x => x.kunci === "pembagi_rapor")?.nilai ?? 10);
+      const skalaAkhir = Math.round(100 * faktor);
+      const skalaRapor = Math.round(100 * faktor / pembagi);
 
-      const rombelMap = new Map();
-      penugasan.forEach(x => rombelMap.set(x.rombel_id, x.rombel.nama));
-      const rombelOpts = [...rombelMap.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+      const semuaRombel = rb.data || [];
+      const idTA = new Set(semuaRombel.map(r => r.id));
+      const penugasan = (pm.data || []).filter(x => x.mapel && idTA.has(x.rombel_id));
+      const lihatSemua = me.peran !== "guru";
 
-      if (!rombelOpts.length) {
-        konten.innerHTML = '<div class="alert alert-info">Anda belum punya penugasan mapel di tahun ajaran ini.</div>';
+      const adalahWali = rid => (semuaRombel.find(r => r.id === rid) || {}).wali_kelas_id === me.id;
+      const mengajarDi = rid => penugasan.some(x => x.rombel_id === rid && x.pegawai_id === me.id);
+      const rombelBisa = semuaRombel.filter(r => lihatSemua || adalahWali(r.id) || mengajarDi(r.id));
+
+      if (!rombelBisa.length) {
+        konten.innerHTML = '<div class="alert alert-info">Belum ada kelas yang bisa Anda lihat.</div>';
         return;
+      }
+
+      // Wali kelas melihat semua mapel di kelasnya. Guru mapel hanya melihat mapelnya.
+      function mapelUntuk(rid) {
+        const semua = penugasan.filter(x => x.rombel_id === rid);
+        const boleh = (lihatSemua || adalahWali(rid)) ? semua : semua.filter(x => x.pegawai_id === me.id);
+        const m = new Map();
+        boleh.forEach(x => m.set(x.mapel.id, x.mapel));
+        return [...m.values()].sort((a, b) => a.urutan - b.urutan);
       }
 
       konten.innerHTML = `
         <div class="card">
           <div class="card-body">
             <div class="form-row align-items-end">
-              <div class="col-12 col-md-3 mb-2">
-                <label class="small mb-1">Mode</label>
-                <select id="mode" class="form-control">
-                  <option value="nilai">Nilai</option>
-                  <option value="deskripsi" ${ganjil ? "" : "disabled"}>Deskripsi Rapor${ganjil ? "" : " (hanya semester ganjil)"}</option>
+              <div class="col-12 col-md-4 mb-2">
+                <label class="small mb-1">Kelas</label>
+                <select id="rombel" class="form-control">
+                  ${rombelBisa.map(r => `<option value="${r.id}">${esc(r.nama)}</option>`).join("")}
                 </select>
               </div>
-              <div class="col-12 col-md-3 mb-2">
-                <label class="small mb-1">Kelas</label>
-                <select id="rombel" class="form-control"></select>
-              </div>
-              <div class="col-12 col-md-3 mb-2">
+              <div class="col-12 col-md-5 mb-2">
                 <label class="small mb-1">Mapel</label>
                 <select id="mapel" class="form-control"></select>
               </div>
-              <div class="col-6 col-md-2 mb-2" id="wrapJumlah">
-                <label class="small mb-1">Jumlah ujian/tema</label>
-                <input id="jumlah" type="number" min="1" max="10" value="4" class="form-control">
-              </div>
-              <div class="col-6 col-md-1 mb-2">
-                <button class="btn btn-kuning btn-block" id="tampil" title="Tampilkan"><i class="fas fa-search"></i></button>
+              <div class="col-12 col-md-3 mb-2">
+                <button class="btn btn-kuning btn-block" id="tampil"><i class="fas fa-table"></i> Tampilkan</button>
               </div>
             </div>
-            <p class="text-muted small mb-0" id="info"></p>
-            <button class="btn btn-outline-dark btn-sm mt-2" id="btnRekap" type="button">
-              <i class="fas fa-table"></i> Lihat Rekap Nilai
-            </button>
+            <p class="small text-muted mb-0" id="info"></p>
           </div>
         </div>
         <div class="tabel-wrap" id="tabel"></div>
-        <button class="btn btn-kuning mt-2" id="simpan" style="display:none"><i class="fas fa-save"></i> Simpan</button>`;
-
-      const $ = id => document.getElementById(id);
-      const rombelSel = $("rombel"), mapelSel = $("mapel"), modeSel = $("mode"), jumlahIn = $("jumlah");
-
-      let santri = [], kolom = [], nilaiLama = {}, akhir = {}, aspek = [], deskLama = {};
-      let mapelId = null;
-
-      rombelSel.innerHTML = rombelOpts.map(([id, nama]) => `<option value="${id}">${esc(nama)}</option>`).join("");
-
-      const info = t => {
-        $("tabel").innerHTML = "";
-        $("simpan").style.display = "none";
-        $("info").textContent = t || "";
-      };
-
-      function isiMapel() {
-        const r = Number(rombelSel.value);
-        const list = penugasan.filter(x => x.rombel_id === r).map(x => x.mapel)
-          .sort((a, b) => a.urutan - b.urutan);
-        mapelSel.innerHTML = list.map(m => `<option value="${m.id}">${esc(m.nama)}</option>`).join("");
-      }
-
-      function gantiMode() {
-        $("wrapJumlah").style.display = modeSel.value === "nilai" ? "" : "none";
-        info("");
-      }
-
-      rombelSel.onchange = () => { isiMapel(); info(""); };
-      mapelSel.onchange = () => info("");
-      modeSel.onchange = gantiMode;
-      jumlahIn.onchange = () => { if (modeSel.value === "nilai" && santri.length) tampil(); };
-      $("tampil").onclick = tampil;
-      $("simpan").onclick = simpan;
-      $("btnRekap").onclick = bukaRekap;
-
-      isiMapel();
-      gantiMode();
-
-      // ===== REKAP DI DALAM DIALOG =====
-      const MODAL_HTML = `
-        <div class="modal fade" id="modalRekap" tabindex="-1" role="dialog">
-          <div class="modal-dialog modal-xl" role="document" style="max-width:96vw;">
-            <div class="modal-content">
-              <div class="modal-header" style="background:#1a1a1a;color:#f2c94c;">
-                <h5 class="modal-title"><i class="fas fa-table"></i> Rekap Nilai</h5>
-                <button type="button" class="close" data-dismiss="modal" style="color:#f2c94c;opacity:1;">&times;</button>
-              </div>
-              <div class="modal-body p-0">
-                <iframe id="iframeRekap" style="width:100%;height:75vh;border:0;"></iframe>
-              </div>
-            </div>
-          </div>
+        <div class="rumus mt-2" id="rumus">
+          Angka di bawah nama kolom adalah bobot. Kehadiran dihitung otomatis dari data absensi.
+          Nilai akhir = (jumlah rata-rata komponen × bobot) ÷ total bobot × ${skalaAkhir} / 100.
+          Nilai rapor = nilai akhir ÷ ${pembagi}.
+          Sel bertanda <span class="badge badge-warning">belum</span> berarti komponen belum diisi, sehingga nilai akhir belum muncul.
         </div>`;
 
-      function bukaRekap() {
-        const rid = Number(rombelSel.value), mid = Number(mapelSel.value);
-        if (!rid || !mid) return peringatan("Pilih kelas dan mapel terlebih dahulu.");
-        if (!document.getElementById("modalRekap")) {
-          document.body.insertAdjacentHTML("beforeend", MODAL_HTML);
-        }
-        document.getElementById("iframeRekap").src =
-          `rekap-nilai.html?embed=1&rombel=${rid}&mapel=${mid}`;
-        jQuery("#modalRekap").modal("show");
+      const $ = id => document.getElementById(id);
+      const f2 = v => Number(v).toFixed(2);
+
+      function isiMapel() {
+        const list = mapelUntuk(Number($("rombel").value));
+        $("mapel").innerHTML = list.length
+          ? list.map(m => `<option value="${m.id}">${esc(m.nama)}</option>`).join("")
+          : `<option value="">(tidak ada mapel)</option>`;
       }
+
+      $("rombel").onchange = () => { isiMapel(); tampil(); };
+      $("mapel").onchange = tampil;
+      $("tampil").onclick = tampil;
 
       async function tampil() {
-        const rid = Number(rombelSel.value);
-        mapelId = Number(mapelSel.value);
-        if (!rid || !mapelId) return peringatan("Pilih kelas dan mapel terlebih dahulu.");
+        const rid = Number($("rombel").value), mid = Number($("mapel").value);
+        if (!rid || !mid) return peringatan("Pilih kelas dan mapel.");
+        $("info").textContent = "Memuat...";
 
-        const { data: kr, error: e1 } = await sb.from("keanggotaan_rombel")
-          .select("santri:santri_id(id, nis, nama_lengkap)")
-          .eq("rombel_id", rid).eq("tahun_ajaran_id", sem.tahun_ajaran_id);
-        if (e1) return gagal(e1);
+        const [kr, bn, nl, kh, na] = await Promise.all([
+          sb.from("keanggotaan_rombel").select("santri:santri_id(id, nis, nama_lengkap)")
+            .eq("rombel_id", rid).eq("tahun_ajaran_id", sem.tahun_ajaran_id),
+          sb.from("bobot_nilai").select("bobot, komponen:komponen_id(id, kode, nama, urutan)")
+            .eq("mapel_id", mid),
+          sb.from("nilai").select("santri_id, komponen_id, nilai")
+            .eq("semester_id", sem.id).eq("mapel_id", mid),
+          sb.from("kehadiran_santri").select("santri_id, nilai").eq("semester_id", sem.id),
+          sb.from("nilai_akhir").select("santri_id, nilai_akhir, nilai_rapor")
+            .eq("semester_id", sem.id).eq("mapel_id", mid)
+        ]);
+        for (const r of [kr, bn, nl, kh, na]) if (r.error) return gagal(r.error);
 
-        santri = (kr || []).map(x => x.santri).filter(Boolean)
+        const santri = (kr.data || []).map(x => x.santri).filter(Boolean)
           .sort((a, b) => a.nama_lengkap.localeCompare(b.nama_lengkap));
-        if (!santri.length) return info("Belum ada santri di kelas ini.");
+        if (!santri.length) {
+          $("tabel").innerHTML = "";
+          $("info").textContent = "Belum ada santri di kelas ini.";
+          return;
+        }
 
-        if (modeSel.value === "deskripsi") return tampilDeskripsi();
-        return tampilNilai();
-      }
-
-      // ===== MODE NILAI =====
-      async function tampilNilai() {
-        const ids = santri.map(s => s.id);
-
-        const { data: bn, error: e1 } = await sb.from("bobot_nilai")
-          .select("komponen_id, komponen:komponen_id(kode, nama, urutan)")
-          .eq("mapel_id", mapelId);
-        if (e1) return gagal(e1);
-
-        const komponen = (bn || [])
-          .filter(b => b.komponen && b.komponen.kode !== "kehadiran")
-          .map(b => ({ id: b.komponen_id, ...b.komponen }))
+        const komponen = (bn.data || []).filter(b => b.komponen)
+          .map(b => ({
+            id: b.komponen.id, kode: b.komponen.kode, nama: b.komponen.nama,
+            urutan: b.komponen.urutan, bobot: Number(b.bobot)
+          }))
           .sort((a, b) => a.urutan - b.urutan);
 
-        const jumlah = Math.min(10, Math.max(1, Number(jumlahIn.value) || 1));
-        kolom = [];
-        komponen.forEach(k => {
-          if (k.kode === "ujian_periodik") {
-            for (let i = 1; i <= jumlah; i++) {
-              kolom.push({ komponenId: k.id, item: String(i), label: "Ujian " + i });
-            }
-          } else {
-            kolom.push({ komponenId: k.id, item: "", label: k.nama });
-          }
+        // Rata-rata item per komponen (misalnya Ujian 1 sampai 4)
+        const nilaiMap = {};
+        (nl.data || []).forEach(n => {
+          const k = n.santri_id + "|" + n.komponen_id;
+          (nilaiMap[k] ||= []).push(Number(n.nilai));
         });
+        const khMap = {};
+        (kh.data || []).forEach(k => khMap[k.santri_id] = Number(k.nilai));
+        const naMap = {};
+        (na.data || []).forEach(a => naMap[a.santri_id] = a);
 
-        const [nl, na] = await Promise.all([
-          sb.from("nilai").select("santri_id, komponen_id, item, nilai")
-            .eq("semester_id", sem.id).eq("mapel_id", mapelId).in("santri_id", ids),
-          sb.from("nilai_akhir").select("santri_id, nilai_akhir, nilai_rapor")
-            .eq("semester_id", sem.id).eq("mapel_id", mapelId).in("santri_id", ids)
-        ]);
-        if (nl.error) return gagal(nl.error);
-        if (na.error) return gagal(na.error);
+        function nilaiKomponen(sid, k) {
+          if (k.kode === "kehadiran") return khMap[sid] ?? null;
+          const arr = nilaiMap[sid + "|" + k.id];
+          return arr && arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+        }
 
-        nilaiLama = {};
-        (nl.data || []).forEach(n => nilaiLama[n.santri_id + "|" + n.komponen_id + "|" + n.item] = n.nilai);
-        akhir = {};
-        (na.data || []).forEach(a => akhir[a.santri_id] = a);
+        let lengkap = 0, totalRapor = 0;
+        const baris = santri.map((s, i) => {
+          const sel = komponen.map(k => {
+            const v = nilaiKomponen(s.id, k);
+            return `<td class="text-center">${v == null ? '<span class="badge badge-warning">belum</span>' : f2(v)}</td>`;
+          }).join("");
+          const a = naMap[s.id];
+          if (a) { lengkap++; totalRapor += Number(a.nilai_rapor); }
+          return `<tr>
+            <td>${i + 1}</td>
+            <td>${esc(s.nis || "-")}</td>
+            <td class="nama">${esc(s.nama_lengkap)}</td>
+            ${sel}
+            <td class="text-center font-weight-bold">${a ? f2(a.nilai_akhir) : "-"}</td>
+            <td class="text-center font-weight-bold">${a ? f2(a.nilai_rapor) : "-"}</td>
+          </tr>`;
+        }).join("");
 
-        renderNilai();
-      }
-
-      function renderNilai() {
-        const head = ["No", "NIS", "Nama", ...kolom.map(k => k.label), "Nilai Akhir (skala 90)", "Nilai Rapor"];
         $("tabel").innerHTML = `
           <table class="table table-sm table-bordered bg-white">
-            <thead><tr>${head.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead>
-            <tbody>
-              ${santri.map((s, i) => {
-                const a = akhir[s.id];
-                return `<tr>
-                  <td>${i + 1}</td>
-                  <td>${esc(s.nis || "-")}</td>
-                  <td class="nama">${esc(s.nama_lengkap)}</td>
-                  ${kolom.map(k => {
-                    const v = nilaiLama[s.id + "|" + k.komponenId + "|" + k.item];
-                    return `<td><input type="number" min="0" max="100" step="0.01" class="form-control form-control-sm"
-                      data-santri="${s.id}" data-komponen="${k.komponenId}" data-item="${esc(k.item)}"
-                      value="${v != null ? v : ""}"></td>`;
-                  }).join("")}
-                  <td class="text-center">${a ? a.nilai_akhir : "-"}</td>
-                  <td class="text-center">${a ? a.nilai_rapor : "-"}</td>
-                </tr>`;
-              }).join("")}
-            </tbody>
+            <thead><tr>
+              <th>No</th><th>NIS</th><th>Nama</th>
+              ${komponen.map(k => `<th>${esc(k.nama)}<br><small>${k.bobot}%</small></th>`).join("")}
+              <th>Nilai Akhir<br><small>skala ${skalaAkhir}</small></th>
+              <th>Rapor<br><small>skala ${skalaRapor}</small></th>
+            </tr></thead>
+            <tbody>${baris}</tbody>
           </table>`;
-        $("simpan").style.display = "inline-block";
-        $("info").textContent = santri.length + " santri. Isi nilai dalam skala 0 sampai 100, lalu simpan.";
+
+        $("info").textContent = lengkap + " dari " + santri.length + " santri sudah lengkap"
+          + (lengkap ? ". Rata-rata nilai rapor: " + f2(totalRapor / lengkap) : "") + ".";
       }
 
-      // ===== MODE DESKRIPSI =====
-      async function tampilDeskripsi() {
-        const { data: asp, error: e1 } = await sb.from("aspek_deskripsi")
-          .select("id, nama, urutan").eq("mapel_id", mapelId).eq("aktif", true).order("urutan");
-        if (e1) return gagal(e1);
-
-        aspek = asp || [];
-        if (!aspek.length) return info("Mapel ini tidak memakai deskripsi rapor.");
-
-        const ids = santri.map(s => s.id);
-        const { data: ds, error: e2 } = await sb.from("deskripsi_rapor")
-          .select("santri_id, aspek_id, isi")
-          .eq("semester_id", sem.id)
-          .in("santri_id", ids)
-          .in("aspek_id", aspek.map(a => a.id));
-        if (e2) return gagal(e2);
-
-        deskLama = {};
-        (ds || []).forEach(d => deskLama[d.santri_id + "|" + d.aspek_id] = d.isi);
-        renderDeskripsi();
-      }
-
-      function renderDeskripsi() {
-        $("tabel").innerHTML = `
-          <table class="table table-sm table-bordered bg-white">
-            <thead><tr><th>No</th><th>Nama</th>${aspek.map(a => `<th>${esc(a.nama)}</th>`).join("")}</tr></thead>
-            <tbody>
-              ${santri.map((s, i) => `<tr>
-                <td>${i + 1}</td>
-                <td class="nama">${esc(s.nama_lengkap)}</td>
-                ${aspek.map(a => `<td><textarea class="form-control form-control-sm isi" rows="3"
-                  data-santri="${s.id}" data-aspek="${a.id}">${esc(deskLama[s.id + "|" + a.id] || "")}</textarea></td>`).join("")}
-              </tr>`).join("")}
-            </tbody>
-          </table>`;
-        $("simpan").style.display = "inline-block";
-        $("info").textContent = santri.length + " santri. Isi deskripsi untuk tiap aspek, lalu simpan.";
-      }
-
-      // ===== SIMPAN =====
-      async function simpan() {
-        const btn = $("simpan");
-        btn.disabled = true;
-        try {
-          if (modeSel.value === "deskripsi") await simpanDeskripsi();
-          else await simpanNilai();
-        } finally {
-          btn.disabled = false;
-        }
-      }
-
-      async function simpanNilai() {
-        const rows = [], salah = [];
-        document.querySelectorAll("#tabel input[data-santri]").forEach(inp => {
-          inp.classList.remove("is-invalid");
-          const v = inp.value.trim();
-          if (v === "") return;
-          const n = Number(v);
-          if (isNaN(n) || n < 0 || n > 100) {
-            inp.classList.add("is-invalid");
-            salah.push(inp);
-            return;
-          }
-          rows.push({
-            santri_id: Number(inp.dataset.santri),
-            komponen_id: Number(inp.dataset.komponen),
-            item: inp.dataset.item,
-            nilai: n,
-            semester_id: sem.id,
-            mapel_id: mapelId,
-            diisi_oleh: me.id,
-            updated_at: new Date().toISOString()
-          });
-        });
-
-        if (salah.length) {
-          salah[0].focus();
-          return peringatan("Ada nilai di luar 0 sampai 100. Kotak merah perlu diperbaiki.");
-        }
-        if (!rows.length) return peringatan("Belum ada nilai yang diisi.");
-
-        const { error } = await sb.from("nilai").upsert(rows,
-          { onConflict: "santri_id,semester_id,mapel_id,komponen_id,item" });
-        if (error) return gagal(error);
-
-        toast("Tersimpan " + rows.length + " nilai.");
-        tampil();
-      }
-
-      async function simpanDeskripsi() {
-        const rows = [];
-        document.querySelectorAll("#tabel textarea[data-santri]").forEach(t => {
-          const isi = t.value.trim();
-          if (!isi) return;
-          rows.push({
-            santri_id: Number(t.dataset.santri),
-            aspek_id: Number(t.dataset.aspek),
-            mapel_id: mapelId,
-            semester_id: sem.id,
-            isi,
-            diisi_oleh: me.id,
-            updated_at: new Date().toISOString()
-          });
-        });
-
-        if (!rows.length) return peringatan("Belum ada deskripsi yang diisi.");
-
-        const { error } = await sb.from("deskripsi_rapor")
-          .upsert(rows, { onConflict: "santri_id,semester_id,aspek_id" });
-        if (error) return gagal(error);
-
-        toast("Tersimpan " + rows.length + " deskripsi.");
-        tampil();
-      }
+            const q = new URLSearchParams(location.search);
+      if (q.get("rombel")) $("rombel").value = q.get("rombel");
+      isiMapel();
+      if (q.get("mapel")) $("mapel").value = q.get("mapel");
+      if ($("mapel").value) tampil();
     }
   });
 </script>
