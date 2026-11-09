@@ -197,7 +197,10 @@
           + (lengkap ? ". Rata-rata nilai rapor: " + f2(totalRapor / lengkap) : "") + ".";
       }
 
+      const q = new URLSearchParams(location.search);
+      if (q.get("rombel")) $("rombel").value = q.get("rombel");
       isiMapel();
+      if (q.get("mapel")) $("mapel").value = q.get("mapel");
       if ($("mapel").value) tampil();
     }
   });
