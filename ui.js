@@ -100,7 +100,17 @@ const KUTTAB = (() => {
     }
     const menu = MENU.filter(m =>
       m.roles.includes(me.peran) && (!m.quranSaja || me.peran !== "guru" || punyaQuran));
-
+        // Mode embed: dibuka di dalam dialog, tanpa sidebar dan navbar
+    if (new URLSearchParams(location.search).get("embed") === "1") {
+      document.body.innerHTML = `<div class="p-2" id="konten"></div>`;
+      document.body.style.background = "#e6f4fb";
+      await render({
+        sb, me, sem, menu, aktif,
+        konten: document.getElementById("konten"),
+        toast, gagal, peringatan, konfirmasi, esc
+      });
+      return;
+    }
     const sebutan = sem && sem.tahun_ajaran
       ? "TA " + esc(sem.tahun_ajaran.kode) + " · Semester " + (sem.nomor === 1 ? "Ganjil" : "Genap")
       : "Belum ada semester aktif";
