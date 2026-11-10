@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Koreksi UAS - Kuttab Al-Kalam</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.4/css/all.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2.0/dist/css/adminlte.min.css">
+<link rel="stylesheet" href="ui.css">
+<style>
+  .daftar-santri { max-height: 60vh; overflow-y: auto; }
+  .daftar-santri .list-group-item.aktif { background: #f2c94c; border-color: #d4a52a; color: #1a1a1a; font-weight: 600; }
+  .aturan-box { font-size: 13px; color: #444; background: #fff; border-left: 4px solid #f2c94c; padding: 8px 10px; }
+  .total-box { font-size: 18px; }
+  .badge-skor { background: #1a1a1a; color: #f2c94c; font-size: 13px; }
+</style>
+</head>
+<body class="hold-transition sidebar-mini">
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/admin-lte@3.2.0/dist/js/adminlte.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="ui.js"></script>
+
+<script>
+  KUTTAB.halaman({
+    aktif: "koreksi-uas",
+    judul: "Koreksi UAS",
+    roles: ["admin", "guru"],
+    render: async ({ sb, me, sem, konten, toast, gagal, peringatan, esc }) => {
+      if (!sem) {
+        konten.innerHTML = '<div class="alert alert-warning">Belum ada semester aktif.</div>';
+        return;
+      }
+
+      const $ = id => document.getElementById(id);
+      const EXCL = ["tahfidz", "tilawah", "kitabah", "ibadah"];
+
+      const aturan = t => t <= 1
+        ? { pgBobot: 5, isi: 5, isiMax: 10, essay: 0, essayMax: 0,
+            label: "Awal 1 dan 2: PG 10 soal × 5 poin, isian 5 soal (maks 10 per soal). Total 100." }
+        : { pgBobot: 3, isi: 5, isiMax: 5, essay: 5, essayMax: 9,
+            label: "Awal 3 sampai Qonuni 4: PG 10 soal × 3 poin, isian 5 soal (maks 5 per soal), essay 5 soal (maks 9 per soal). Total 100." };
+
+      const [rb, pm, bn] = await Promise.all([
+        sb.from("rombel").select("id, nama, wali_kelas_id, tingkat_kode")
+          .eq("tahun_ajaran_id", sem.tahun_ajaran_id).order("nama"),
+        sb.from("penugasan_mapel").select("rombel_id, pegawai_id, mapel:mapel_id(id, kode, nama, urutan)"),
+        sb.from("bobot_nilai").select("mapel_id, komponen:komponen_id(kode)")
+      ]);
+      const err = [rb, pm, bn].find(r => r.error);
+      if (err) return gagal(err.error);
+
+      const rombelMap = new Map(rb.data.map(r => [r.id, r]));
+      const mapelUas = new Set((bn.data || []).filter(b => b.komponen && b.komponen.kode === "uas").map(b => b.mapel_id));
+      const penugasan = (pm.data || []).filter(x =>
+        x.mapel && rombelMap.has(x.rombel_id) &&
+        (me.peran === "admin" || x.pegawai_id === me.id) &&
+        mapelUas.has(x.mapel.id) && !EXCL.includes(x.mapel.kode));
+
+      const rombelOpts = [...new Map(penugasan.map(x => [x.rombel_id, rombelMap.get(x.rombel_id)])).values()]
+        .sort((a, b) => a.nama.localeCompare(b.nama));
+      if (!rombelOpts.length) {
+        konten.innerHTML = '<div class="alert alert-info">Belum ada mapel yang perlu dikoreksi UAS untuk akun Anda.</div>';
+        return;
+      }
+
+      konten.innerHTML = `
+        <div class="card"><div class="card-body">
+          <div class="form-row align-items-end">
+            <div class="col-12 col-md-5 mb-2">
+              <label class="small mb-1">Kelas</label>
+              <select id="rombel" class="form-control"></select>
+            </div>
+            <div class="col-12 col-md-7 mb-2">
+              <label class="small mb-1">Mapel</label>
+              <select id="mapel" class="form-control"></select>
+            </div>
+          </div>
+          <p class="small text-muted mb-0">
+            Tahfidz, Tilawah, Kitabah, dan Ibadah tidak ditampilkan di sini.
+            Tahfidz dan Tilawah dinilai di menu Penilaian Tahfidz &amp; Tilawah.
+          </p>
+        </div></div>
+        <div class="row">
+          <div class="col-lg-5 mb-3">
+            <div class="card">
+              <div class="card-header"><strong>Daftar santri</strong></div>
+              <div class="p-0 daftar-santri" id="daftar"></div>
+            </div>
+          </div>
+          <div class="col-lg-7 mb-3">
+            <div class="card" id="form"></div>
+          </div>
+        </div>`;
+
+      let rombelId = null, mapelId = null, santriList = [], uasMap = {}, curId = null;
+
+      $("rombel").innerHTML = rombelOpts.map(r => `<option value="${r.id}">${esc(r.nama)}</option>`).join("");
+      $("rombel").onchange = () => { isiMapel(); muatKelas(); };
+      $("mapel").onchange = muatKelas;
+
+      function isiMapel() {
+        const rid = Number($("rombel").value);
+        const list = [...new Map(penugasan.filter(x => x.rombel_id === rid).map(x => [x.mapel.id, x.mapel])).values()]
+          .sort((a, b) => a.urutan - b.urutan);
+        $("mapel").innerHTML = list.map(m => `<option value="${m.id}">${esc(m.nama)}</option>`).join("");
+      }
+
+      async function muatKelas() {
+        rombelId = Number($("rombel").value);
+        mapelId = Number($("mapel").value);
+        if (!rombelId || !mapelId) return;
+
+        $("daftar").innerHTML = '<div class="p-3 text-muted">Memuat...</div>';
+        const [kr, ua] = await Promise.all([
+          sb.from("keanggotaan_rombel").select("santri:santri_id(id, nis, nama_lengkap, tingkat_sekarang)")
+            .eq("rombel_id", rombelId).eq("tahun_ajaran_id", sem.tahun_ajaran_id),
+          sb.from("uas_koreksi").select("santri_id, pg_benar, isian, essay, skor")
+            .eq("semester_id", sem.id).eq("mapel_id", mapelId)
+        ]);
+        if (kr.error) return gagal(kr.error);
+        if (ua.error) return gagal(ua.error);
+
+        santriList = (kr.data || []).map(x => x.santri).filter(Boolean)
+          .sort((a, b) => a.nama_lengkap.localeCompare(b.nama_lengkap));
+        uasMap = {};
+        (ua.data || []).forEach(u => uasMap[u.santri_id] = u);
+        curId = null;
+        renderDaftar();
+        kosongkanForm();
+      }
+
+      function renderDaftar() {
+        if (!santriList.length) {
+          $("daftar").innerHTML = '<div class="p-3 text-muted">Belum ada santri di kelas ini.</div>';
+          return;
+        }
+        const sudah = santriList.filter(s => uasMap[s.id]).length;
+        $("daftar").innerHTML = `
+          <div class="px-3 pt-2 small text-muted">${sudah} dari ${santriList.length} santri sudah dikoreksi</div>
+          <div class="list-group list-group-flush">
+            ${santriList.map((s, i) => {
+              const u = uasMap[s.id];
+              return `<button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center ${s.id === curId ? "aktif" : ""}" data-id="${s.id}">
+                <span>${i + 1}. ${esc(s.nama_lengkap)}<br><small class="text-muted">${esc(s.nis || "-")}</small></span>
+                ${u ? `<span class="badge badge-skor">${Number(u.skor).toFixed(2)}</span>`
+                    : '<span class="badge badge-light border">belum</span>'}
+              </button>`;
+            }).join("")}
+          </div>`;
+        $("daftar").querySelectorAll("[data-id]").forEach(b => b.onclick = () => pilihSantri(Number(b.dataset.id)));
+      }
+
+      function kosongkanForm() {
+        $("form").innerHTML = '<div class="card-body text-muted">Pilih santri dari daftar di sebelah kiri.</div>';
+      }
+
+      function pilihSantri(id) {
+        curId = id;
+        renderDaftar();
+        const s = santriList.find(x => x.id === id);
+        if (!s) return kosongkanForm();
+
+        const a = aturan(s.tingkat_sekarang);
+        const u = uasMap[id] || {};
+        const isian = Array.isArray(u.isian) ? u.isian : [];
+        const essay = Array.isArray(u.essay) ? u.essay : [];
+
+        $("form").innerHTML = `
+          <div class="card-header">
+            <strong>${esc(s.nama_lengkap)}</strong>
+            <span class="text-muted small ml-2">NIS ${esc(s.nis || "-")}</span>
+          </div>
+          <div class="card-body">
+            <div class="aturan-box mb-3">${esc(a.label)}</div>
+
+            <div class="form-group">
+              <label class="font-weight-bold">Pilihan ganda: jumlah benar (0–10)</label>
+              <div class="input-group" style="max-width:240px">
+                <input type="number" id="uPg" class="form-control" min="0" max="10" step="1"
+                  value="${u.pg_benar ?? ""}">
+                <div class="input-group-append"><span class="input-group-text">× ${a.pgBobot} poin</span></div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="font-weight-bold">Isian (maks ${a.isiMax} per soal)</label>
+              <div class="form-row">
+                ${Array.from({ length: a.isi }, (_, i) => `
+                  <div class="col-6 col-md-4 mb-2">
+                    <small class="text-muted">No ${i + 1}</small>
+                    <input type="number" class="form-control uIsi" min="0" max="${a.isiMax}" step="0.5"
+                      value="${isian[i] ?? ""}">
+                  </div>`).join("")}
+              </div>
+            </div>
+
+            ${a.essay ? `
+            <div class="form-group">
+              <label class="font-weight-bold">Essay (maks ${a.essayMax} per soal)</label>
+              <div class="form-row">
+                ${Array.from({ length: a.essay }, (_, i) => `
+                  <div class="col-6 col-md-4 mb-2">
+                    <small class="text-muted">No ${i + 1}</small>
+                    <input type="number" class="form-control uEssay" min="0" max="${a.essayMax}" step="0.5"
+                      value="${essay[i] ?? ""}">
+                  </div>`).join("")}
+              </div>
+            </div>` : ""}
+
+            <div class="total-box mb-3">Total skor: <strong id="uTotal">0.00</strong> / 100</div>
+            <button class="btn btn-kuning" id="uSimpan"><i class="fas fa-save"></i> Simpan skor UAS</button>
+          </div>`;
+
+        const hitungTotal = () => {
+          const pg = Number($("uPg").value) || 0;
+          const isiSum = [...document.querySelectorAll(".uIsi")].reduce((t, x) => t + (Number(x.value) || 0), 0);
+          const esSum = [...document.querySelectorAll(".uEssay")].reduce((t, x) => t + (Number(x.value) || 0), 0);
+          $("uTotal").textContent = (pg * a.pgBobot + isiSum + esSum).toFixed(2);
+        };
+        document.querySelectorAll("#form input").forEach(i => i.oninput = hitungTotal);
+        hitungTotal();
+        $("uSimpan").onclick = () => simpan(s, a);
+      }
+
+      async function simpan(s, a) {
+        const angka = (v, maks) => {
+          const n = Number(v);
+          if (v === "" || !Number.isFinite(n) || n < 0 || n > maks) return null;
+          return n;
+        };
+
+        document.querySelectorAll("#form input").forEach(i => i.classList.remove("is-invalid"));
+
+        const pgRaw = $("uPg").value.trim();
+        const pgN = Number(pgRaw);
+        if (pgRaw === "" || !Number.isInteger(pgN) || pgN < 0 || pgN > 10) {
+          $("uPg").classList.add("is-invalid");
+          return peringatan("Jumlah benar PG harus bilangan bulat 0 sampai 10.");
+        }
+
+        const isianEl = [...document.querySelectorAll(".uIsi")];
+        const isian = isianEl.map(x => angka(x.value.trim(), a.isiMax));
+        if (isian.some(v => v === null)) {
+          isianEl.forEach((x, i) => { if (isian[i] === null) x.classList.add("is-invalid"); });
+          return peringatan("Isi semua nomor isian dengan angka 0 sampai " + a.isiMax + ". Isi 0 jika salah.");
+        }
+
+        const essayEl = [...document.querySelectorAll(".uEssay")];
+        const essay = essayEl.map(x => angka(x.value.trim(), a.essayMax));
+        if (essay.some(v => v === null)) {
+          essayEl.forEach((x, i) => { if (essay[i] === null) x.classList.add("is-invalid"); });
+          return peringatan("Isi semua nomor essay dengan angka 0 sampai " + a.essayMax + ". Isi 0 jika salah.");
+        }
+
+        const total = pgN * a.pgBobot
+          + isian.reduce((t, v) => t + v, 0)
+          + essay.reduce((t, v) => t + v, 0);
+
+        const btn = $("uSimpan");
+        btn.disabled = true;
+        const { error } = await sb.from("uas_koreksi").upsert({
+          santri_id: s.id, semester_id: sem.id, mapel_id: mapelId,
+          pg_benar: pgN, isian, essay,
+          diisi_oleh: me.id, updated_at: new Date().toISOString()
+        }, { onConflict: "santri_id,semester_id,mapel_id" });
+        btn.disabled = false;
+        if (error) return gagal(error);
+
+        uasMap[s.id] = { santri_id: s.id, pg_benar: pgN, isian, essay, skor: total };
+        toast("Skor UAS " + s.nama_lengkap + ": " + total.toFixed(2) + " tersimpan.");
+        pilihSantri(s.id);
+      }
+
+      isiMapel();
+      muatKelas();
+    }
+  });
+</script>
+</body>
+</html>
