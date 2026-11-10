@@ -1,42 +1,212 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Login - Kuttab Al-Kalam</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Masuk - Kuttab Al-Kalam</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color: #0f172a; }
+
+  .split { display: grid; grid-template-columns: 1fr 1fr; min-height: 100vh; }
+
+  /* ===== Kiri ===== */
+  .kiri {
+    position: relative; color: #fff; padding: 40px 56px;
+    background: linear-gradient(160deg, #2563eb 0%, #6366f1 55%, #8b5cf6 100%);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .kiri::before {
+    content: ""; position: absolute; top: -120px; right: -120px; width: 420px; height: 420px;
+    background: radial-gradient(circle, rgba(255,255,255,.22), transparent 70%); pointer-events: none;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 17px; position: relative; }
+  .logo {
+    width: 40px; height: 40px; border-radius: 10px; border: 1px solid rgba(255,255,255,.35);
+    background: rgba(255,255,255,.12); display: flex; align-items: center; justify-content: center;
+    font-size: 18px; color: #f2c94c; font-weight: 700;
+  }
+  .hero { margin-top: auto; margin-bottom: auto; position: relative; max-width: 480px; }
+  .eyebrow { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; letter-spacing: .14em; opacity: .75; margin-bottom: 14px; }
+  .hero h1 { font-size: 40px; line-height: 1.12; margin: 0 0 16px; font-weight: 800; letter-spacing: -.02em; }
+  .hero p { font-size: 16px; line-height: 1.6; opacity: .9; margin: 0; }
+
+  .kutipan {
+    position: relative; max-width: 440px; border: 1px solid rgba(255,255,255,.28);
+    background: rgba(255,255,255,.1); border-radius: 14px; padding: 18px 20px;
+    backdrop-filter: blur(4px);
+  }
+  .kutipan p { margin: 0 0 8px; font-size: 15px; line-height: 1.55; }
+  .kutipan small { opacity: .8; font-size: 13px; }
+
+  .footer-kiri { position: relative; margin-top: 40px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; letter-spacing: .08em; opacity: .7; }
+
+  /* ===== Kanan ===== */
+  .kanan { background: #eef2f7; display: flex; flex-direction: column; padding: 40px 56px; }
+  .form-wrap { margin: auto; width: 100%; max-width: 400px; }
+  .form-wrap h2 { font-size: 30px; font-weight: 800; letter-spacing: -.02em; margin: 0 0 8px; }
+  .sub { color: #64748b; font-size: 15px; line-height: 1.5; margin: 0 0 28px; }
+
+  label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+  .label-row { display: flex; justify-content: space-between; align-items: baseline; }
+  .label-row a { font-size: 13px; font-weight: 600; color: #2563eb; text-decoration: none; }
+  .label-row a:hover { text-decoration: underline; }
+
+  .input {
+    display: flex; align-items: center; gap: 8px; background: #fff; border: 1px solid #d5dce6;
+    border-radius: 10px; padding: 0 12px; margin-bottom: 16px; height: 46px;
+  }
+  .input:focus-within { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
+  .input svg { flex-shrink: 0; color: #94a3b8; }
+  .input input {
+    flex: 1; border: 0; outline: 0; font-size: 15px; background: transparent; min-width: 0; color: #0f172a;
+  }
+  .input input::placeholder { color: #94a3b8; }
+  .input button {
+    border: 0; background: none; color: #64748b; font-size: 13px; font-weight: 600; cursor: pointer; padding: 4px;
+  }
+
+  .btn {
+    width: 100%; height: 48px; border: 0; border-radius: 10px; background: #2563eb; color: #fff;
+    font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 4px;
+    box-shadow: 0 6px 16px rgba(37,99,235,.25);
+  }
+  .btn:hover { background: #1d4ed8; }
+  .btn:disabled { background: #94a3b8; box-shadow: none; cursor: default; }
+
+  #pesan { min-height: 20px; font-size: 14px; margin-top: 14px; font-weight: 600; }
+  #pesan.error { color: #dc2626; }
+  #pesan.info { color: #64748b; }
+
+  .catatan { font-size: 13px; color: #64748b; margin-top: 28px; line-height: 1.6; }
+
+  .footer-kanan { font-size: 12px; color: #94a3b8; text-align: center; margin-top: 40px; line-height: 1.6; }
+
+  @media (max-width: 900px) {
+    .split { grid-template-columns: 1fr; }
+    .kiri { padding: 28px 24px; min-height: 300px; }
+    .hero h1 { font-size: 28px; }
+    .kanan { padding: 32px 24px; }
+  }
+</style>
 </head>
-<body style="font-family:sans-serif;max-width:380px;margin:60px auto;padding:0 16px">
-  <h2>Login Pegawai</h2>
-  <form id="f">
-    <input id="email" type="email" required placeholder="Email"
-      style="width:100%;padding:8px;margin:8px 0;box-sizing:border-box">
-    <input id="pw" type="password" required placeholder="Password"
-      style="width:100%;padding:8px;margin:8px 0;box-sizing:border-box">
-    <button type="submit" style="padding:8px 16px">Masuk</button>
-  </form>
-  <p id="msg"></p>
+<body>
 
-  <script>
-    const SUPABASE_URL = "https://epynlmuqxumuwcjsrnsz.supabase.co";
-    const SUPABASE_ANON_KEY = "sb_publishable_Oq_to1zgHLnachvWYLV_yA_DoOTGI3s";
+<div class="split">
+  <aside class="kiri">
+    <div class="brand">
+      <span class="logo">K</span>
+      <span>Kuttab Al-Kalam</span>
+    </div>
 
-    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    const msg = document.getElementById("msg");
+    <div class="hero">
+      <div class="eyebrow">SISTEM AKADEMIK · TA 2026/2027</div>
+      <h1>Satu tempat untuk santri, nilai, dan jurnal.</h1>
+      <p>Input nilai, jurnal tahsin, RKK, dan rapor dalam satu aplikasi yang bisa dibuka dari HP maupun komputer.</p>
+    </div>
 
-    document.getElementById("f").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      msg.textContent = "Memproses...";
-      const { data, error } = await sb.auth.signInWithPassword({
-        email: document.getElementById("email").value.trim().toLowerCase(),
-        password: document.getElementById("pw").value
-      });
-      if (error) {
-        msg.textContent = "Login gagal: " + error.message;
-        return;
-      }
-      location.href = "dashboard.html";
-    });
-  </script>
+    <div class="kutipan">
+      <p>"Membangun peradaban iman dan Al-Qur'an."</p>
+      <small>Visi Kuttab Al-Kalam</small>
+    </div>
+
+    <div class="footer-kiri">© 2026 · BAMBU APUS, PAMULANG</div>
+  </aside>
+
+  <main class="kanan">
+    <div class="form-wrap">
+      <h2>Selamat datang</h2>
+      <p class="sub">Masuk ke akun pegawai Anda untuk melanjutkan pekerjaan.</p>
+
+      <form id="fLogin" novalidate>
+        <label for="email">Email</label>
+        <div class="input">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
+          <input id="email" type="email" placeholder="nama@email.com" autocomplete="username" required>
+        </div>
+
+        <div class="label-row">
+          <label for="pw">Password</label>
+          <a href="#" id="lupa">Lupa?</a>
+        </div>
+        <div class="input">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+          <input id="pw" type="password" placeholder="••••••••" autocomplete="current-password" required>
+          <button type="button" id="tampilPw">Tampil</button>
+        </div>
+
+        <button type="submit" class="btn" id="btnMasuk">Masuk →</button>
+        <div id="pesan"></div>
+      </form>
+
+      <p class="catatan">Akun dibuat oleh admin. Jika belum memiliki akun, hubungi admin Kuttab Al-Kalam.</p>
+    </div>
+
+    <div class="footer-kanan">Dengan masuk, Anda menyetujui penggunaan data sekolah sesuai kebijakan Kuttab Al-Kalam.</div>
+  </main>
+</div>
+
+<script>
+  const SUPABASE_URL = "https://epynlmuqxumuwcjsrnsz.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_Oq_to1zgHLnachvWYLV_yA_DoOTGI3s";
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  const $ = id => document.getElementById(id);
+  const pesan = (t, tipe = "info") => {
+    $("pesan").textContent = t;
+    $("pesan").className = tipe;
+  };
+
+  // Jika sudah login, langsung ke dashboard
+  sb.auth.getSession().then(({ data }) => {
+    if (data.session) location.href = "dashboard.html";
+  });
+
+  $("tampilPw").onclick = () => {
+    const pw = $("pw");
+    const tampil = pw.type === "password";
+    pw.type = tampil ? "text" : "password";
+    $("tampilPw").textContent = tampil ? "Sembunyi" : "Tampil";
+  };
+
+  $("fLogin").addEventListener("submit", async e => {
+    e.preventDefault();
+    const email = $("email").value.trim().toLowerCase();
+    const password = $("pw").value;
+
+    if (!email || !password) return pesan("Isi email dan password.", "error");
+
+    const btn = $("btnMasuk");
+    btn.disabled = true;
+    btn.textContent = "Memproses...";
+    pesan("");
+
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+
+    if (error) {
+      btn.disabled = false;
+      btn.textContent = "Masuk →";
+      const teks = /Invalid login credentials/i.test(error.message)
+        ? "Email atau password salah."
+        : "Gagal masuk: " + error.message;
+      return pesan(teks, "error");
+    }
+
+    location.href = "dashboard.html";
+  });
+
+  $("lupa").addEventListener("click", async e => {
+    e.preventDefault();
+    const email = $("email").value.trim().toLowerCase();
+    if (!email) return pesan("Isi email terlebih dahulu, lalu klik Lupa lagi.", "error");
+
+    const redirectTo = new URL("set-password.html", location.href).href;
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
+    if (error) return pesan("Gagal mengirim tautan: " + error.message, "error");
+
+    pesan("Jika email terdaftar, tautan untuk membuat password baru sudah dikirim.", "info");
+  });
+</script>
 </body>
 </html>
