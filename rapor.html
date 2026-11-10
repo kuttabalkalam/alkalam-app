@@ -4,29 +4,25 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Rapor - Kuttab Al-Kalam</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.4/css/all.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2.0/dist/css/adminlte.min.css">
+<link rel="stylesheet" href="ui.css">
 <style>
-  body { font-family: Arial, sans-serif; font-size: 12px; color: #111; margin: 0; }
-
-  .controls { max-width: 900px; margin: 16px auto; padding: 12px; }
-  .controls a { display: inline-block; margin-bottom: 8px; }
-  .controls label { display: inline-block; margin: 4px 12px 4px 0; }
-  .controls select, .controls input[type=date] { padding: 4px; }
-  .controls button { padding: 6px 12px; margin: 4px 6px 4px 0; }
-  #pesan { font-weight: bold; min-height: 18px; }
-
-  .page { width: 210mm; margin: 0 auto 10mm; padding-bottom: 8mm; box-sizing: border-box; background: #fff; }
+  /* ===== Pratinjau di layar ===== */
+  .pratinjau { overflow-x: auto; background: #dfe7ef; padding: 12px; border-radius: 6px; }
+  .page {
+    width: 210mm; margin: 0 auto 14px; padding-bottom: 8mm; box-sizing: border-box;
+    background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.12);
+  }
   .page.lampiran { border-top: 1px dashed #ccc; }
   .kop { display: block; width: 100%; margin: 0; }
-  .isi { padding: 0 12mm; }
-
+  .isi { padding: 0 12mm; color: #111; font-size: 12px; }
   h3.judul { text-align: center; font-size: 14px; font-weight: bold; margin: 8mm 0 5mm; line-height: 1.5; }
 
-  /* Identitas: label dan nilai berdekatan */
   .ident { display: grid; grid-template-columns: 130px 1fr 55px 1fr; row-gap: 2px; font-size: 12px; margin-bottom: 5mm; }
 
-  table { border-collapse: collapse; }
-  table.tabel { width: 100%; table-layout: fixed; font-size: 12px; }
+  table.tabel { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 12px; }
   table.tabel th, table.tabel td { border: 1px solid #000; padding: 6px; vertical-align: middle; word-wrap: break-word; }
   table.tabel th { background: #fff; text-align: center; font-weight: bold; }
   table.tabel td.kel { font-weight: bold; text-align: center; }
@@ -34,8 +30,7 @@
   table.tabel td.sub { padding-left: 18px; }
   table.tabel td.isi { text-align: justify; line-height: 1.5; white-space: pre-line; padding: 6px 8px; }
 
-  /* Border per kotak mata pelajaran (judul + sub). Selector dibuat lebih spesifik
-     agar tidak kalah dengan aturan border umum di atas. */
+  /* Border per kotak mata pelajaran (judul + sub) */
   table.tabel td.r-top { border-bottom: none; }
   table.tabel td.r-mid { border-top: none; border-bottom: none; }
   table.tabel td.r-bot { border-top: none; }
@@ -45,355 +40,405 @@
   table.kecil { margin: 0 auto; width: auto; font-size: 12px; }
   table.kecil th, table.kecil td { border: 1px solid #000; padding: 3px 14px; font-size: 12px; }
 
-  /* Tanda tangan: dua kolom sama lebar.
-     Baris 1: tanggal di kolom kanan (rata tengah terhadap Guru Kelas).
-     Baris 2: Orang Tua dan Guru Kelas sejajar horizontal. */
+  /* Tanda tangan: tanggal di atas Guru Kelas, Orang Tua dan Guru Kelas sejajar */
   .ttd { display: grid; grid-template-columns: 1fr 1fr; column-gap: 8mm; margin-top: 10mm; }
   .ttd > div { text-align: center; }
   .ttd .tgl { margin-bottom: 4mm; }
 
+  /* ===== Cetak: hanya halaman rapor yang keluar ===== */
   @media print {
     @page { size: A4; margin: 0; }
-    body { margin: 0; }
-    .no-print { display: none !important; }
-    .page { width: 210mm; margin: 0; padding-bottom: 8mm; border: none; page-break-after: always; }
+    body, .wrapper, .content-wrapper, .content, .container-fluid {
+      background: #fff !important; margin: 0 !important; padding: 0 !important; min-height: 0 !important;
+    }
+    .main-header, .main-sidebar, .content-header, .main-footer, .no-print { display: none !important; }
+    .content-wrapper { margin-left: 0 !important; }
+    .card { border: 0 !important; box-shadow: none !important; background: transparent !important; }
+    .card-body { padding: 0 !important; }
+    .pratinjau { overflow: visible !important; background: #fff !important; padding: 0 !important; }
+    .page { width: 210mm; margin: 0; padding-bottom: 8mm; border: none; box-shadow: none; page-break-after: always; }
     .page:last-child { page-break-after: auto; }
     .page.lampiran { border-top: none; }
   }
 </style>
 </head>
-<body>
+<body class="hold-transition sidebar-mini">
 
-<div class="controls no-print">
-  <a href="dashboard.html">← Dashboard</a>
-  <h2>Rapor</h2>
-  <label>Tahun ajaran <select id="taSel"></select></label>
-  <label>Semester <select id="semSel"></select></label>
-  <label>Kelas <select id="rombelSel"></select></label>
-  <label>Tanggal rapor <input type="date" id="tanggal"></label>
-  <label><input type="checkbox" id="lampiranChk" checked> Sertakan lampiran deskripsi (semester ganjil)</label>
-  <br>
-  <button id="tampil">Tampilkan</button>
-  <button id="cetakBtn">Cetak / Simpan PDF</button>
-  <p id="pesan"></p>
-</div>
-
-<div id="cetak"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/admin-lte@3.2.0/dist/js/adminlte.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="ui.js"></script>
 
 <script>
-  const SUPABASE_URL = "https://epynlmuqxumuwcjsrnsz.supabase.co";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVweW5sbXVxeHVtdXdjanNybnN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxNjc5MTcsImV4cCI6MjEwODc0MzkxN30.9WNiASpdWVQBtaC1hnOZuujzOGCpl4i8m_E5cVZFBKY";
-  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  KUTTAB.halaman({
+    aktif: "rapor",
+    judul: "Rapor",
+    roles: ["admin", "kepala", "guru"],
+    render: async ({ sb, me, konten, gagal, esc }) => {
+      const $ = id => document.getElementById(id);
 
-  const $ = id => document.getElementById(id);
-  const pesan = t => $("pesan").textContent = t;
-  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+      const pesan = (t, tipe = "info") => {
+        const el = $("pesan");
+        el.textContent = t;
+        el.className = "small ml-2 " + (tipe === "error" ? "text-danger" : tipe === "ok" ? "text-success" : "text-muted");
+      };
 
-  const SATUAN = ["Nol","Satu","Dua","Tiga","Empat","Lima","Enam","Tujuh","Delapan","Sembilan","Sepuluh","Sebelas"];
-  function bilangan(n) {
-    if (n < 12) return SATUAN[n];
-    if (n < 20) return SATUAN[n - 10] + " Belas";
-    if (n < 100) { const p = Math.floor(n / 10), s = n % 10; return SATUAN[p] + " Puluh" + (s ? " " + SATUAN[s] : ""); }
-    return "Seratus";
-  }
-  function nilaiTeks(v) {
-    if (v == null || v === "") return { a: "-", t: "-" };
-    const [b, d] = Number(v).toFixed(2).split(".");
-    return { a: b + "," + d, t: bilangan(Number(b)) + " Koma " + d.split("").map(x => SATUAN[Number(x)]).join(" ") };
-  }
+      // ===== Helper rapor =====
+      const SATUAN = ["Nol","Satu","Dua","Tiga","Empat","Lima","Enam","Tujuh","Delapan","Sembilan","Sepuluh","Sebelas"];
+      function bilangan(n) {
+        if (n < 12) return SATUAN[n];
+        if (n < 20) return SATUAN[n - 10] + " Belas";
+        if (n < 100) { const p = Math.floor(n / 10), s = n % 10; return SATUAN[p] + " Puluh" + (s ? " " + SATUAN[s] : ""); }
+        return "Seratus";
+      }
+      function nilaiTeks(v) {
+        if (v == null || v === "") return { a: "-", t: "-" };
+        const [b, d] = Number(v).toFixed(2).split(".");
+        return { a: b + "," + d, t: bilangan(Number(b)) + " Koma " + d.split("").map(x => SATUAN[Number(x)]).join(" ") };
+      }
 
-  const BULAN = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
-  const tglIndo = iso => { const [y, m, d] = iso.split("-"); return Number(d) + " " + BULAN[Number(m) - 1] + " " + y; };
+      const BULAN = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+      const tglIndo = iso => { const [y, m, d] = iso.split("-"); return Number(d) + " " + BULAN[Number(m) - 1] + " " + y; };
+      const teksAman = v => v == null || v === "" ? "-" : esc(v);
 
-  // Struktur: kelompok > mapel > sub-komponen (anak). Mapel tanpa anak adalah baris tunggal.
-  const STRUKTUR = [
-    { kelompok: "I. Muatan Khusus", mapel: [
-      { label: "A. Karakter Iman", anak: [
-        { kode: "iman", label: "1) Pemahaman" }
-      ]},
-      { label: "B. Al-Qur'an", anak: [
-        { kode: "tahfidz", label: "1) Tahfidz" },
-        { kode: "tilawah", label: "2) Tilawah" },
-        { kode: "kitabah", label: "3) Kitabah" }
-      ]},
-      { label: "C. Ibadah", kode: "ibadah" }
-    ]},
-    { kelompok: "II. Murofaqot", mapel: [
-      { label: "A. Matematika / Berhitung", kode: "mtk" },
-      { label: "B. Bahasa Indonesia", kode: "bindo" },
-      { label: "C. Ilmu Pengetahuan Alam", kode: "ipa" },
-      { label: "D. Ilmu Pengetahuan Sosial", kode: "ips" }
-    ]},
-    { kelompok: "III. Muatan Penunjang", mapel: [
-      { label: "A. Keterampilan Fisik / Olahraga", kode: "olahraga" },
-      { label: "B. Keterampilan Hidup / Life Skill", kode: "lifeskill" },
-      { label: "C. Bahasa Peradaban / Bahasa Arab", kode: "arab" }
-    ]}
-  ];
+      // Struktur: kelompok > mapel > sub-komponen (anak). Mapel tanpa anak adalah baris tunggal.
+      const STRUKTUR = [
+        { kelompok: "I. Muatan Khusus", mapel: [
+          { label: "A. Karakter Iman", anak: [
+            { kode: "iman", label: "1) Pemahaman" }
+          ]},
+          { label: "B. Al-Qur'an", anak: [
+            { kode: "tahfidz", label: "1) Tahfidz" },
+            { kode: "tilawah", label: "2) Tilawah" },
+            { kode: "kitabah", label: "3) Kitabah" }
+          ]},
+          { label: "C. Ibadah", kode: "ibadah" }
+        ]},
+        { kelompok: "II. Murofaqot", mapel: [
+          { label: "A. Matematika / Berhitung", kode: "mtk" },
+          { label: "B. Bahasa Indonesia", kode: "bindo" },
+          { label: "C. Ilmu Pengetahuan Alam", kode: "ipa" },
+          { label: "D. Ilmu Pengetahuan Sosial", kode: "ips" }
+        ]},
+        { kelompok: "III. Muatan Penunjang", mapel: [
+          { label: "A. Keterampilan Fisik / Olahraga", kode: "olahraga" },
+          { label: "B. Keterampilan Hidup / Life Skill", kode: "lifeskill" },
+          { label: "C. Bahasa Peradaban / Bahasa Arab", kode: "arab" }
+        ]}
+      ];
 
-  let me = null, taList = [], semList = [], rombelList = [];
-  let nilaiMap = {}, absenMap = {}, deskMap = {}, aspekByKode = {}, kodeMapel = {};
+      function htmlIdentitas(s, ctx) {
+        return `<div class="ident">
+          <div>Nama Santri</div><div>: ${esc(s.nama_lengkap)}</div>
+          <div>Kelas</div><div>: ${esc(ctx.rombel.nama)}</div>
+          <div>Nomor Induk Santri</div><div>: ${esc(s.nis || "-")}</div>
+          <div></div><div></div>
+        </div>`;
+      }
 
-  function htmlIdentitas(s, ctx) {
-    return `<div class="ident">
-      <div>Nama Santri</div><div>: ${esc(s.nama_lengkap)}</div>
-      <div>Kelas</div><div>: ${esc(ctx.rombel.nama)}</div>
-      <div>Nomor Induk Santri</div><div>: ${esc(s.nis || "-")}</div>
-      <div></div><div></div>
-    </div>`;
-  }
+      function htmlTtd(ctx) {
+        return `<div class="ttd">
+          <div></div>
+          <div class="tgl">Tangerang Selatan, ${tglIndo(ctx.tanggal)}</div>
+          <div>Orang Tua / Wali<br><br><br><br>( ........................................ )</div>
+          <div>Guru Kelas Kuttab Al Kalam<br><br><br><br><b><u>${esc(ctx.waliNama || "........................")}</u></b></div>
+        </div>`;
+      }
 
-  function htmlTtd(ctx) {
-    return `<div class="ttd">
-      <div></div>
-      <div class="tgl">Tangerang Selatan, ${tglIndo(ctx.tanggal)}</div>
-      <div>Orang Tua / Wali<br><br><br><br>( ........................................ )</div>
-      <div>Guru Kelas Kuttab Al Kalam<br><br><br><br><b><u>${esc(ctx.waliNama || "........................")}</u></b></div>
-    </div>`;
-  }
+      function htmlRapor(s, ctx, nilaiMap, absenMap) {
+        const n = nilaiMap[s.id] || {};
+        const ab = absenMap[s.id];
+        const semLabel = ctx.sem.nomor === 1 ? "GANJIL" : "GENAP";
+        const nilaiList = [];
+        const ambil = kode => { const v = n[kode]; if (v != null) nilaiList.push(Number(v)); return v; };
+        const rows = [];
 
-  function htmlRapor(s, ctx) {
-    const n = nilaiMap[s.id] || {};
-    const ab = absenMap[s.id];
-    const semLabel = ctx.sem.nomor === 1 ? "GANJIL" : "GENAP";
-    const nilaiList = [];
-    const ambil = kode => { const v = n[kode]; if (v != null) nilaiList.push(Number(v)); return v; };
-    let rows = "";
-
-    STRUKTUR.forEach(g => {
-      const baris = [];
-      g.mapel.forEach(m => {
-        if (m.anak) {
-          baris.push({ label: m.label, cls: "r-top", kode: null, sub: false });
-          m.anak.forEach((a, i) => baris.push({
-            label: a.label, kode: a.kode, sub: true,
-            cls: i === m.anak.length - 1 ? "r-bot" : "r-mid"
-          }));
-        } else {
-          baris.push({ label: m.label, kode: m.kode, sub: false, cls: "r-solo" });
-        }
-      });
-
-      baris.forEach((r, i) => {
-        const kel = i === 0 ? `<td rowspan="${baris.length}" class="kel">${esc(g.kelompok)}</td>` : "";
-        let angka = "", huruf = "";
-        if (r.kode) {
-          const f = nilaiTeks(ambil(r.kode));
-          angka = f.a; huruf = f.t;
-        }
-        rows += `<tr>${kel}<td class="${r.cls}${r.sub ? " sub" : ""}">${esc(r.label)}</td>` +
-                `<td class="c ${r.cls}">${angka}</td><td class="c ${r.cls}">${huruf}</td></tr>`;
-      });
-    });
-
-    const rata = nilaiList.length ? nilaiList.reduce((a, b) => a + b, 0) / nilaiList.length : null;
-    const fr = nilaiTeks(rata);
-    const absen = k => ab ? ab[k] : "-";
-
-    return `<section class="page rapor">
-      <img class="kop" src="kop.png" alt="Kop Kuttab Al-Kalam">
-      <div class="isi">
-        <h3 class="judul">RAPOR SEMESTER ${semLabel}<br>TAHUN AJARAN ${esc(ctx.ta.kode)}</h3>
-        ${htmlIdentitas(s, ctx)}
-        <table class="tabel">
-          <colgroup><col style="width:22%"><col style="width:40%"><col style="width:15%"><col style="width:23%"></colgroup>
-          <tr><th colspan="2" rowspan="2">MATA PELAJARAN</th><th colspan="2">PENILAIAN</th></tr>
-          <tr><th>ANGKA</th><th>HURUF</th></tr>
-          ${rows}
-          <tr><td colspan="2" class="c"><b>Nilai rata-rata</b></td><td class="c"><b>${fr.a}</b></td><td class="c"><b>${fr.t}</b></td></tr>
-        </table>
-        <div class="absen">
-          <p>Ketidakhadiran/Absensi</p>
-          <table class="tabel kecil">
-            <tr><th>No</th><th>Alasan</th><th>Hari</th></tr>
-            <tr><td class="c">1</td><td>Sakit</td><td class="c">${absen("sakit")}</td></tr>
-            <tr><td class="c">2</td><td>Izin</td><td class="c">${absen("izin")}</td></tr>
-            <tr><td class="c">3</td><td>Tanpa Uzur Syar'i</td><td class="c">${absen("tanpa_uzur")}</td></tr>
-          </table>
-        </div>
-        ${htmlTtd(ctx)}
-      </div>
-    </section>`;
-  }
-
-  function htmlLampiran(s, ctx) {
-    const d = deskMap[s.id] || {};
-    let body = "";
-
-    STRUKTUR.forEach(g => {
-      const baris = [];
-      g.mapel.forEach(m => {
-        if (m.anak) {
-          const subs = [];
-          m.anak.forEach(a => (aspekByKode[a.kode] || []).forEach(asp => {
-            const isi = (d[asp.id] || "").trim();
-            if (isi) subs.push({ nama: asp.nama, isi });
-          }));
-          if (!subs.length) return;
-          baris.push({ label: m.label + ":", isi: "", cls: "r-top", sub: false });
-          subs.forEach((x, i) => baris.push({
-            label: (i + 1) + ". " + x.nama, isi: x.isi, sub: true,
-            cls: i === subs.length - 1 ? "r-bot" : "r-mid"
-          }));
-        } else {
-          (aspekByKode[m.kode] || []).forEach(asp => {
-            const isi = (d[asp.id] || "").trim();
-            if (isi) baris.push({ label: m.label, isi, sub: false, cls: "r-solo" });
+        STRUKTUR.forEach(g => {
+          const baris = [];
+          g.mapel.forEach(m => {
+            if (m.anak) {
+              baris.push({ label: m.label, cls: "r-top", kode: null, sub: false });
+              m.anak.forEach((a, i) => baris.push({
+                label: a.label, kode: a.kode, sub: true,
+                cls: i === m.anak.length - 1 ? "r-bot" : "r-mid"
+              }));
+            } else {
+              baris.push({ label: m.label, kode: m.kode, sub: false, cls: "r-solo" });
+            }
           });
-        }
-      });
 
-      if (!baris.length) return;
-      body += baris.map((r, i) => {
-        const kel = i === 0 ? `<td rowspan="${baris.length}" class="kel">${esc(g.kelompok)}</td>` : "";
-        return `<tr>${kel}<td class="${r.cls}${r.sub ? " sub" : ""}">${esc(r.label)}</td>` +
-               `<td class="isi ${r.cls}">${esc(r.isi)}</td></tr>`;
-      }).join("");
-    });
+          baris.forEach((r, i) => {
+            const kel = i === 0 ? `<td rowspan="${baris.length}" class="kel">${esc(g.kelompok)}</td>` : "";
+            let angka = "", huruf = "";
+            if (r.kode) {
+              const f = nilaiTeks(ambil(r.kode));
+              angka = f.a; huruf = f.t;
+            }
+            rows.push(`<tr>${kel}<td class="${r.cls}${r.sub ? " sub" : ""}">${esc(r.label)}</td>` +
+              `<td class="c ${r.cls}">${angka}</td><td class="c ${r.cls}">${huruf}</td></tr>`);
+          });
+        });
 
-    if (!body) body = `<tr><td colspan="3" class="c">Belum ada deskripsi untuk santri ini.</td></tr>`;
+        const rata = nilaiList.length ? nilaiList.reduce((a, b) => a + b, 0) / nilaiList.length : null;
+        const fr = nilaiTeks(rata);
+        const absen = k => ab ? ab[k] : "-";
 
-    return `<section class="page lampiran">
-      <img class="kop" src="kop.png" alt="Kop Kuttab Al-Kalam">
-      <div class="isi">
-        <h3 class="judul">LAMPIRAN DESKRIPSI CAPAIAN<br>SEMESTER GANJIL TAHUN AJARAN ${esc(ctx.ta.kode)}</h3>
-        ${htmlIdentitas(s, ctx)}
-        <table class="tabel">
-          <colgroup><col style="width:20%"><col style="width:30%"><col style="width:50%"></colgroup>
-          <tr><th colspan="2">MATA PELAJARAN</th><th>DESKRIPSI</th></tr>
-          ${body}
-        </table>
-        ${htmlTtd(ctx)}
-      </div>
-    </section>`;
-  }
+        return `<section class="page rapor">
+          <img class="kop" src="kop.png" alt="Kop Kuttab Al-Kalam">
+          <div class="isi">
+            <h3 class="judul">RAPOR SEMESTER ${semLabel}<br>TAHUN AJARAN ${esc(ctx.ta.kode)}</h3>
+            ${htmlIdentitas(s, ctx)}
+            <table class="tabel">
+              <colgroup><col style="width:22%"><col style="width:40%"><col style="width:15%"><col style="width:23%"></colgroup>
+              <tr><th colspan="2" rowspan="2">MATA PELAJARAN</th><th colspan="2">PENILAIAN</th></tr>
+              <tr><th>ANGKA</th><th>HURUF</th></tr>
+              ${rows.join("")}
+              <tr><td colspan="2" class="c"><b>Nilai rata-rata</b></td><td class="c"><b>${fr.a}</b></td><td class="c"><b>${fr.t}</b></td></tr>
+            </table>
+            <div class="absen">
+              <p>Ketidakhadiran/Absensi</p>
+              <table class="tabel kecil">
+                <tr><th>No</th><th>Alasan</th><th>Hari</th></tr>
+                <tr><td class="c">1</td><td>Sakit</td><td class="c">${absen("sakit")}</td></tr>
+                <tr><td class="c">2</td><td>Izin</td><td class="c">${absen("izin")}</td></tr>
+                <tr><td class="c">3</td><td>Tanpa Uzur Syar'i</td><td class="c">${absen("tanpa_uzur")}</td></tr>
+              </table>
+            </div>
+            ${htmlTtd(ctx)}
+          </div>
+        </section>`;
+      }
 
-  async function init() {
-    const { data: { session } } = await sb.auth.getSession();
-    if (!session) { location.href = "login.html"; return; }
+      function htmlLampiran(s, ctx, deskMap, aspekByKode) {
+        const d = deskMap[s.id] || {};
+        let body = "";
 
-    const { data: p, error: eP } = await sb.from("pegawai")
-      .select("id, nama_lengkap, peran").eq("auth_user_id", session.user.id).maybeSingle();
-    if (eP) { pesan("Gagal memuat akun: " + eP.message); return; }
-    if (!p) { pesan("Akun " + session.user.email + " belum terhubung ke data pegawai."); return; }
-    if (!["admin", "kepala", "guru"].includes(p.peran)) {
-      pesan("Peran '" + p.peran + "' tidak punya akses ke rapor."); return;
-    }
-    me = p;
+        STRUKTUR.forEach(g => {
+          const baris = [];
+          g.mapel.forEach(m => {
+            if (m.anak) {
+              const subs = [];
+              m.anak.forEach(a => (aspekByKode[a.kode] || []).forEach(asp => {
+                const isi = (d[asp.id] || "").trim();
+                if (isi) subs.push({ nama: asp.nama, isi });
+              }));
+              if (!subs.length) return;
+              baris.push({ label: m.label + ":", isi: "", cls: "r-top", sub: false });
+              subs.forEach((x, i) => baris.push({
+                label: (i + 1) + ". " + x.nama, isi: x.isi, sub: true,
+                cls: i === subs.length - 1 ? "r-bot" : "r-mid"
+              }));
+            } else {
+              (aspekByKode[m.kode] || []).forEach(asp => {
+                const isi = (d[asp.id] || "").trim();
+                if (isi) baris.push({ label: m.label, isi, sub: false, cls: "r-solo" });
+              });
+            }
+          });
 
-    const [{ data: tas }, { data: sems }] = await Promise.all([
-      sb.from("tahun_ajaran").select("id, kode, aktif").order("kode"),
-      sb.from("semester").select("id, nomor, aktif, tahun_ajaran_id").order("nomor")
-    ]);
-    taList = tas || [];
-    semList = sems || [];
+          if (!baris.length) return;
+          body += baris.map((r, i) => {
+            const kel = i === 0 ? `<td rowspan="${baris.length}" class="kel">${esc(g.kelompok)}</td>` : "";
+            return `<tr>${kel}<td class="${r.cls}${r.sub ? " sub" : ""}">${esc(r.label)}</td>` +
+              `<td class="isi ${r.cls}">${esc(r.isi)}</td></tr>`;
+          }).join("");
+        });
 
-    $("taSel").innerHTML = taList.map(t =>
-      `<option value="${t.id}" ${t.aktif ? "selected" : ""}>${esc(t.kode)}${t.aktif ? " (aktif)" : ""}</option>`).join("");
-    $("tanggal").value = new Date().toLocaleDateString("sv-SE");
+        if (!body) body = `<tr><td colspan="3" class="c">Belum ada deskripsi untuk santri ini.</td></tr>`;
 
-    $("taSel").onchange = async () => { isiSemester(); await isiRombel(); };
-    $("tampil").onclick = tampilkan;
-    $("cetakBtn").onclick = () => window.print();
+        return `<section class="page lampiran">
+          <img class="kop" src="kop.png" alt="Kop Kuttab Al-Kalam">
+          <div class="isi">
+            <h3 class="judul">LAMPIRAN DESKRIPSI CAPAIAN<br>SEMESTER GANJIL TAHUN AJARAN ${esc(ctx.ta.kode)}</h3>
+            ${htmlIdentitas(s, ctx)}
+            <table class="tabel">
+              <colgroup><col style="width:20%"><col style="width:30%"><col style="width:50%"></colgroup>
+              <tr><th colspan="2">MATA PELAJARAN</th><th>DESKRIPSI</th></tr>
+              ${body}
+            </table>
+            ${htmlTtd(ctx)}
+          </div>
+        </section>`;
+      }
 
-    isiSemester();
-    await isiRombel();
-  }
-
-  function isiSemester() {
-    const taId = Number($("taSel").value);
-    const ta = taList.find(t => t.id === taId);
-    const list = semList.filter(s => s.tahun_ajaran_id === taId);
-    $("semSel").innerHTML = list.map(s =>
-      `<option value="${s.id}">Semester ${s.nomor === 1 ? "Ganjil" : "Genap"}</option>`).join("");
-    const def = list.find(s => ta && ta.aktif && s.aktif) || list.find(s => s.nomor === 2) || list[0];
-    if (def) $("semSel").value = String(def.id);
-  }
-
-  async function isiRombel() {
-    const taId = Number($("taSel").value);
-    const { data, error } = await sb.from("rombel")
-      .select("id, nama, tingkat_kode, wali_kelas_id")
-      .eq("tahun_ajaran_id", taId).order("nama");
-    if (error) { pesan("Gagal memuat kelas: " + error.message); return; }
-
-    rombelList = (data || []).filter(r => me.peran !== "guru" || r.wali_kelas_id === me.id);
-    $("rombelSel").innerHTML = rombelList.map(r => `<option value="${r.id}">${esc(r.nama)}</option>`).join("");
-
-    if (!rombelList.length) {
-      pesan(me.peran === "guru"
-        ? "Anda belum menjadi wali kelas di tahun ajaran ini."
-        : "Belum ada kelas di tahun ajaran ini.");
-    } else {
-      pesan("");
-    }
-  }
-
-  async function tampilkan() {
-    const rombel = rombelList.find(r => r.id === Number($("rombelSel").value));
-    const sem = semList.find(s => s.id === Number($("semSel").value));
-    const ta = taList.find(t => t.id === Number($("taSel").value));
-    if (!rombel || !sem) { pesan("Pilih kelas dan semester."); return; }
-
-    pesan("Memuat...");
-    $("cetak").innerHTML = "";
-
-    const { data: kr, error } = await sb.from("keanggotaan_rombel")
-      .select("santri:santri_id(id, nis, nama_lengkap)")
-      .eq("rombel_id", rombel.id).eq("tahun_ajaran_id", ta.id);
-    if (error) { pesan("Gagal memuat santri: " + error.message); return; }
-
-    const santri = (kr || []).map(x => x.santri).filter(Boolean)
-      .sort((a, b) => a.nama_lengkap.localeCompare(b.nama_lengkap));
-    if (!santri.length) { pesan("Belum ada santri di kelas ini."); return; }
-    const ids = santri.map(s => s.id);
-
-    const [mapelRes, naRes, absRes] = await Promise.all([
-      sb.from("mata_pelajaran").select("id, kode"),
-      sb.from("nilai_akhir").select("santri_id, mapel_id, nilai_rapor").eq("semester_id", sem.id).in("santri_id", ids),
-      sb.from("absensi_rapor").select("santri_id, sakit, izin, tanpa_uzur").eq("semester_id", sem.id).in("santri_id", ids)
-    ]);
-
-    kodeMapel = {};
-    (mapelRes.data || []).forEach(m => kodeMapel[m.id] = m.kode);
-
-    nilaiMap = {};
-    (naRes.data || []).forEach(r => {
-      (nilaiMap[r.santri_id] ||= {})[kodeMapel[r.mapel_id]] = r.nilai_rapor;
-    });
-
-    absenMap = {};
-    (absRes.data || []).forEach(a => absenMap[a.santri_id] = a);
-
-    const adaLampiran = sem.nomor === 1 && $("lampiranChk").checked;
-    if (adaLampiran) {
-      const [asp, desk] = await Promise.all([
-        sb.from("aspek_deskripsi").select("id, mapel_id, nama, urutan").eq("aktif", true).order("urutan"),
-        sb.from("deskripsi_rapor").select("santri_id, aspek_id, isi").eq("semester_id", sem.id).in("santri_id", ids)
+      // ===== Data =====
+      const [tas, sems, pgRes] = await Promise.all([
+        sb.from("tahun_ajaran").select("id, kode, aktif").order("kode"),
+        sb.from("semester").select("id, nomor, aktif, tahun_ajaran_id").order("nomor"),
+        sb.from("pengaturan").select("kunci, nilai")
       ]);
-      aspekByKode = {};
-      (asp.data || []).forEach(a => (aspekByKode[kodeMapel[a.mapel_id]] ||= []).push(a));
-      deskMap = {};
-      (desk.data || []).forEach(d => (deskMap[d.santri_id] ||= {})[d.aspek_id] = d.isi);
+      if (tas.error) return gagal(tas.error);
+      if (sems.error) return gagal(sems.error);
+
+      const taList = tas.data || [];
+      const semList = sems.data || [];
+      let rombelList = [];
+
+      // ===== Kerangka halaman =====
+      konten.innerHTML = `
+        <div class="card card-outline card-warning no-print">
+          <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-file-alt"></i> Filter Rapor</h3>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-12 col-md-3">
+                <div class="form-group"><label class="small mb-1">Tahun ajaran</label>
+                  <select id="taSel" class="form-control"></select></div>
+              </div>
+              <div class="col-12 col-md-3">
+                <div class="form-group"><label class="small mb-1">Semester</label>
+                  <select id="semSel" class="form-control"></select></div>
+              </div>
+              <div class="col-12 col-md-3">
+                <div class="form-group"><label class="small mb-1">Kelas</label>
+                  <select id="rombelSel" class="form-control"></select></div>
+              </div>
+              <div class="col-12 col-md-3">
+                <div class="form-group"><label class="small mb-1">Tanggal rapor</label>
+                  <input type="date" id="tanggal" class="form-control"></div>
+              </div>
+            </div>
+            <div class="custom-control custom-checkbox">
+              <input class="custom-control-input" type="checkbox" id="lampiranChk" checked>
+              <label class="custom-control-label" for="lampiranChk">Sertakan lampiran deskripsi (semester ganjil)</label>
+            </div>
+          </div>
+          <div class="card-footer">
+            <button class="btn btn-kuning" id="tampil"><i class="fas fa-search"></i> Tampilkan</button>
+            <button class="btn btn-hitam" id="cetakBtn"><i class="fas fa-print"></i> Cetak / Simpan PDF</button>
+            <span id="pesan"></span>
+          </div>
+        </div>
+
+        <div class="card card-outline card-info">
+          <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-eye"></i> Pratinjau</h3>
+          </div>
+          <div class="card-body p-0">
+            <div class="pratinjau" id="cetak">
+              <p class="text-center text-muted p-4 mb-0">Pilih kelas dan semester, lalu klik Tampilkan.</p>
+            </div>
+          </div>
+        </div>`;
+
+      // Pengaturan (faktor & pembagi) tidak dipakai di tampilan rapor, tetapi diambil untuk konsistensi
+      void pgRes;
+
+      $("taSel").innerHTML = taList.map(t =>
+        `<option value="${t.id}" ${t.aktif ? "selected" : ""}>${esc(t.kode)}${t.aktif ? " (aktif)" : ""}</option>`).join("");
+      $("tanggal").value = new Date().toLocaleDateString("sv-SE");
+
+      async function muatRombel() {
+        const taId = Number($("taSel").value);
+        const { data, error } = await sb.from("rombel")
+          .select("id, nama, tingkat_kode, wali_kelas_id")
+          .eq("tahun_ajaran_id", taId).order("nama");
+        if (error) return gagal(error);
+
+        rombelList = (data || []).filter(r => me.peran !== "guru" || r.wali_kelas_id === me.id);
+        $("rombelSel").innerHTML = rombelList.map(r => `<option value="${r.id}">${esc(r.nama)}</option>`).join("");
+
+        if (!rombelList.length) {
+          pesan(me.peran === "guru"
+            ? "Anda belum menjadi wali kelas di tahun ajaran ini."
+            : "Belum ada kelas di tahun ajaran ini.", "info");
+        } else {
+          pesan("");
+        }
+      }
+
+      function isiSemester() {
+        const taId = Number($("taSel").value);
+        const ta = taList.find(t => t.id === taId);
+        const list = semList.filter(s => s.tahun_ajaran_id === taId);
+        $("semSel").innerHTML = list.map(s =>
+          `<option value="${s.id}">Semester ${s.nomor === 1 ? "Ganjil" : "Genap"}</option>`).join("");
+        const def = list.find(s => ta && ta.aktif && s.aktif) || list.find(s => s.nomor === 2) || list[0];
+        if (def) $("semSel").value = String(def.id);
+      }
+
+      $("taSel").onchange = async () => { isiSemester(); await muatRombel(); };
+      $("tampil").onclick = tampilkan;
+      $("cetakBtn").onclick = () => window.print();
+
+      isiSemester();
+      await muatRombel();
+
+      // ===== Tampilkan pratinjau =====
+      async function tampilkan() {
+        const rombel = rombelList.find(r => r.id === Number($("rombelSel").value));
+        const sem = semList.find(s => s.id === Number($("semSel").value));
+        const ta = taList.find(t => t.id === Number($("taSel").value));
+        if (!rombel || !sem) return pesan("Pilih kelas dan semester.", "error");
+
+        pesan("Memuat...");
+        $("cetak").innerHTML = "";
+
+        const { data: kr, error } = await sb.from("keanggotaan_rombel")
+          .select("santri:santri_id(id, nis, nama_lengkap)")
+          .eq("rombel_id", rombel.id).eq("tahun_ajaran_id", ta.id);
+        if (error) return gagal(error);
+
+        const santri = (kr || []).map(x => x.santri).filter(Boolean)
+          .sort((a, b) => a.nama_lengkap.localeCompare(b.nama_lengkap));
+        if (!santri.length) return pesan("Belum ada santri di kelas ini.", "error");
+        const ids = santri.map(s => s.id);
+
+        const [mapelRes, naRes, absRes] = await Promise.all([
+          sb.from("mata_pelajaran").select("id, kode"),
+          sb.from("nilai_akhir").select("santri_id, mapel_id, nilai_rapor").eq("semester_id", sem.id).in("santri_id", ids),
+          sb.from("absensi_rapor").select("santri_id, sakit, izin, tanpa_uzur").eq("semester_id", sem.id).in("santri_id", ids)
+        ]);
+        for (const r of [mapelRes, naRes, absRes]) if (r.error) return gagal(r.error);
+
+        const kodeMapel = {};
+        (mapelRes.data || []).forEach(m => kodeMapel[m.id] = m.kode);
+
+        const nilaiMap = {};
+        (naRes.data || []).forEach(r => {
+          (nilaiMap[r.santri_id] ||= {})[kodeMapel[r.mapel_id]] = r.nilai_rapor;
+        });
+
+        const absenMap = {};
+        (absRes.data || []).forEach(a => absenMap[a.santri_id] = a);
+
+        const adaLampiran = sem.nomor === 1 && $("lampiranChk").checked;
+        let aspekByKode = {}, deskMap = {};
+        if (adaLampiran) {
+          const [asp, desk] = await Promise.all([
+            sb.from("aspek_deskripsi").select("id, mapel_id, nama, urutan").eq("aktif", true).order("urutan"),
+            sb.from("deskripsi_rapor").select("santri_id, aspek_id, isi").eq("semester_id", sem.id).in("santri_id", ids)
+          ]);
+          if (asp.error) return gagal(asp.error);
+          if (desk.error) return gagal(desk.error);
+          (asp.data || []).forEach(a => (aspekByKode[kodeMapel[a.mapel_id]] ||= []).push(a));
+          (desk.data || []).forEach(d => (deskMap[d.santri_id] ||= {})[d.aspek_id] = d.isi);
+        }
+
+        let waliNama = "";
+        if (rombel.wali_kelas_id) {
+          const { data: w } = await sb.from("pegawai").select("nama_lengkap")
+            .eq("id", rombel.wali_kelas_id).maybeSingle();
+          waliNama = w ? w.nama_lengkap : "";
+        }
+
+        const ctx = {
+          ta, sem, rombel, waliNama, adaLampiran,
+          tanggal: $("tanggal").value || new Date().toLocaleDateString("sv-SE")
+        };
+
+        $("cetak").innerHTML = santri.map(s =>
+          htmlRapor(s, ctx, nilaiMap, absenMap) +
+          (adaLampiran ? htmlLampiran(s, ctx, deskMap, aspekByKode) : "")
+        ).join("");
+
+        pesan("Siap dicetak: " + santri.length + " santri.", "ok");
+      }
     }
-
-    let waliNama = "";
-    if (rombel.wali_kelas_id) {
-      const { data: w } = await sb.from("pegawai").select("nama_lengkap").eq("id", rombel.wali_kelas_id).maybeSingle();
-      waliNama = w ? w.nama_lengkap : "";
-    }
-
-    const ctx = {
-      ta, sem, rombel, waliNama, adaLampiran,
-      tanggal: $("tanggal").value || new Date().toLocaleDateString("sv-SE")
-    };
-
-    $("cetak").innerHTML = santri.map(s =>
-      htmlRapor(s, ctx) + (adaLampiran ? htmlLampiran(s, ctx) : "")).join("");
-    pesan("Siap dicetak: " + santri.length + " santri.");
-  }
-
-  init();
+  });
 </script>
 </body>
 </html>
