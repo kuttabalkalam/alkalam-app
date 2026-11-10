@@ -75,8 +75,8 @@
                 <select id="mapel" class="form-control"></select>
               </div>
               <div class="col-6 col-md-2 mb-2" id="wrapJumlah">
-                <label class="small mb-1">Jumlah ujian/tema</label>
-                <input id="jumlah" type="number" min="1" max="10" value="4" class="form-control">
+                <label class="small mb-1">Jumlah Ujian</label>
+                <input id="jumlah" type="number" min="1" max="10" value="1" class="form-control">
               </div>
               <div class="col-6 col-md-1 mb-2">
                 <button class="btn btn-kuning btn-block" id="tampil" title="Tampilkan"><i class="fas fa-search"></i></button>
@@ -95,7 +95,7 @@
       const rombelSel = $("rombel"), mapelSel = $("mapel"), modeSel = $("mode"), jumlahIn = $("jumlah");
 
       let santri = [], kolom = [], nilaiLama = {}, akhir = {}, aspek = [], deskLama = {};
-      let mapelId = null;
+      let mapelId = null, mapelKode = "";
 
       rombelSel.innerHTML = rombelOpts.map(([id, nama]) => `<option value="${id}">${esc(nama)}</option>`).join("");
 
@@ -159,6 +159,7 @@
         const rid = Number(rombelSel.value);
         mapelId = Number(mapelSel.value);
         if (!rid || !mapelId) return peringatan("Pilih kelas dan mapel terlebih dahulu.");
+        mapelKode = penugasan.find(x => x.mapel.id === mapelId)?.mapel.kode || "";
 
         const { data: kr, error: e1 } = await sb.from("keanggotaan_rombel")
           .select("santri:santri_id(id, nis, nama_lengkap)")
@@ -187,12 +188,14 @@
           .map(b => ({ id: b.komponen_id, ...b.komponen }))
           .sort((a, b) => a.urutan - b.urutan);
 
+        // Tahfidz dan tilawah memakai label "Nilai", mapel lain memakai "Ujian"
+        const pakaiNilai = ["tahfidz", "tilawah"].includes(mapelKode);
         const jumlah = Math.min(10, Math.max(1, Number(jumlahIn.value) || 1));
         kolom = [];
         komponen.forEach(k => {
           if (k.kode === "ujian_periodik") {
             for (let i = 1; i <= jumlah; i++) {
-              kolom.push({ komponenId: k.id, item: String(i), label: "Ujian " + i });
+              kolom.push({ komponenId: k.id, item: String(i), label: (pakaiNilai ? "Nilai " : "Ujian ") + i });
             }
           } else {
             kolom.push({ komponenId: k.id, item: "", label: k.nama });
