@@ -84,4 +84,143 @@
         return [...m.values()].sort((a, b) => a.urutan - b.urutan);
       }
 
-      const
+      const kodeMapelDari = mid => (penugasan.find(x => x.mapel.id === mid) || {}).mapel?.kode || "";
+
+      konten.innerHTML = `
+        <div class="card">
+          <div class="card-body">
+            <div class="form-row align-items-end">
+              <div class="col-12 col-md-4 mb-2">
+                <label class="small mb-1">Kelas</label>
+                <select id="rombel" class="form-control">
+                  ${rombelBisa.map(r => `<option value="${r.id}">${esc(r.nama)}</option>`).join("")}
+                </select>
+              </div>
+              <div class="col-12 col-md-5 mb-2">
+                <label class="small mb-1">Mapel</label>
+                <select id="mapel" class="form-control"></select>
+              </div>
+              <div class="col-12 col-md-3 mb-2">
+                <button class="btn btn-kuning btn-block" id="tampil"><i class="fas fa-table"></i> Tampilkan</button>
+              </div>
+            </div>
+            <p class="small text-muted mb-0" id="info"></p>
+          </div>
+        </div>
+        <div class="tabel-wrap" id="tabel"></div>
+        <div class="rumus mt-2">
+          Angka di bawah nama kolom adalah bobot. Kehadiran dihitung otomatis dari data absensi.
+          Nilai akhir = (jumlah rata-rata komponen × bobot) ÷ total bobot × ${skalaAkhir} / 100.
+          Nilai rapor = nilai akhir ÷ ${pembagi}.
+          Sel bertanda <span class="badge badge-warning">belum</span> berarti komponen belum diisi, sehingga nilai akhir belum muncul.
+        </div>`;
+
+      const $ = id => document.getElementById(id);
+      const f2 = v => Number(v).toFixed(2);
+
+      function isiMapel() {
+        const list = mapelUntuk(Number($("rombel").value));
+        $("mapel").innerHTML = list.length
+          ? list.map(m => `<option value="${m.id}">${esc(m.nama)}</option>`).join("")
+          : `<option value="">(tidak ada mapel)</option>`;
+      }
+
+      $("rombel").onchange = () => { isiMapel(); tampil(); };
+      $("mapel").onchange = tampil;
+      $("tampil").onclick = tampil;
+
+      async function tampil() {
+        const rid = Number($("rombel").value), mid = Number($("mapel").value);
+        if (!rid || !mid) return peringatan("Pilih kelas dan mapel.");
+        $("info").textContent = "Memuat...";
+        const kodeMapel = kodeMapelDari(mid);
+
+        const [kr, bn, nl, kh, na] = await Promise.all([
+          sb.from("keanggotaan_rombel").select("santri:santri_id(id, nis, nama_lengkap)")
+            .eq("rombel_id", rid).eq("tahun_ajaran_id", sem.tahun_ajaran_id),
+          sb.from("bobot_nilai").select("bobot, komponen:komponen_id(id, kode, nama, urutan)")
+            .eq("mapel_id", mid),
+          sb.from("nilai").select("santri_id, komponen_id, nilai")
+            .eq("semester_id", sem.id).eq("mapel_id", mid),
+          sb.from("kehadiran_santri").select("santri_id, nilai").eq("semester_id", sem.id),
+          sb.from("nilai_akhir").select("santri_id, nilai_akhir, nilai_rapor")
+            .eq("semester_id", sem.id).eq("mapel_id", mid)
+        ]);
+        for (const r of [kr, bn, nl, kh, na]) if (r.error) return gagal(r.error);
+
+        const santri = (kr.data || []).map(x => x.santri).filter(Boolean)
+          .sort((a, b) => a.nama_lengkap.localeCompare(b.nama_lengkap));
+        if (!santri.length) {
+          $("tabel").innerHTML = "";
+          $("info").textContent = "Belum ada santri di kelas ini.";
+          return;
+        }
+
+        const komponen = (bn.data || []).filter(b => b.komponen)
+          .map(b => ({
+            id: b.komponen.id, kode: b.komponen.kode, nama: b.komponen.nama,
+            urutan: b.komponen.urutan, bobot: Number(b.bobot)
+          }))
+          .sort((a, b) => a.urutan - b.urutan);
+
+        // Rata-rata item per komponen (misalnya Nilai 1 sampai 4)
+        const nilaiMap = {};
+        (nl.data || []).forEach(n => {
+          const k = n.santri_id + "|" + n.komponen_id;
+          (nilaiMap[k] ||= []).push(Number(n.nilai));
+        });
+        const khMap = {};
+        (kh.data || []).forEach(k => khMap[k.santri_id] = Number(k.nilai));
+        const naMap = {};
+        (na.data || []).forEach(a => naMap[a.santri_id] = a);
+
+        function nilaiKomponen(sid, k) {
+          if (k.kode === "kehadiran") return khMap[sid] ?? null;
+          const arr = nilaiMap[sid + "|" + k.id];
+          return arr && arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+        }
+
+        let lengkap = 0, totalRapor = 0;
+        const baris = santri.map((s, i) => {
+          const sel = komponen.map(k => {
+            const v = nilaiKomponen(s.id, k);
+            return `<td class="text-center">${v == null ? '<span class="badge badge-warning">belum</span>' : f2(v)}</td>`;
+          }).join("");
+          const a = naMap[s.id];
+          if (a) { lengkap++; totalRapor += Number(a.nilai_rapor); }
+          return `<tr>
+            <td>${i + 1}</td>
+            <td>${esc(s.nis || "-")}</td>
+            <td class="nama">${esc(s.nama_lengkap)}</td>
+            ${sel}
+            <td class="text-center font-weight-bold">${a ? f2(a.nilai_akhir) : "-"}</td>
+            <td class="text-center font-weight-bold">${a ? f2(a.nilai_rapor) : "-"}</td>
+          </tr>`;
+        }).join("");
+
+        $("tabel").innerHTML = `
+          <table class="table table-sm table-bordered bg-white">
+            <thead><tr>
+              <th>No</th><th>NIS</th><th>Nama</th>
+              ${komponen.map(k => `<th>${esc(labelKomponen(k.kode, kodeMapel, k.nama))}<br><small>${k.bobot}%</small></th>`).join("")}
+              <th>Nilai Akhir<br><small>skala ${skalaAkhir}</small></th>
+              <th>Rapor<br><small>skala ${skalaRapor}</small></th>
+            </tr></thead>
+            <tbody>${baris}</tbody>
+          </table>`;
+
+        $("info").textContent = lengkap + " dari " + santri.length + " santri sudah lengkap"
+          + (lengkap ? ". Rata-rata nilai rapor: " + f2(totalRapor / lengkap) : "") + ".";
+      }
+
+      isiMapel();
+      const q = new URLSearchParams(location.search);
+      if (q.get("rombel")) $("rombel").value = q.get("rombel");
+      isiMapel();
+      if (q.get("mapel")) $("mapel").value = q.get("mapel");
+      if ($("mapel").value) tampil();
+    }
+  });
+</script>
+</body>
+</html>
