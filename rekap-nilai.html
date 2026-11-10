@@ -25,6 +25,11 @@
 <script src="ui.js"></script>
 
 <script>
+  const LABEL_TAHFIDZ = { ujian_periodik: "Nilai Harian", keaktifan: "Progres", uas: "UAS", adab: "Adab", kehadiran: "Kehadiran" };
+  function labelKomponen(kode, mapelKode, namaAsli) {
+    if (["tahfidz", "tilawah"].includes(mapelKode) && LABEL_TAHFIDZ[kode]) return LABEL_TAHFIDZ[kode];
+    return namaAsli;
+  }
   KUTTAB.halaman({
     aktif: "rekap-nilai",
     judul: "Rekap Nilai",
@@ -166,9 +171,10 @@
 
         let lengkap = 0, totalRapor = 0;
         const baris = santri.map((s, i) => {
-          const sel = komponen.map(k => {
-            const v = nilaiKomponen(s.id, k);
-            return `<td class="text-center">${v == null ? '<span class="badge badge-warning">belum</span>' : f2(v)}</td>`;
+          const mapelKodeRekap = penugasan.find(x => x.mapel.id === mid)?.mapel.kode || "";
+            const sel = komponen.map(k => {
+              const v = nilaiKomponen(s.id, k);
+              return `<td class="text-center">${v == null ? '<span class="badge badge-warning">belum</span>' : f2(v)}</td>`;
           }).join("");
           const a = naMap[s.id];
           if (a) { lengkap++; totalRapor += Number(a.nilai_rapor); }
@@ -186,7 +192,7 @@
           <table class="table table-sm table-bordered bg-white">
             <thead><tr>
               <th>No</th><th>NIS</th><th>Nama</th>
-              ${komponen.map(k => `<th>${esc(k.nama)}<br><small>${k.bobot}%</small></th>`).join("")}
+              ${komponen.map(k => `<th>${esc(labelKomponen(k.kode, mapelKodeRekap, k.nama))}<br><small>${k.bobot}%</small></th>`).join("")}
               <th>Nilai Akhir<br><small>skala ${skalaAkhir}</small></th>
               <th>Rapor<br><small>skala ${skalaRapor}</small></th>
             </tr></thead>
