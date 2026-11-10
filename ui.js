@@ -12,6 +12,7 @@ const KUTTAB = (() => {
   const MENU = [
     { key: "dashboard", label: "Beranda", href: "dashboard.html", icon: "fa-home", roles: ["admin","kepala","staf","guru"] },
     { key: "data-siswa", label: "Data Siswa", href: "data-siswa.html", icon: "fa-user-graduate", roles: ["admin","kepala","staf","guru"] },
+    { key: "koreksi-uas", label: "Koreksi UAS", href: "koreksi-uas.html", icon: "fa-file-signature", roles: ["admin","guru"] },
     { key: "input-nilai", label: "Input Nilai", href: "input-nilai.html", icon: "fa-pen", roles: ["admin","guru"] },
     { key: "rapor", label: "Rapor", href: "rapor.html", icon: "fa-file-alt", roles: ["admin","kepala","guru"] },
     { key: "jurnal-tahsin", label: "Jurnal Tahsin", href: "jurnal-tahsin.html", icon: "fa-book-open", roles: ["admin","guru"] },
