@@ -75,7 +75,7 @@
                 <select id="mapel" class="form-control"></select>
               </div>
               <div class="col-6 col-md-2 mb-2" id="wrapJumlah">
-                <label class="small mb-1">Jumlah Ujian</label>
+                <label class="small mb-1">Jumlah ujian</label>
                 <input id="jumlah" type="number" min="1" max="10" value="1" class="form-control">
               </div>
               <div class="col-6 col-md-1 mb-2">
@@ -171,6 +171,7 @@
         if (!santri.length) return info("Belum ada santri di kelas ini.");
 
         if (modeSel.value === "deskripsi") return tampilDeskripsi();
+        if (mapelKode === "ibadah") return tampilIbadah();
         return tampilNilai();
       }
 
@@ -247,6 +248,73 @@
         $("info").textContent = santri.length + " santri. Isi nilai dalam skala 0 sampai 100, lalu simpan.";
       }
 
+      // ===== MODE IBADAH (empat penyusun, nilai = rata-rata kolom yang terisi) =====
+      const IBADAH_KOLOM = [
+        ["praktik_sholat", "Praktik Sholat"],
+        ["praktik_wudhu", "Praktik Wudhu"],
+        ["hafalan_hadits", "Hafalan Hadits"],
+        ["hafalan_doa", "Hafalan Doa"]
+      ];
+
+      function rataIbadah(d) {
+        const isi = IBADAH_KOLOM.map(([k]) => d[k])
+          .filter(v => v != null && v !== "" && !isNaN(Number(v)))
+          .map(Number);
+        if (!isi.length) return null;
+        return isi.reduce((a, b) => a + b, 0) / isi.length;
+      }
+
+      async function tampilIbadah() {
+        const ids = santri.map(s => s.id);
+        const { data, error } = await sb.from("ibadah_penyusun")
+          .select("santri_id, praktik_sholat, praktik_wudhu, hafalan_hadits, hafalan_doa")
+          .eq("semester_id", sem.id).in("santri_id", ids);
+        if (error) return gagal(error);
+
+        const lama = {};
+        (data || []).forEach(d => lama[d.santri_id] = d);
+
+        $("tabel").innerHTML = `
+          <table class="table table-sm table-bordered bg-white">
+            <thead><tr>
+              <th>No</th><th>NIS</th><th>Nama</th>
+              ${IBADAH_KOLOM.map(([, l]) => `<th>${esc(l)}</th>`).join("")}
+              <th>Nilai Ibadah</th>
+            </tr></thead>
+            <tbody>
+              ${santri.map((s, i) => {
+                const d = lama[s.id] || {};
+                const nilai = rataIbadah(d);
+                return `<tr>
+                  <td>${i + 1}</td>
+                  <td>${esc(s.nis || "-")}</td>
+                  <td class="nama">${esc(s.nama_lengkap)}</td>
+                  ${IBADAH_KOLOM.map(([k]) => `<td><input type="number" min="0" max="100" step="0.01"
+                    class="form-control form-control-sm" data-santri="${s.id}" data-kolom="${k}"
+                    value="${d[k] != null ? d[k] : ""}"></td>`).join("")}
+                  <td class="text-center font-weight-bold" data-nilai-ibadah="${s.id}">${nilai == null ? "-" : nilai.toFixed(2)}</td>
+                </tr>`;
+              }).join("")}
+            </tbody>
+          </table>`;
+
+        // Pratinjau nilai ibadah ikut berubah saat guru mengetik
+        $("tabel").querySelectorAll("input[data-santri]").forEach(inp => {
+          inp.oninput = () => {
+            const sid = inp.dataset.santri;
+            const vals = {};
+            $("tabel").querySelectorAll(`input[data-santri="${sid}"]`).forEach(x => {
+              vals[x.dataset.kolom] = x.value.trim() === "" ? null : Number(x.value);
+            });
+            const n = rataIbadah(vals);
+            $("tabel").querySelector(`[data-nilai-ibadah="${sid}"]`).textContent = n == null ? "-" : n.toFixed(2);
+          };
+        });
+
+        $("simpan").style.display = "inline-block";
+        $("info").textContent = santri.length + " santri. Kosongkan kolom yang tidak dinilai. Nilai ibadah dihitung dari rata-rata kolom yang terisi.";
+      }
+
       // ===== MODE DESKRIPSI =====
       async function tampilDeskripsi() {
         const { data: asp, error: e1 } = await sb.from("aspek_deskripsi")
@@ -292,6 +360,7 @@
         btn.disabled = true;
         try {
           if (modeSel.value === "deskripsi") await simpanDeskripsi();
+          else if (mapelKode === "ibadah") await simpanIbadah();
           else await simpanNilai();
         } finally {
           btn.disabled = false;
@@ -333,6 +402,48 @@
         if (error) return gagal(error);
 
         toast("Tersimpan " + rows.length + " nilai.");
+        tampil();
+      }
+
+      async function simpanIbadah() {
+        const per = {}, salah = [];
+        document.querySelectorAll("#tabel input[data-santri]").forEach(inp => {
+          inp.classList.remove("is-invalid");
+          const sid = Number(inp.dataset.santri);
+          per[sid] = per[sid] || {};
+          const v = inp.value.trim();
+          if (v === "") { per[sid][inp.dataset.kolom] = null; return; }
+          const n = Number(v);
+          if (isNaN(n) || n < 0 || n > 100) {
+            inp.classList.add("is-invalid");
+            salah.push(inp);
+            return;
+          }
+          per[sid][inp.dataset.kolom] = n;
+        });
+
+        if (salah.length) {
+          salah[0].focus();
+          return peringatan("Nilai ibadah harus 0 sampai 100. Kotak merah perlu diperbaiki.");
+        }
+
+        const rows = Object.entries(per).map(([sid, v]) => ({
+          santri_id: Number(sid),
+          semester_id: sem.id,
+          praktik_sholat: v.praktik_sholat ?? null,
+          praktik_wudhu: v.praktik_wudhu ?? null,
+          hafalan_hadits: v.hafalan_hadits ?? null,
+          hafalan_doa: v.hafalan_doa ?? null,
+          diisi_oleh: me.id,
+          updated_at: new Date().toISOString()
+        }));
+        if (!rows.length) return peringatan("Belum ada nilai yang diisi.");
+
+        const { error } = await sb.from("ibadah_penyusun")
+          .upsert(rows, { onConflict: "santri_id,semester_id" });
+        if (error) return gagal(error);
+
+        toast("Nilai ibadah tersimpan untuk " + rows.length + " santri.");
         tampil();
       }
 
