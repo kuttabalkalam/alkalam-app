@@ -183,7 +183,7 @@
         if (e1) return gagal(e1);
 
         const komponen = (bn || [])
-          .filter(b => b.komponen && b.komponen.kode !== "kehadiran")
+          .filter(b => b.komponen && !["kehadiran", "uas"].includes(b.komponen.kode))
           .map(b => ({ id: b.komponen_id, ...b.komponen }))
           .sort((a, b) => a.urutan - b.urutan);
 
