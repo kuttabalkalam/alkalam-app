@@ -53,6 +53,7 @@
 .btn-outline-primary {
   color: #1a1a1a;
   border-color: #f2c94c;
+  border-radius: 20px;
 }
 .btn-outline-primary:hover,
 .btn-outline-primary:focus,
