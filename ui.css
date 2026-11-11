@@ -49,3 +49,17 @@
 /* Tombol profil di navbar */
 .main-header .profil-ikon i { font-size: 1.4rem; color: var(--kuning); vertical-align: middle; }
 .main-header .nav-link:hover .profil-ikon i { color: #fff; }
+/* Tombol outline primary mengikuti tema kuning-hitam */
+.btn-outline-primary {
+  color: #1a1a1a;
+  border-color: #f2c94c;
+  background: #fff;
+}
+.btn-outline-primary:hover,
+.btn-outline-primary:focus,
+.btn-outline-primary:active {
+  color: #1a1a1a;
+  background: #f2c94c;
+  border-color: #d4a52a;
+  box-shadow: none;
+}
