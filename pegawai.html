@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Data Pegawai - Kuttab Al-Kalam</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.4/css/all.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2.0/dist/css/adminlte.min.css">
+<link rel="stylesheet" href="ui.css">
+<style>
+  .tabel-wrap { overflow-x: auto; }
+  .tabel-wrap th, .tabel-wrap td { white-space: nowrap; vertical-align: middle; }
+  .tabel-wrap input.nama { min-width: 180px; }
+</style>
+</head>
+<body class="hold-transition sidebar-mini">
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/admin-lte@3.2.0/dist/js/adminlte.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="ui.js"></script>
+
+<script>
+  KUTTAB.halaman({
+    aktif: "pegawai",
+    judul: "Data Pegawai",
+    roles: ["admin"],
+    render: async ({ sb, me, konten, toast, gagal, peringatan, konfirmasi, esc }) => {
+      const $ = id => document.getElementById(id);
+      const PERAN = ["admin", "kepala", "guru", "staf"];
+      let rows = [];
+
+      konten.innerHTML = `
+        <div class="card card-outline card-warning"><div class="card-body">
+          <div class="form-row align-items-end">
+            <div class="col-12 col-md-6 mb-2">
+              <label class="small mb-1">Cari nama atau email</label>
+              <input id="cari" class="form-control" placeholder="ketik untuk mencari">
+            </div>
+            <div class="col-12 col-md-6 mb-2 text-md-right">
+              <button class="btn btn-kuning" id="btnTambah"><i class="fas fa-user-plus"></i> Tambah pegawai</button>
+            </div>
+          </div>
+          <p class="small text-muted mb-0" id="info"></p>
+        </div></div>
+        <div class="card"><div class="card-body p-0"><div class="tabel-wrap" id="tabel"></div></div></div>
+        <p class="small text-muted mt-2">
+          Pegawai yang baru ditambahkan belum bisa login. Buat akunnya di Supabase
+          (Authentication, Add user, centang Auto Confirm User) dengan email yang sama.
+        </p>`;
+
+      async function muat() {
+        const { data, error } = await sb.from("pegawai")
+          .select("id, nama_lengkap, email, nomor_hp, peran, status_aktif, auth_user_id")
+          .order("nama_lengkap");
+        if (error) return gagal(error);
+        rows = data || [];
+        render();
+      }
+
+      function render() {
+        const q = $("cari").value.trim().toLowerCase();
+        const list = rows.filter(r =>
+          !q || r.nama_lengkap.toLowerCase().includes(q) || r.email.toLowerCase().includes(q));
+
+        $("info").textContent = list.length + " pegawai" + (q ? " (hasil pencarian)" : "") + ".";
+
+        $("tabel").innerHTML = `
+          <table class="table table-sm mb-0">
+            <thead><tr><th>Nama</th><th>Email</th><th>No. HP</th><th>Peran</th><th>Aktif</th><th>Akun login</th><th></th></tr></thead>
+            <tbody>
+              ${list.map(r => `<tr data-id="${r.id}">
+                <td><input class="form-control form-control-sm nama" data-f="nama_lengkap" value="${esc(r.nama_lengkap)}"></td>
+                <td><small>${esc(r.email)}</small></td>
+                <td><input class="form-control form-control-sm" data-f="nomor_hp" value="${esc(r.nomor_hp || "")}" style="width:150px"></td>
+                <td>
+                  <select class="form-control form-control-sm" data-f="peran">
+                    ${PERAN.map(p => `<option ${p === r.peran ? "selected" : ""}>${p}</option>`).join("")}
+                  </select>
+                </td>
+                <td class="text-center"><input type="checkbox" data-f="status_aktif" ${r.status_aktif ? "checked" : ""}></td>
+                <td>${r.auth_user_id
+                  ? '<span class="badge badge-success">sudah</span>'
+                  : '<span class="badge badge-warning">belum</span>'}</td>
+                <td><button class="btn btn-sm btn-hitam" data-save="${r.id}">Simpan</button></td>
+              </tr>`).join("")}
+            </tbody>
+          </table>`;
+
+        $("tabel").querySelectorAll("[data-save]").forEach(b => b.onclick = async () => {
+          const id = Number(b.dataset.save);
+          const tr = b.closest("tr");
+          const nama = tr.querySelector('[data-f="nama_lengkap"]').value.trim();
+          const hp = tr.querySelector('[data-f="nomor_hp"]').value.trim() || null;
+          const peran = tr.querySelector('[data-f="peran"]').value;
+          const status_aktif = tr.querySelector('[data-f="status_aktif"]').checked;
+
+          if (!nama) return peringatan("Nama wajib diisi.");
+
+          if (id === me.id && (!status_aktif || peran !== "admin")) {
+            const ok = await konfirmasi("Ubah akun Anda sendiri?",
+              "Peran atau status aktif akun Anda akan berubah. Anda bisa kehilangan akses admin.");
+            if (!ok) return;
+          }
+
+          const { error } = await sb.from("pegawai")
+            .update({ nama_lengkap: nama, nomor_hp: hp, peran, status_aktif })
+            .eq("id", id);
+          if (error) return gagal(error);
+
+          toast("Data pegawai tersimpan.");
+          muat();
+        });
+      }
+
+      $("cari").oninput = render;
+
+      $("btnTambah").onclick = async () => {
+        const r = await Swal.fire({
+          title: "Tambah pegawai",
+          html: `
+            <input id="swNama" class="swal2-input" placeholder="Nama lengkap">
+            <input id="swEmail" class="swal2-input" placeholder="Email (huruf kecil)">
+            <input id="swHp" class="swal2-input" placeholder="No. HP (opsional)">
+            <select id="swPeran" class="swal2-select">
+              <option value="guru">guru</option>
+              <option value="kepala">kepala</option>
+              <option value="staf">staf</option>
+              <option value="admin">admin</option>
+            </select>`,
+          showCancelButton: true,
+          confirmButtonText: "Tambah",
+          cancelButtonText: "Batal",
+          confirmButtonColor: "#1a1a1a",
+          preConfirm: () => ({
+            nama: document.getElementById("swNama").value.trim(),
+            email: document.getElementById("swEmail").value.trim().toLowerCase(),
+            hp: document.getElementById("swHp").value.trim() || null,
+            peran: document.getElementById("swPeran").value
+          })
+        });
+        if (!r.isConfirmed) return;
+
+        const v = r.value;
+        if (!v.nama || !v.email) return peringatan("Nama dan email wajib diisi.");
+        if (rows.some(x => x.email === v.email)) return peringatan("Email " + v.email + " sudah terdaftar.");
+
+        const { error } = await sb.from("pegawai").insert({
+          nama_lengkap: v.nama,
+          email: v.email,
+          nomor_hp: v.hp,
+          peran: v.peran,
+          status_aktif: true
+        });
+        if (error) return gagal(error);
+
+        toast("Pegawai ditambahkan. Buat akun login dengan email ini.");
+        muat();
+      };
+
+      muat();
+    }
+  });
+</script>
+</body>
+</html>
