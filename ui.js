@@ -23,7 +23,6 @@ const KUTTAB = (() => {
     { key: "pengajuan-jilid", label: "Pengajuan Ujian Jilid", href: "pengajuan-jilid.html", icon: "fa-certificate", roles: ["admin","kepala","guru"], quranSaja: true },
     { key: "pegawai", label: "Data Pegawai", href: "pegawai.html", icon: "fa-users", roles: ["admin"] },
     { key: "pengaturan", label: "Pengaturan", href: "pengaturan.html", icon: "fa-cogs", roles: ["admin"] },
-    { key: "profil", label: "Profil", href: "profil.html", icon: "fa-user-cog", roles: ["admin","kepala","staf","guru"] }
   ];
 
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
