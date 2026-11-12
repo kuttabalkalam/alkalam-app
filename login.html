@@ -11,43 +11,22 @@
 
   .split { display: grid; grid-template-columns: 1fr 1fr; min-height: 100vh; }
 
-  /* ===== Kiri (hitam) ===== */
+  /* ===== Kiri: gambar login ===== */
   .kiri {
     position: relative; color: #fff; padding: 40px 56px;
-    background: #121212;
-    display: flex; flex-direction: column; overflow: hidden;
+    background: url('login.png') center / cover no-repeat;
+    display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden;
   }
-  .kiri::before {
-    content: ""; position: absolute; top: -140px; right: -140px; width: 460px; height: 460px;
-    background: radial-gradient(circle, rgba(242,201,76,.16), transparent 70%); pointer-events: none;
+  .footer-kiri {
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; letter-spacing: .08em;
+    color: #fff; text-shadow: 0 1px 6px rgba(0,0,0,.6);
   }
-  .kiri::after {
-    content: ""; position: absolute; bottom: -160px; left: -120px; width: 400px; height: 400px;
-    background: radial-gradient(circle, rgba(242,201,76,.10), transparent 70%); pointer-events: none;
-  }
-  .brand { position: relative; display: flex; align-items: center; gap: 14px; }
-  .brand img { width: 220px; max-width: 70%; height: auto; }  .brand .nama { font-weight: 700; font-size: 16px; color: #f2c94c; letter-spacing: .02em; }
-  .hero { margin-top: auto; margin-bottom: auto; position: relative; max-width: 480px; }
-  .eyebrow {
-    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; letter-spacing: .14em;
-    color: #f2c94c; margin-bottom: 16px; font-weight: 600;
-  }
-  .hero h1 { font-size: 40px; line-height: 1.15; margin: 0; font-weight: 800; letter-spacing: -.02em; color: #fff; }
-
-  .kutipan {
-    position: relative; max-width: 440px; border: 1px solid rgba(242,201,76,.35);
-    background: rgba(242,201,76,.06); border-radius: 14px; padding: 18px 20px;
-  }
-  .kutipan p { margin: 0 0 8px; font-size: 15px; line-height: 1.55; color: #f5f5f5; }
-  .kutipan small { color: #f2c94c; font-size: 13px; }
-
-  .footer-kiri { position: relative; margin-top: 40px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; letter-spacing: .08em; color: #8a8a8a; }
 
   /* ===== Kanan ===== */
   .kanan { background: #eef2f7; display: flex; flex-direction: column; padding: 40px 56px; }
   .form-wrap { margin: auto; width: 100%; max-width: 400px; }
-  .form-wrap h2 { font-size: 30px; font-weight: 800; letter-spacing: -.02em; margin: 0 0 8px; }
-  .sub { color: #64748b; font-size: 15px; line-height: 1.5; margin: 0 0 28px; }
+
+  .logo-form { display: block; width: 200px; max-width: 70%; height: auto; margin: 0 auto 32px; }
 
   label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px; }
   .label-row { display: flex; justify-content: space-between; align-items: baseline; }
@@ -86,8 +65,7 @@
 
   @media (max-width: 900px) {
     .split { grid-template-columns: 1fr; }
-    .kiri { padding: 28px 24px; min-height: 300px; }
-    .hero h1 { font-size: 28px; }
+    .kiri { min-height: 260px; padding: 24px; }
     .kanan { padding: 32px 24px; }
   }
 </style>
@@ -96,23 +74,12 @@
 
 <div class="split">
   <aside class="kiri">
-    <div class="brand">
-      <img src="logo.png" alt="Logo Kuttab Al-Kalam">
-    </div>
-
-    <div class="hero">
-      <div class="eyebrow">SISTEM AKADEMIK · TA 2026/2027</div>
-      <h1>Kuttab Al-Kalam</h1>
-      <p>"Membangun peradaban iman dan Al-Qur'an."</p>
-    </div>
-
     <div class="footer-kiri">© 2026 · BAMBU APUS, PAMULANG</div>
   </aside>
 
   <main class="kanan">
     <div class="form-wrap">
-      <h2>Selamat datang</h2>
-      <p class="sub">Masuk ke akun pegawai Anda untuk melanjutkan pekerjaan.</p>
+      <img src="logo.png" alt="Logo Kuttab Al-Kalam" class="logo-form">
 
       <form id="fLogin" novalidate>
         <label for="email">Email</label>
