@@ -4,138 +4,68 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Jurnal Tahsin - Kuttab Al-Kalam</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.4/css/all.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2.0/dist/css/adminlte.min.css">
+<link rel="stylesheet" href="ui.css">
 <style>
-  * { box-sizing: border-box; }
-  body { font-family: Arial, sans-serif; font-size: 16px; margin: 0; padding: 0 0 20px; background: #f7f7f7; color: #111; }
-  header { background: #222; color: #f2c94c; padding: 12px 16px; }
-  header a { color: #f2c94c; text-decoration: none; }
-  main { max-width: 640px; margin: 0 auto; padding: 12px; }
-  .tabs { display: flex; gap: 6px; margin-bottom: 12px; }
-  .tabs button { flex: 1; padding: 10px; border: 1px solid #bbb; background: #fff; border-radius: 6px; font-size: 15px; }
-  .tabs button.aktif { background: #f2c94c; border-color: #d4a52a; font-weight: bold; }
-  .panel { display: none; }
-  .panel.aktif { display: block; }
-  .box { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
-  label { display: block; margin-bottom: 10px; font-size: 14px; color: #444; }
-  select, input, textarea { width: 100%; padding: 10px; font-size: 16px; border: 1px solid #bbb; border-radius: 6px; margin-top: 4px; font-family: inherit; }
-  .btn { padding: 12px; font-size: 16px; border: none; border-radius: 6px; background: #28a745; color: #fff; width: 100%; }
-  .btn:disabled { background: #aaa; }
-  .kitab { display: flex; gap: 6px; margin-bottom: 10px; }
-  .kitab button { flex: 1; padding: 10px; border: 1px solid #bbb; background: #fff; border-radius: 6px; font-size: 15px; }
-  .kitab button.aktif { background: #28a745; color: #fff; border-color: #28a745; }
-  .dua { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  @media (max-width: 480px) { .dua { grid-template-columns: 1fr; } }
-  .ket { display: flex; gap: 8px; margin: 6px 0 12px; }
-  .ket button { flex: 1; padding: 12px 4px; border: 1px solid #bbb; background: #fff; border-radius: 6px; font-size: 16px; font-weight: bold; }
-  .ket button.L.aktif { background: #28a745; color: #fff; border-color: #28a745; }
-  .ket button.CL.aktif { background: #f0ad4e; color: #fff; border-color: #f0ad4e; }
-  .ket button.TL.aktif { background: #dc3545; color: #fff; border-color: #dc3545; }
-  .progres { font-weight: bold; margin-bottom: 10px; }
-  .sudah { border-bottom: 1px solid #eee; padding: 8px 0; font-size: 15px; }
-  .sudah .nama { font-weight: bold; }
-  .sudah .detail { color: #555; font-size: 14px; }
-  .santri { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
-  .santri .nama { font-weight: bold; }
-  .santri .nis { font-size: 13px; color: #666; margin-bottom: 8px; }
-  .santri textarea { min-height: 80px; font-size: 15px; }
-  #pesan { font-weight: bold; min-height: 20px; margin: 8px 0; }
-  .muted { color: #666; font-size: 14px; }
+  .nav-tabs .nav-link { color: #1a1a1a; }
+  .nav-tabs .nav-link.active { background: #f2c94c; border-color: #d4a52a; color: #1a1a1a; font-weight: 600; }
+  .kitab-btn.active { background: #1a1a1a; color: #f2c94c; border-color: #1a1a1a; }
+  .btn-ket.L.active { background: #28a745; color: #fff; border-color: #28a745; }
+  .btn-ket.CL.active { background: #f0ad4e; color: #fff; border-color: #f0ad4e; }
+  .btn-ket.TL.active { background: #dc3545; color: #fff; border-color: #dc3545; }
+  .form-jurnal { border-top: 1px dashed #ccc; padding-top: 10px; }
+  .badge-kitab { background: #1a1a1a; color: #f2c94c; }
 </style>
 </head>
-<body>
-<header><a href="dashboard.html">← Dashboard</a> &nbsp; <strong>Jurnal Tahsin</strong></header>
+<body class="hold-transition sidebar-mini">
 
-<main>
-  <p class="muted" id="info"></p>
-  <div class="tabs">
-    <button id="tabJurnal" class="aktif">Catat Jurnal</button>
-    <button id="tabCatatan">Catatan Pekanan/Bulanan</button>
-  </div>
-  <p id="pesan"></p>
-
-  <section class="panel aktif" id="pJurnal">
-    <div class="box">
-      <label>Kelas <select id="jRombel"></select></label>
-      <label>Tanggal <input type="date" id="jTanggal"></label>
-      <label>Kitab</label>
-      <div class="kitab" id="jKitab">
-        <button type="button" data-k="tilawati" class="aktif">Tilawati</button>
-        <button type="button" data-k="quran">Quran</button>
-        <button type="button" data-k="tahfidz">Tahfidz</button>
-      </div>
-      <button class="btn" id="jMulai">Mulai Mengisi</button>
-    </div>
-
-    <div class="box" id="formBox" style="display:none">
-      <div class="progres" id="progres"></div>
-      <label>Santri <select id="fSantri"></select></label>
-      <div class="dua">
-        <label><span id="lblUnit">Jilid</span>
-          <input id="fUnit" type="text" autocomplete="off">
-        </label>
-        <label><span id="lblAngka">Halaman</span>
-          <input id="fAngka" type="number" inputmode="numeric" min="0">
-        </label>
-      </div>
-      <label>Keterangan</label>
-      <div class="ket">
-        <button type="button" class="L" data-v="L">L</button>
-        <button type="button" class="CL" data-v="CL">CL</button>
-        <button type="button" class="TL" data-v="TL">TL</button>
-      </div>
-      <button class="btn" id="fSimpan">Simpan dan Lanjut</button>
-    </div>
-
-    <div class="box" id="sudahBox" style="display:none">
-      <strong>Sudah diisi hari ini</strong>
-      <div id="sudahList"></div>
-      <p class="muted">Koreksi data yang keliru dilakukan oleh admin.</p>
-    </div>
-  </section>
-
-  <section class="panel" id="pCatatan">
-    <div class="box">
-      <label>Kelas <select id="cRombel"></select></label>
-      <label>Jenis
-        <select id="cJenis">
-          <option value="pekan">Pekanan</option>
-          <option value="bulan">Bulanan</option>
-        </select>
-      </label>
-      <label>Tanggal dalam periode <input type="date" id="cTanggal"></label>
-      <p class="muted" id="cPeriode"></p>
-      <button class="btn" id="cMuat">Tampilkan Santri</button>
-    </div>
-    <div id="cDaftar"></div>
-    <div id="cSimpanWrap" style="display:none">
-      <button class="btn" id="cSimpan">Simpan Catatan</button>
-    </div>
-  </section>
-</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/admin-lte@3.2.0/dist/js/adminlte.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="ui.js"></script>
 
 <script>
-  const SUPABASE_URL = "https://epynlmuqxumuwcjsrnsz.supabase.co";
-  const SUPABASE_ANON_KEY = "sb_publishable_Oq_to1zgHLnachvWYLV_yA_DoOTGI3s";
-  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-  const $ = id => document.getElementById(id);
-  const pesan = t => $("pesan").textContent = t;
-  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  const fmt = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
-  const BULAN = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
-  const tglIndo = iso => { const d = new Date(iso + "T00:00:00"); return d.getDate() + " " + BULAN[d.getMonth()] + " " + d.getFullYear(); };
-  const KODE_QURAN = ["tilawah", "tahfidz", "kitabah"];
-
-  // Label kolom per kitab
-  const UNIT = {
+  const KITAB = { tilawati: "Tilawati", quran: "Quran", tahfidz: "Tahfidz" };
+  const LABEL = {
     tilawati: { unit: "Jilid", angka: "Halaman" },
     quran:    { unit: "Juz",   angka: "Halaman" },
     tahfidz:  { unit: "Surat", angka: "Ayat" }
   };
+  const SURAH = [
+    "Al-Fatihah","Al-Baqarah","Ali Imran","An-Nisa","Al-Ma'idah","Al-An'am","Al-A'raf","Al-Anfal","At-Taubah","Yunus",
+    "Hud","Yusuf","Ar-Ra'd","Ibrahim","Al-Hijr","An-Nahl","Al-Isra","Al-Kahf","Maryam","Taha",
+    "Al-Anbiya","Al-Hajj","Al-Mu'minun","An-Nur","Al-Furqan","Asy-Syu'ara","An-Naml","Al-Qasas","Al-Ankabut","Ar-Rum",
+    "Luqman","As-Sajdah","Al-Ahzab","Saba","Fatir","Yasin","As-Saffat","Sad","Az-Zumar","Gafir",
+    "Fussilat","Asy-Syura","Az-Zukhruf","Ad-Dukhan","Al-Jasiyah","Al-Ahqaf","Muhammad","Al-Fath","Al-Hujurat","Qaf",
+    "Az-Zariyat","At-Tur","An-Najm","Al-Qamar","Ar-Rahman","Al-Waqi'ah","Al-Hadid","Al-Mujadilah","Al-Hasyr","Al-Mumtahanah",
+    "As-Saff","Al-Jumu'ah","Al-Munafiqun","At-Tagabun","At-Talaq","At-Tahrim","Al-Mulk","Al-Qalam","Al-Haqqah","Al-Ma'arij",
+    "Nuh","Al-Jinn","Al-Muzzammil","Al-Muddassir","Al-Qiyamah","Al-Insan","Al-Mursalat","An-Naba","An-Nazi'at","Abasa",
+    "At-Takwir","Al-Infitar","Al-Muthaffifin","Al-Insyiqaq","Al-Buruj","At-Tariq","Al-A'la","Al-Gasyiyah","Al-Fajr","Al-Balad",
+    "Asy-Syams","Al-Lail","Ad-Duha","Asy-Syarh","At-Tin","Al-Alaq","Al-Qadr","Al-Bayyinah","Az-Zalzalah","Al-Adiyat",
+    "Al-Qari'ah","At-Takasur","Al-Asr","Al-Humazah","Al-Fil","Quraisy","Al-Ma'un","Al-Kautsar","Al-Kafirun","An-Nasr",
+    "Al-Lahab","Al-Ikhlas","Al-Falaq","An-Nas"
+  ];
+  const OPSI = {
+    tilawati: Array.from({ length: 4 }, (_, i) => [String(i + 1), "Jilid " + (i + 1)]),
+    quran:    Array.from({ length: 30 }, (_, i) => [String(i + 1), "Juz " + (i + 1)]),
+    tahfidz:  SURAH.map((n, i) => [String(i + 1), (i + 1) + ". " + n])
+  };
+  const KODE_QURAN = ["tilawah", "tahfidz", "kitabah"];
+  const BULAN = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+
+  const fmt = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  const tglIndo = iso => { const d = new Date(iso + "T00:00:00"); return d.getDate() + " " + BULAN[d.getMonth()] + " " + d.getFullYear(); };
+  const namaUnit = (k, u) => {
+    const o = (OPSI[k] || []).find(x => x[0] === String(u));
+    return o ? o[1] : (u ?? "-");
+  };
 
   // Pekan = Senin s.d. Minggu. Bulan = tanggal 1 s.d. akhir bulan.
-  function batasPeriode(jenis, iso) {
+  function periode(jenis, iso) {
     const d = new Date(iso + "T00:00:00");
     if (jenis === "pekan") {
       const senin = new Date(d);
@@ -150,276 +80,316 @@
     };
   }
 
-  let me = null, sem = null, rombelJurnal = [], rombelCatatan = [];
-  let modeAktif = "jurnal", kitab = "tilawati";
-  let sesi = null, santriList = [], existing = {}, fKet = "";
-  let daftarCatatan = [], existingCatatan = {};
-
-  function setBarCatatan(on) { $("cSimpanWrap").style.display = on ? "block" : "none"; }
-
-  function isiSelect(id, list) {
-    $(id).innerHTML = list.map(r => `<option value="${r.id}">${esc(r.nama)}</option>`).join("");
-  }
-
-  function updatePeriode() {
-    const { mulai, selesai } = batasPeriode($("cJenis").value, $("cTanggal").value);
-    $("cPeriode").textContent = "Periode: " + tglIndo(mulai) + " s.d. " + tglIndo(selesai);
-  }
-
-  async function init() {
-    const { data: { session } } = await sb.auth.getSession();
-    if (!session) { location.href = "login.html"; return; }
-
-    const { data: p, error: eP } = await sb.from("pegawai")
-      .select("id, peran").eq("auth_user_id", session.user.id).maybeSingle();
-    if (eP) return pesan("Gagal memuat akun: " + eP.message);
-    if (!p || !["admin", "guru"].includes(p.peran)) return pesan("Halaman ini hanya untuk guru dan admin.");
-    me = p;
-
-    const { data: s } = await sb.from("semester")
-      .select("id, nomor, tahun_ajaran_id, tahun_ajaran:tahun_ajaran_id(kode)")
-      .eq("aktif", true).maybeSingle();
-    if (!s) return pesan("Belum ada semester aktif.");
-    sem = s;
-    $("info").textContent = "TA " + s.tahun_ajaran.kode + " · Semester " + (s.nomor === 1 ? "Ganjil" : "Genap");
-
-    const [{ data: r }, { data: pm }] = await Promise.all([
-      sb.from("rombel").select("id, nama, wali_kelas_id").eq("tahun_ajaran_id", s.tahun_ajaran_id).order("nama"),
-      sb.from("penugasan_mapel").select("rombel_id, pegawai_id, mapel:mapel_id(kode)")
-    ]);
-    const semua = r || [];
-    const quran = new Set((pm || []).filter(x => x.pegawai_id === me.id && KODE_QURAN.includes(x.mapel?.kode)).map(x => x.rombel_id));
-    const wali = new Set(semua.filter(x => x.wali_kelas_id === me.id).map(x => x.id));
-
-    rombelJurnal = me.peran === "admin" ? semua : semua.filter(x => quran.has(x.id) || wali.has(x.id));
-    rombelCatatan = me.peran === "admin" ? semua : semua.filter(x => wali.has(x.id));
-
-    isiSelect("jRombel", rombelJurnal);
-    isiSelect("cRombel", rombelCatatan);
-    if (!rombelJurnal.length) pesan("Anda belum punya kelas tahsin, tahfidz, atau kitabah di tahun ajaran ini.");
-
-    $("jTanggal").value = fmt(new Date());
-    $("cTanggal").value = fmt(new Date());
-    updatePeriode();
-  }
-
-  function bukaTab(mode) {
-    modeAktif = mode;
-    $("tabJurnal").classList.toggle("aktif", mode === "jurnal");
-    $("tabCatatan").classList.toggle("aktif", mode === "catatan");
-    $("pJurnal").classList.toggle("aktif", mode === "jurnal");
-    $("pCatatan").classList.toggle("aktif", mode === "catatan");
-    sesi = null;
-    $("formBox").style.display = "none";
-    $("sudahBox").style.display = "none";
-    $("cDaftar").innerHTML = "";
-    setBarCatatan(false);
-    pesan("");
-  }
-
-  async function ambilSantri(rid) {
-    const { data, error } = await sb.from("keanggotaan_rombel")
-      .select("santri:santri_id(id, nis, nama_lengkap)")
-      .eq("rombel_id", rid).eq("tahun_ajaran_id", sem.tahun_ajaran_id);
-    if (error) throw new Error(error.message);
-    return (data || []).map(x => x.santri).filter(Boolean)
-      .sort((a, b) => a.nama_lengkap.localeCompare(b.nama_lengkap));
-  }
-
-  // ===== JURNAL: satu santri per isian =====
-  async function mulai() {
-    const rid = Number($("jRombel").value), tgl = $("jTanggal").value;
-    if (!rid || !tgl) return pesan("Pilih kelas dan tanggal.");
-    pesan("Memuat...");
-    try {
-      santriList = await ambilSantri(rid);
-      const ids = santriList.map(s => s.id);
-      existing = {};
-      if (ids.length) {
-        const { data, error } = await sb.from("jurnal_tahsin")
-          .select("santri_id, unit, halaman, keterangan")
-          .eq("tanggal", tgl).eq("kitab", kitab).in("santri_id", ids);
-        if (error) throw new Error(error.message);
-        (data || []).forEach(j => existing[j.santri_id] = j);
-      }
-      sesi = { rid, tgl };
-      $("formBox").style.display = "block";
-      $("sudahBox").style.display = "block";
-      resetForm(false);
-      renderAll();
-      pesan(santriList.length ? "" : "Belum ada santri di kelas ini.");
-    } catch (e) {
-      pesan("Gagal memuat: " + e.message);
-    }
-  }
-
-  function renderAll() {
-    const label = UNIT[kitab];
-    $("lblUnit").textContent = label.unit;
-    $("lblAngka").textContent = label.angka;
-    $("fUnit").placeholder = kitab === "tahfidz" ? "contoh: An-Naba" : (kitab === "quran" ? "contoh: 3" : "contoh: 2");
-    renderOptions();
-    renderSudah();
-    renderProgres();
-  }
-
-  function renderOptions() {
-    const sisa = santriList.filter(s => !existing[s.id]);
-    $("fSantri").innerHTML = `<option value="">-- pilih santri --</option>` +
-      sisa.map(s => `<option value="${s.id}">${esc(s.nama_lengkap)}</option>`).join("");
-    $("fSimpan").disabled = sisa.length === 0;
-  }
-
-  function renderSudah() {
-    const label = UNIT[kitab];
-    const list = santriList.filter(s => existing[s.id]);
-    $("sudahList").innerHTML = list.length ? list.map(s => {
-      const e = existing[s.id];
-      return `<div class="sudah"><div class="nama">${esc(s.nama_lengkap)}</div>
-        <div class="detail">${label.unit} ${esc(e.unit)} · ${label.angka} ${e.halaman} · ${e.keterangan}</div></div>`;
-    }).join("") : `<p class="muted">Belum ada yang diisi.</p>`;
-  }
-
-  function renderProgres() {
-    const n = santriList.filter(s => existing[s.id]).length;
-    const total = santriList.length;
-    $("progres").textContent = n === total && total > 0
-      ? `Semua ${total} santri sudah diisi.`
-      : `Sudah ${n} dari ${total} santri`;
-  }
-
-  function resetForm(keepUnit) {
-    $("fAngka").value = "";
-    if (!keepUnit) $("fUnit").value = "";
-    fKet = "";
-    document.querySelectorAll("#formBox .ket button").forEach(b => b.classList.remove("aktif"));
-  }
-
-  async function simpanSatu() {
-    const sid = Number($("fSantri").value);
-    const unit = $("fUnit").value.trim();
-    const angkaStr = $("fAngka").value.trim();
-    const angka = Number(angkaStr);
-    const label = UNIT[kitab];
-
-    if (!sid) return pesan("Pilih santri.");
-    if (!unit) return pesan("Isi " + label.unit + ".");
-    if (angkaStr === "" || !Number.isInteger(angka) || angka < 0)
-      return pesan("Isi " + label.angka + " dengan angka 0 atau lebih.");
-    if (!fKet) return pesan("Pilih L, CL, atau TL.");
-
-    $("fSimpan").disabled = true;
-    const row = {
-      santri_id: sid, rombel_id: sesi.rid, semester_id: sem.id,
-      tanggal: sesi.tgl, kitab, unit, halaman: angka, keterangan: fKet,
-      diisi_oleh: me.id, updated_at: new Date().toISOString()
-    };
-    const { error } = await sb.from("jurnal_tahsin").upsert(row, { onConflict: "santri_id,tanggal,kitab" });
-    $("fSimpan").disabled = false;
-    if (error) return pesan("Gagal menyimpan: " + error.message);
-
-    const nama = (santriList.find(s => s.id === sid) || {}).nama_lengkap || "";
-    existing[sid] = { santri_id: sid, unit, halaman: angka, keterangan: fKet };
-    resetForm(true);
-    renderAll();
-    pesan("Tersimpan: " + nama);
-  }
-
-  // ===== CATATAN PEKANAN / BULANAN =====
-  async function catatanMuat() {
-    const rid = Number($("cRombel").value), jenis = $("cJenis").value, tgl = $("cTanggal").value;
-    if (!rid || !tgl) return pesan("Pilih kelas dan tanggal.");
-    const { mulai } = batasPeriode(jenis, tgl);
-    updatePeriode();
-    pesan("Memuat...");
-    try {
-      daftarCatatan = await ambilSantri(rid);
-      const ids = daftarCatatan.map(s => s.id);
-      existingCatatan = {};
-      if (ids.length) {
-        const { data, error } = await sb.from("catatan_periodik")
-          .select("santri_id, catatan")
-          .eq("jenis", jenis).eq("periode_mulai", mulai).in("santri_id", ids);
-        if (error) throw new Error(error.message);
-        (data || []).forEach(c => existingCatatan[c.santri_id] = c.catatan);
-      }
-      renderCatatan();
-      pesan(daftarCatatan.length ? "" : "Belum ada santri di kelas ini.");
-    } catch (e) {
-      pesan("Gagal memuat: " + e.message);
-    }
-  }
-
-  function renderCatatan() {
-    $("cDaftar").innerHTML = "";
-    daftarCatatan.forEach(s => {
-      const div = document.createElement("div");
-      div.className = "santri";
-      div.innerHTML = `
-        <div class="nama">${esc(s.nama_lengkap)}</div>
-        <div class="nis">${esc(s.nis || "-")}</div>
-        <textarea data-santri="${s.id}" placeholder="Catatan perkembangan periode ini...">${esc(existingCatatan[s.id] || "")}</textarea>`;
-      $("cDaftar").appendChild(div);
-    });
-    setBarCatatan(daftarCatatan.length > 0);
-  }
-
-  async function simpanCatatan() {
-    const jenis = $("cJenis").value;
-    const { mulai } = batasPeriode(jenis, $("cTanggal").value);
-    const rows = [], hapus = [];
-
-    document.querySelectorAll("#cDaftar textarea").forEach(t => {
-      const sid = Number(t.dataset.santri), isi = t.value.trim();
-      if (!isi) {
-        if (existingCatatan[sid]) hapus.push(sid);
+  KUTTAB.halaman({
+    aktif: "jurnal-tahsin",
+    judul: "Jurnal Tahsin",
+    roles: ["admin", "guru"],
+    render: async ({ sb, me, sem, konten, toast, gagal, peringatan, esc }) => {
+      if (!sem) {
+        konten.innerHTML = '<div class="alert alert-warning">Belum ada semester aktif.</div>';
         return;
       }
-      rows.push({
-        santri_id: sid, semester_id: sem.id, jenis,
-        periode_mulai: mulai, catatan: isi,
-        diisi_oleh: me.id, updated_at: new Date().toISOString()
+
+      const [rb, pm] = await Promise.all([
+        sb.from("rombel").select("id, nama").eq("tahun_ajaran_id", sem.tahun_ajaran_id).order("nama"),
+        sb.from("penugasan_mapel").select("rombel_id, pegawai_id, mapel:mapel_id(kode)")
+      ]);
+      if (rb.error) return gagal(rb.error);
+      if (pm.error) return gagal(pm.error);
+
+      const quranSet = new Set((pm.data || [])
+        .filter(x => me.peran === "admin" || x.pegawai_id === me.id)
+        .filter(x => KODE_QURAN.includes(x.mapel?.kode))
+        .map(x => x.rombel_id));
+      const rombelList = (rb.data || []).filter(r => me.peran === "admin" || quranSet.has(r.id));
+
+      if (!rombelList.length) {
+        konten.innerHTML = '<div class="alert alert-info">Jurnal tahsin hanya tersedia untuk guru Quran di kelas tahun ajaran ini.</div>';
+        return;
+      }
+
+      konten.innerHTML = `
+        <div class="card card-outline card-warning"><div class="card-body">
+          <div class="form-row align-items-end">
+            <div class="col-12 col-md-4 mb-2">
+              <label class="small mb-1">Kelas</label>
+              <select id="rombel" class="form-control">
+                ${rombelList.map(r => `<option value="${r.id}">${esc(r.nama)}</option>`).join("")}
+              </select>
+            </div>
+            <div class="col-6 col-md-3 mb-2">
+              <label class="small mb-1">Tanggal</label>
+              <input type="date" id="tanggal" class="form-control">
+            </div>
+            <div class="col-6 col-md-5 mb-2">
+              <label class="small mb-1">Kitab</label>
+              <div class="btn-group d-flex" role="group">
+                <button type="button" class="btn btn-outline-dark kitab-btn active" data-kitab="tilawati">Tilawati</button>
+                <button type="button" class="btn btn-outline-dark kitab-btn" data-kitab="quran">Quran</button>
+                <button type="button" class="btn btn-outline-dark kitab-btn" data-kitab="tahfidz">Tahfidz</button>
+              </div>
+            </div>
+          </div>
+        </div></div>
+
+        <ul class="nav nav-tabs mb-3">
+          <li class="nav-item"><a class="nav-link active" href="#" data-tab="jurnal">Catat Jurnal</a></li>
+          <li class="nav-item"><a class="nav-link" href="#" data-tab="catatan">Catatan Pekanan/Bulanan</a></li>
+        </ul>
+
+        <div id="panelJurnal"></div>
+
+        <div id="panelCatatan" style="display:none">
+          <div class="card card-outline card-info"><div class="card-body">
+            <div class="form-row align-items-end">
+              <div class="col-6 mb-2">
+                <label class="small mb-1">Jenis</label>
+                <select id="cJenis" class="form-control">
+                  <option value="pekan">Pekanan</option>
+                  <option value="bulan">Bulanan</option>
+                </select>
+              </div>
+              <div class="col-6 mb-2">
+                <label class="small mb-1">Tanggal dalam periode</label>
+                <input type="date" id="cTanggal" class="form-control">
+              </div>
+            </div>
+            <p class="small text-muted mb-0" id="cPeriode"></p>
+          </div></div>
+          <div id="cList"></div>
+          <button class="btn btn-kuning" id="cSimpan" style="display:none"><i class="fas fa-save"></i> Simpan Catatan</button>
+        </div>`;
+
+      const $ = id => document.getElementById(id);
+      const tgl = () => $("tanggal").value;
+      const rid = () => Number($("rombel").value);
+
+      let tab = "jurnal", kitab = "tilawati";
+      let santri = [], jurnalRaw = [], lastMap = {}, todayMap = {}, catatanMap = {};
+
+      $("tanggal").value = fmt(new Date());
+      $("cTanggal").value = fmt(new Date());
+
+      // Peta: jurnal terakhir per santri, dan jurnal hari ini untuk kitab yang dipilih
+      function hitungMap() {
+        lastMap = {};
+        todayMap = {};
+        jurnalRaw.forEach(j => {
+          if (!lastMap[j.santri_id]) lastMap[j.santri_id] = j;
+          if (j.kitab === kitab && j.tanggal === tgl() && !todayMap[j.santri_id]) todayMap[j.santri_id] = j;
+        });
+      }
+
+      function ringkas(j) {
+        const lbl = LABEL[j.kitab] || LABEL.tilawati;
+        return `<span class="badge badge-kitab">${esc(KITAB[j.kitab] || j.kitab)}</span>
+          ${esc(namaUnit(j.kitab, j.unit))} · ${lbl.angka} ${j.halaman} · <strong>${esc(j.keterangan)}</strong> · ${tglIndo(j.tanggal)}`;
+      }
+
+      function renderJurnal() {
+        const lbl = LABEL[kitab];
+        if (!santri.length) {
+          $("panelJurnal").innerHTML = '<div class="alert alert-light">Belum ada santri di kelas ini.</div>';
+          return;
+        }
+        $("panelJurnal").innerHTML = santri.map((s, i) => {
+          const hari = todayMap[s.id], last = lastMap[s.id];
+          return `<div class="card mb-2">
+            <div class="card-body py-2">
+              <div class="d-flex justify-content-between align-items-start">
+                <div>
+                  <div class="font-weight-bold">${i + 1}. ${esc(s.nama_lengkap)}</div>
+                  <small class="text-muted">${esc(s.nis || "-")}</small>
+                </div>
+                ${hari ? '<span class="badge badge-success">sudah hari ini</span>' : ""}
+              </div>
+              <div class="small mt-1">${last ? ringkas(last) : '<span class="text-muted">Belum ada jurnal</span>'}</div>
+              <button class="btn btn-sm btn-kuning mt-2" data-buka="${s.id}">
+                <i class="fas fa-pen"></i> ${hari ? "Ubah" : "Isi"} ${esc(lbl.angka.toLowerCase())} ${esc(KITAB[kitab])}
+              </button>
+              <div class="form-jurnal mt-2" id="form-${s.id}" style="display:none"></div>
+            </div>
+          </div>`;
+        }).join("");
+
+        $("panelJurnal").querySelectorAll("[data-buka]").forEach(b =>
+          b.onclick = () => bukaForm(Number(b.dataset.buka)));
+      }
+
+      function bukaForm(sid) {
+        const box = $("form-" + sid);
+        if (box.style.display !== "none") { box.style.display = "none"; return; }
+        document.querySelectorAll(".form-jurnal").forEach(f => f.style.display = "none");
+
+        const hari = todayMap[sid] || {};
+        const lbl = LABEL[kitab];
+        box.innerHTML = `
+          <div class="form-row">
+            <div class="col-12 col-md-6 mb-2">
+              <label class="small mb-1">${lbl.unit}</label>
+              <select class="form-control f-unit">
+                <option value="">-- pilih ${esc(lbl.unit.toLowerCase())} --</option>
+                ${OPSI[kitab].map(([v, t]) =>
+                  `<option value="${v}" ${String(hari.unit ?? "") === v ? "selected" : ""}>${esc(t)}</option>`).join("")}
+              </select>
+            </div>
+            <div class="col-12 col-md-3 mb-2">
+              <label class="small mb-1">${lbl.angka}</label>
+              <input type="number" min="0" step="1" class="form-control f-angka" value="${hari.halaman ?? ""}">
+            </div>
+            <div class="col-12 col-md-3 mb-2">
+              <label class="small mb-1">Keterangan</label>
+              <div class="btn-group btn-group-sm d-flex" data-ket="${esc(hari.keterangan || "")}">
+                ${["L", "CL", "TL"].map(v =>
+                  `<button type="button" class="btn btn-outline-dark btn-ket ${v} ${hari.keterangan === v ? "active" : ""}" data-v="${v}">${v}</button>`).join("")}
+              </div>
+            </div>
+          </div>
+          <button class="btn btn-kuning btn-sm f-simpan"><i class="fas fa-save"></i> Simpan</button>`;
+        box.style.display = "block";
+
+        box.querySelectorAll(".btn-ket").forEach(b => b.onclick = () => {
+          box.querySelectorAll(".btn-ket").forEach(x => x.classList.remove("active"));
+          b.classList.add("active");
+          box.querySelector(".btn-group").dataset.ket = b.dataset.v;
+        });
+        box.querySelector(".f-simpan").onclick = () => simpanJurnal(sid, box);
+      }
+
+      async function simpanJurnal(sid, box) {
+        const unit = box.querySelector(".f-unit").value;
+        const angkaStr = box.querySelector(".f-angka").value.trim();
+        const angka = Number(angkaStr);
+        const ket = box.querySelector(".btn-group").dataset.ket;
+        const lbl = LABEL[kitab];
+
+        if (!unit) return peringatan("Pilih " + lbl.unit.toLowerCase() + " terlebih dahulu.");
+        if (angkaStr === "" || !Number.isInteger(angka) || angka < 0)
+          return peringatan("Isi " + lbl.angka.toLowerCase() + " dengan angka 0 atau lebih.");
+        if (!ket) return peringatan("Pilih L, CL, atau TL.");
+
+        const btn = box.querySelector(".f-simpan");
+        btn.disabled = true;
+        const { error } = await sb.from("jurnal_tahsin").upsert({
+          santri_id: sid, rombel_id: rid(), semester_id: sem.id,
+          tanggal: tgl(), kitab, unit, halaman: angka, keterangan: ket,
+          diisi_oleh: me.id, updated_at: new Date().toISOString()
+        }, { onConflict: "santri_id,tanggal,kitab" });
+        btn.disabled = false;
+        if (error) return gagal(error);
+
+        const nama = (santri.find(s => s.id === sid) || {}).nama_lengkap || "";
+        toast("Jurnal " + nama + " tersimpan.");
+        await muat();
+      }
+
+      async function muat() {
+        const id = rid();
+        if (!id) return;
+        const [kr, jr] = await Promise.all([
+          sb.from("keanggotaan_rombel").select("santri:santri_id(id, nis, nama_lengkap)")
+            .eq("rombel_id", id).eq("tahun_ajaran_id", sem.tahun_ajaran_id),
+          sb.from("jurnal_tahsin").select("santri_id, kitab, unit, halaman, keterangan, tanggal, updated_at")
+            .eq("rombel_id", id).eq("semester_id", sem.id)
+            .order("tanggal", { ascending: false })
+            .order("updated_at", { ascending: false })
+        ]);
+        if (kr.error) return gagal(kr.error);
+        if (jr.error) return gagal(jr.error);
+
+        santri = (kr.data || []).map(x => x.santri).filter(Boolean)
+          .sort((a, b) => a.nama_lengkap.localeCompare(b.nama_lengkap));
+        jurnalRaw = jr.data || [];
+        hitungMap();
+        renderJurnal();
+        if (tab === "catatan") muatCatatan();
+      }
+
+      // ===== CATATAN PEKANAN / BULANAN =====
+      async function muatCatatan() {
+        const jenis = $("cJenis").value;
+        const { mulai, selesai } = periode(jenis, $("cTanggal").value || tgl());
+        $("cPeriode").textContent = "Periode: " + tglIndo(mulai) + " s.d. " + tglIndo(selesai);
+
+        catatanMap = {};
+        if (santri.length) {
+          const { data, error } = await sb.from("catatan_periodik").select("santri_id, catatan")
+            .eq("jenis", jenis).eq("periode_mulai", mulai).in("santri_id", santri.map(s => s.id));
+          if (error) return gagal(error);
+          (data || []).forEach(c => catatanMap[c.santri_id] = c.catatan);
+        }
+
+        $("cList").innerHTML = santri.length ? santri.map(s => `
+          <div class="card mb-2"><div class="card-body py-2">
+            <div class="font-weight-bold">${esc(s.nama_lengkap)}</div>
+            <textarea class="form-control mt-1 c-isi" rows="2" data-santri="${s.id}"
+              placeholder="Catatan perkembangan periode ini...">${esc(catatanMap[s.id] || "")}</textarea>
+          </div></div>`).join("") : '<div class="alert alert-light">Belum ada santri di kelas ini.</div>';
+        $("cSimpan").style.display = santri.length ? "" : "none";
+      }
+
+      async function simpanCatatan() {
+        const jenis = $("cJenis").value;
+        const { mulai } = periode(jenis, $("cTanggal").value || tgl());
+        const rows = [], hapus = [];
+
+        document.querySelectorAll(".c-isi").forEach(t => {
+          const sid = Number(t.dataset.santri), isi = t.value.trim();
+          if (!isi) { if (catatanMap[sid]) hapus.push(sid); return; }
+          rows.push({
+            santri_id: sid, semester_id: sem.id, jenis, periode_mulai: mulai,
+            catatan: isi, diisi_oleh: me.id, updated_at: new Date().toISOString()
+          });
+        });
+
+        if (!rows.length && !hapus.length) return peringatan("Belum ada catatan yang diisi.");
+
+        if (rows.length) {
+          const { error } = await sb.from("catatan_periodik")
+            .upsert(rows, { onConflict: "santri_id,jenis,periode_mulai" });
+          if (error) return gagal(error);
+        }
+        if (hapus.length) {
+          const { error } = await sb.from("catatan_periodik").delete()
+            .eq("jenis", jenis).eq("periode_mulai", mulai).in("santri_id", hapus);
+          if (error) return gagal(error);
+        }
+
+        toast("Catatan tersimpan.");
+        muatCatatan();
+      }
+
+      // ===== NAVIGASI & EVENT =====
+      function setTab(t) {
+        tab = t;
+        konten.querySelectorAll("[data-tab]").forEach(a => a.classList.toggle("active", a.dataset.tab === t));
+        $("panelJurnal").style.display = t === "jurnal" ? "" : "none";
+        $("panelCatatan").style.display = t === "catatan" ? "" : "none";
+        if (t === "catatan") muatCatatan();
+      }
+
+      konten.querySelectorAll("[data-tab]").forEach(a => a.onclick = e => {
+        e.preventDefault();
+        setTab(a.dataset.tab);
       });
-    });
 
-    if (!rows.length && !hapus.length) return pesan("Belum ada catatan yang diisi.");
+      konten.querySelectorAll("[data-kitab]").forEach(b => b.onclick = () => {
+        kitab = b.dataset.kitab;
+        konten.querySelectorAll("[data-kitab]").forEach(x => x.classList.toggle("active", x === b));
+        hitungMap();
+        renderJurnal();
+      });
 
-    pesan("Menyimpan...");
-    if (rows.length) {
-      const { error } = await sb.from("catatan_periodik").upsert(rows, { onConflict: "santri_id,jenis,periode_mulai" });
-      if (error) return pesan("Gagal menyimpan: " + error.message);
+      $("rombel").onchange = muat;
+      $("tanggal").onchange = () => { hitungMap(); renderJurnal(); };
+      $("cJenis").onchange = muatCatatan;
+      $("cTanggal").onchange = muatCatatan;
+      $("cSimpan").onclick = simpanCatatan;
+
+      setTab("jurnal");
+      muat();
     }
-    if (hapus.length) {
-      const { error } = await sb.from("catatan_periodik").delete()
-        .eq("jenis", jenis).eq("periode_mulai", mulai).in("santri_id", hapus);
-      if (error) return pesan("Gagal menghapus: " + error.message);
-    }
-    await catatanMuat();
-    pesan("Tersimpan " + rows.length + " catatan.");
-  }
-
-  // ===== EVENT =====
-  $("tabJurnal").onclick = () => bukaTab("jurnal");
-  $("tabCatatan").onclick = () => bukaTab("catatan");
-  $("jMulai").onclick = mulai;
-  $("fSimpan").onclick = simpanSatu;
-  $("cMuat").onclick = catatanMuat;
-  $("cSimpan").onclick = simpanCatatan;
-  $("cJenis").onchange = updatePeriode;
-  $("cTanggal").onchange = updatePeriode;
-
-  document.querySelectorAll("#jKitab button").forEach(b => b.onclick = () => {
-    kitab = b.dataset.k;
-    document.querySelectorAll("#jKitab button").forEach(x => x.classList.toggle("aktif", x === b));
-    if (sesi) mulai();
   });
-
-  document.querySelectorAll("#formBox .ket button").forEach(b => b.onclick = () => {
-    fKet = b.dataset.v;
-    document.querySelectorAll("#formBox .ket button").forEach(x => x.classList.toggle("aktif", x === b));
-  });
-
-  init();
 </script>
 </body>
 </html>
