@@ -2,383 +2,446 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Formulir Pendaftaran - Kuttab Al-Kalam</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pendaftaran Santri - Kuttab Al-Kalam</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.4/css/all.min.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
 <style>
-  :root { --primary-green: #28a745; --text-muted: #6c757d; }
-  body { background: #fff; font-family: Arial, sans-serif; }
-  .header-title { text-align: center; margin-top: 30px; }
-  .header-title h1 { font-size: 24px; color: #333; margin-bottom: 5px; }
-  .header-title p { color: var(--text-muted); font-size: 14px; }
-  .wizard-container { max-width: 900px; margin: 30px auto; padding: 20px; }
-  .stepper { display: flex; justify-content: space-between; margin-bottom: 40px; position: relative; }
-  .stepper::before { content: ""; position: absolute; top: 25px; left: 50px; right: 50px; height: 2px; background: #ddd; z-index: 1; }
-  .step-item { flex: 1; text-align: center; position: relative; z-index: 2; }
-  .step-circle { width: 50px; height: 50px; border-radius: 50%; background: #fff; border: 2px solid #ddd; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; color: #ddd; font-size: 20px; transition: 0.3s; }
-  .step-label { font-size: 14px; color: var(--text-muted); font-weight: 500; }
-  .step-item.active .step-circle { border-color: var(--primary-green); color: var(--primary-green); }
-  .step-item.active .step-label { color: var(--primary-green); font-weight: bold; }
-  .step-item.completed .step-circle { background: var(--primary-green); border-color: var(--primary-green); color: #fff; }
-  .form-section { display: none; }
-  .form-section.active { display: block; }
-  .form-label { font-weight: 600; color: #444; font-size: 14px; }
-  .navigation-btns { display: flex; justify-content: flex-end; gap: 10px; margin-top: 40px; border-top: 1px solid #eee; padding-top: 20px; }
-  .btn-prev { background: #f0ad4e; color: #fff; border: none; padding: 10px 20px; border-radius: 4px; font-weight: bold; }
-  .btn-next, .btn-submit { background: var(--primary-green); color: #fff; border: none; padding: 10px 20px; border-radius: 4px; font-weight: bold; }
-  .btn-prev:hover, .btn-next:hover, .btn-submit:hover { opacity: 0.9; color: #fff; }
+  :root { --kuning: #f2c94c; --hitam: #1a1a1a; --biru: #e6f4fb; }
+  body { background: var(--biru); font-family: Arial, sans-serif; color: var(--hitam); }
+  .header { background: var(--hitam); border-bottom: 4px solid var(--kuning); color: var(--kuning); padding: 18px 16px; text-align: center; }
+  .header img { height: 90px; }
+  .header h1 { font-size: 20px; margin: 8px 0 2px; font-weight: 700; }
+  .header small { color: #ddd; }
+  .wrap { max-width: 720px; margin: 20px auto; padding: 0 12px 40px; }
+  .card { border-top: 3px solid var(--kuning); margin-bottom: 16px; }
+  .card-header { background: #bfe3f5; font-weight: 600; }
+  .btn-kuning { background: var(--kuning); color: var(--hitam); border: none; font-weight: 600; }
+  .btn-kuning:hover { background: #e0b53a; color: var(--hitam); }
+  .btn-hitam { background: var(--hitam); color: var(--kuning); border: none; font-weight: 600; }
+  .btn-hitam:hover { background: #333; color: var(--kuning); }
+  .nav-tabs .nav-link { color: var(--hitam); }
+  .nav-tabs .nav-link.active { background: var(--kuning); border-color: #d4a52a; color: var(--hitam); font-weight: 600; }
+  .kode-box { font-size: 30px; letter-spacing: 6px; font-weight: 800; background: #fff; border: 2px dashed var(--kuning); border-radius: 10px; padding: 14px; text-align: center; }
+  .ringkas { background: #fff; border-left: 4px solid var(--kuning); padding: 10px 12px; font-size: 14px; margin-bottom: 12px; }
+  .bagian { font-weight: 700; color: var(--hitam); border-bottom: 1px solid #ddd; margin: 14px 0 10px; padding-bottom: 4px; }
+  .honeypot { position: absolute; left: -9999px; }
 </style>
 </head>
 <body>
 
-<div class="header-title" id="mainHeader">
-  <h1>Pendaftaran Santri Kuttab Al-Kalam</h1>
-  <p>kuttabalkalam.id</p>
+<div class="header">
+  <img src="logo.png" alt="Logo Kuttab Al-Kalam">
+  <h1>Pendaftaran Santri</h1>
+  <small id="tahunLabel"></small>
 </div>
 
-<p id="loading" class="text-center text-muted mt-5">Memuat...</p>
+<div class="wrap">
+  <ul class="nav nav-tabs mb-3">
+    <li class="nav-item"><a class="nav-link active" href="#" data-tab="t1">Tahap 1: Pendaftaran</a></li>
+    <li class="nav-item"><a class="nav-link" href="#" data-tab="t2">Tahap 2: Lengkapi Data</a></li>
+  </ul>
 
-<div class="wizard-container">
-  <div class="stepper" id="mainStepper" style="display:none;">
-    <div class="step-item active"><div class="step-circle"><i class="fa-solid fa-user"></i></div><div class="step-label">Biodata</div></div>
-    <div class="step-item"><div class="step-circle"><i class="fa-solid fa-house-chimney"></i></div><div class="step-label">Alamat</div></div>
-    <div class="step-item"><div class="step-circle"><i class="fa-solid fa-users"></i></div><div class="step-label">Keluarga</div></div>
-    <div class="step-item"><div class="step-circle"><i class="fa-solid fa-graduation-cap"></i></div><div class="step-label">Akademik</div></div>
-  </div>
+  <!-- ================= TAHAP 1 ================= -->
+  <section id="t1">
+    <div class="alert alert-warning d-none" id="t1Tutup">
+      Pendaftaran belum dibuka. Silakan hubungi admin untuk informasi lebih lanjut.
+    </div>
 
-  <div id="thankYou" style="display:none; text-align:center; padding: 40px 20px;">
-    <div style="font-size: 60px; color: #28a745;"><i class="fa-solid fa-circle-check"></i></div>
-    <h2 class="mt-3" style="font-weight: bold; color: #333;">Alhamdulillah!</h2>
-    <p class="text-muted">Data pendaftaran Ananda telah kami terima.</p>
-    <p class="mb-4">Silakan konfirmasi ke Admin PPDB melalui WhatsApp di bawah ini.</p>
-    <a href="https://wa.me/6285121117095?text=Assalamu'alaikum%20Admin%20PPDB%20Kuttab%20Al-Kalam.%20Saya%20sudah%20mengisi%20formulir%20pendaftaran%20Ananda%20melalui%20website."
-       target="_blank" class="btn btn-success btn-lg px-4 py-2 shadow-sm">
-      <i class="fa-brands fa-whatsapp me-2"></i> Hubungi Admin via WhatsApp
-    </a>
-  </div>
-
-  <form id="ppdbForm" style="display:none;">
-    <input type="text" id="website" name="website" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px;">
-
-    <div class="form-section active">
-      <h5 class="mb-4 text-success"><i class="fa-solid fa-circle-info me-2"></i>Identitas Siswa</h5>
-      <div class="row g-3">
-        <div class="col-md-6">
-          <label class="form-label">Nama Lengkap (Sesuai Akta)</label>
-          <input type="text" id="nama_lengkap" class="form-control" required>
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Nama Panggilan</label>
-          <input type="text" id="nama_panggilan" class="form-control" placeholder="Contoh: ZAYN" required>
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Jenis Kelamin</label>
-          <select id="jenis_kelamin" class="form-select" required>
-            <option value="">-- Pilih --</option>
-            <option value="L">Laki-laki</option>
-            <option value="P">Perempuan</option>
-          </select>
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">NIK Siswa (16 Digit)</label>
-          <input type="text" id="nik" class="form-control" maxlength="16" pattern="\d{16}" required>
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Tempat Lahir</label>
-          <input type="text" id="tempat_lahir" class="form-control" required>
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Tanggal Lahir</label>
-          <input type="date" id="tanggal_lahir" class="form-control" required>
-        </div>
-        <div class="col-md-12">
-          <label class="form-label">Nomor Registrasi Akta Kelahiran</label>
-          <input type="text" id="no_registrasi_akta" class="form-control" placeholder="Contoh: 3674-LU-21102020-0027" required>
-        </div>
-        <div class="col-md-12">
-          <label class="form-label">NISN (Nomor Induk Siswa Nasional)</label>
-          <input type="text" id="nisn" class="form-control" placeholder="Kosongkan jika belum memiliki NISN">
-        </div>
+    <div id="t1Sukses" class="card d-none">
+      <div class="card-body text-center">
+        <h4 class="font-weight-bold mb-2">Alhamdulillah, pendaftaran diterima</h4>
+        <p class="text-muted mb-3">Simpan nomor pendaftaran ini. Anda membutuhkannya untuk tahap kedua setelah wawancara.</p>
+        <div class="kode-box" id="kodeHasil"></div>
+        <button class="btn btn-sm btn-hitam mt-3" id="btnSalin"><i class="fas fa-copy"></i> Salin nomor</button>
+        <hr>
+        <p class="small text-muted mb-2">Bergabunglah dengan grup calon wali santri untuk informasi selanjutnya.</p>
+        <a href="https://chat.whatsapp.com/FZ7S0GTAfRPAkJ9SExOLv5" target="_blank" class="btn btn-kuning btn-block">
+          <i class="fab fa-whatsapp"></i> Gabung Group Calon Wali Santri
+        </a>
       </div>
     </div>
 
-    <div class="form-section">
-      <h5 class="mb-4 text-success"><i class="fa-solid fa-map-location-dot me-2"></i>Alamat & Domisili</h5>
-      <div class="row g-3">
-        <div class="col-12">
-          <label class="form-label">Alamat Jalan / Perumahan / Kampung (Sesuai KK)</label>
-          <input type="text" id="alamat_kk" class="form-control" required>
+    <form id="formT1" class="card" novalidate>
+      <div class="card-header">Formulir Pendaftaran</div>
+      <div class="card-body">
+        <div class="honeypot"><input id="website" tabindex="-1" autocomplete="off"></div>
+
+        <div class="bagian">Data Santri</div>
+        <div class="form-row">
+          <div class="col-md-6 form-group"><label class="small mb-1">Nama lengkap (sesuai calon ijazah) *</label>
+            <input id="nama_lengkap" class="form-control" required></div>
+          <div class="col-md-6 form-group"><label class="small mb-1">NIK santri (16 digit) *</label>
+            <input id="nik" class="form-control" maxlength="19" inputmode="numeric" required></div>
+          <div class="col-md-6 form-group"><label class="small mb-1">Jenis kelamin *</label>
+            <select id="jenis_kelamin" class="form-control" required>
+              <option value="">-- pilih --</option>
+              <option value="L">Laki-laki</option>
+              <option value="P">Perempuan</option>
+            </select></div>
+          <div class="col-md-6 form-group"><label class="small mb-1">NISN (jika ada)</label>
+            <input id="nisn" class="form-control" inputmode="numeric"></div>
+          <div class="col-md-6 form-group"><label class="small mb-1">Tempat lahir *</label>
+            <input id="tempat_lahir" class="form-control" required></div>
+          <div class="col-md-6 form-group"><label class="small mb-1">Tanggal lahir *</label>
+            <input id="tanggal_lahir" type="date" class="form-control" required></div>
         </div>
-        <div class="col-md-3">
-          <label class="form-label">RT</label>
-          <input type="text" id="rt_kk" class="form-control" maxlength="3" pattern="\d{1,3}" placeholder="000" required>
+
+        <div class="bagian">Alamat Domisili</div>
+        <div class="form-group"><label class="small mb-1">Alamat (nama jalan / perumahan / kampung) *</label>
+          <input id="alamat" class="form-control" required></div>
+        <div class="form-row">
+          <div class="col-4 form-group"><label class="small mb-1">RT *</label>
+            <input id="alamat_dom_rt" class="form-control" maxlength="3" inputmode="numeric" required></div>
+          <div class="col-4 form-group"><label class="small mb-1">RW *</label>
+            <input id="alamat_dom_rw" class="form-control" maxlength="3" inputmode="numeric" required></div>
+          <div class="col-4 form-group"><label class="small mb-1">Kode pos *</label>
+            <input id="alamat_dom_kodepos" class="form-control" maxlength="5" inputmode="numeric" required></div>
+          <div class="col-md-6 form-group"><label class="small mb-1">Desa / Kelurahan *</label>
+            <input id="alamat_dom_desa" class="form-control" required></div>
+          <div class="col-md-6 form-group"><label class="small mb-1">Kecamatan *</label>
+            <input id="alamat_dom_kecamatan" class="form-control" required></div>
         </div>
-        <div class="col-md-3">
-          <label class="form-label">RW</label>
-          <input type="text" id="rw_kk" class="form-control" maxlength="3" pattern="\d{1,3}" placeholder="000" required>
+
+        <div class="bagian">Data Orang Tua</div>
+        <div class="form-row">
+          <div class="col-md-6 form-group"><label class="small mb-1">Nama ibu kandung *</label>
+            <input id="nama_ibu" class="form-control" required></div>
+          <div class="col-md-6 form-group"><label class="small mb-1">No. HP ibu (WhatsApp) *</label>
+            <input id="hp_ibu" type="tel" class="form-control" placeholder="08xxxxxxxxxx" required></div>
+          <div class="col-md-6 form-group"><label class="small mb-1">Nama ayah kandung *</label>
+            <input id="nama_ayah" class="form-control" required></div>
+          <div class="col-md-6 form-group"><label class="small mb-1">No. HP ayah (WhatsApp) *</label>
+            <input id="hp_ayah" type="tel" class="form-control" placeholder="08xxxxxxxxxx" required></div>
         </div>
-        <div class="col-md-6">
-          <label class="form-label">Desa / Kelurahan</label>
-          <input type="text" id="desa_kk" class="form-control" required>
+
+        <div class="bagian">Pendaftaran</div>
+        <div class="form-row">
+          <div class="col-md-6 form-group"><label class="small mb-1">Mendaftar untuk tingkat *</label>
+            <select id="tingkat_masuk" class="form-control" required></select></div>
+          <div class="col-md-6 form-group"><label class="small mb-1">Jenis pendaftaran *</label>
+            <select id="jenis_pendaftaran" class="form-control" required>
+              <option value="">-- pilih --</option>
+              <option value="Siswa Baru">Siswa Baru</option>
+              <option value="Pindahan">Pindahan</option>
+            </select></div>
         </div>
-        <div class="col-md-6">
-          <label class="form-label">Kecamatan</label>
-          <input type="text" id="kec_kk" class="form-control" required>
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Kode Pos</label>
-          <input type="text" id="pos_kk" class="form-control" maxlength="5" pattern="\d{5}" required>
-        </div>
-        <div class="col-12 mt-4">
-          <label class="form-label" style="color:#155724; background:#d4edda; padding:8px; display:block; border-radius:4px;">
-            Apakah alamat domisili (tempat tinggal sekarang) sama dengan alamat KK?
-          </label>
-          <select id="sama" class="form-select" required>
-            <option value="ya">Ya, sama dengan KK</option>
-            <option value="tidak">Tidak, berbeda dengan KK</option>
-          </select>
-        </div>
-        <div class="col-12" id="domisiliGroup" style="display:none;">
-          <label class="form-label text-danger">Alamat Domisili Sekarang</label>
-          <input type="text" id="alamat_domisili" class="form-control" placeholder="Nama jalan, RT/RW, dan kelurahan saat ini">
-        </div>
+
+        <button type="submit" class="btn btn-kuning btn-block mt-2" id="btnT1">
+          <i class="fas fa-paper-plane"></i> Kirim Pendaftaran
+        </button>
+        <div id="pesanT1" class="mt-2"></div>
+      </div>
+    </form>
+  </section>
+
+  <!-- ================= TAHAP 2 ================= -->
+  <section id="t2" class="d-none">
+    <div id="t2Sukses" class="card d-none">
+      <div class="card-body text-center">
+        <h4 class="font-weight-bold mb-2">Alhamdulillah, data sudah lengkap</h4>
+        <p class="text-muted mb-3">Silakan konfirmasi ke admin melalui WhatsApp. Admin akan menghubungi Anda untuk langkah selanjutnya.</p>
+        <a id="btnWaAdmin" href="#" target="_blank" class="btn btn-kuning btn-block">
+          <i class="fab fa-whatsapp"></i> Hubungi Admin via WhatsApp
+        </a>
       </div>
     </div>
 
-    <div class="form-section">
-      <h5 class="mb-4 text-success"><i class="fa-solid fa-people-roof me-2"></i>Data Orang Tua</h5>
-      <div class="row g-3">
-        <div class="col-md-6">
-          <label class="form-label">Nama Ibu Kandung</label>
-          <input type="text" id="nama_ibu" class="form-control" required>
+    <div class="card" id="cardCari">
+      <div class="card-header">Cari Data Pendaftaran</div>
+      <div class="card-body">
+        <p class="small text-muted">Masukkan NIK santri dan nomor pendaftaran yang diberikan saat tahap 1.</p>
+        <div class="form-row">
+          <div class="col-md-6 form-group"><label class="small mb-1">NIK santri *</label>
+            <input id="cariNik" class="form-control" maxlength="19" inputmode="numeric"></div>
+          <div class="col-md-6 form-group"><label class="small mb-1">Nomor pendaftaran *</label>
+            <input id="cariKode" class="form-control text-uppercase" maxlength="8"></div>
         </div>
-        <div class="col-md-6">
-          <label class="form-label">NIK Ibu Kandung</label>
-          <input type="text" id="nik_ibu" class="form-control" maxlength="16" pattern="\d{16}" required>
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Nama Ayah Kandung</label>
-          <input type="text" id="nama_ayah" class="form-control" required>
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">NIK Ayah Kandung</label>
-          <input type="text" id="nik_ayah" class="form-control" maxlength="16" pattern="\d{16}" required>
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Pekerjaan Ayah</label>
-          <select id="pekerjaan_ayah" class="form-select" required>
-            <option value="">-- Pilih --</option>
-            <option value="PNS">PNS / ASN</option>
-            <option value="Swasta">Karyawan Swasta</option>
-            <option value="Wirausaha">Wirausaha / Dagang</option>
-            <option value="Freelance">Pekerja Lepas / Freelance</option>
-            <option value="Tidak Bekerja">Tidak Bekerja</option>
-          </select>
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">No. HP Orang Tua (WhatsApp Aktif)</label>
-          <input type="tel" id="hp_orang_tua" class="form-control" placeholder="08xxxxxxxx" required>
-        </div>
+        <button class="btn btn-hitam btn-block" id="btnCari"><i class="fas fa-search"></i> Cari Data</button>
+        <div id="pesanCari" class="mt-2"></div>
       </div>
     </div>
 
-    <div class="form-section">
-      <h5 class="mb-4 text-success"><i class="fa-solid fa-school-circle-check me-2"></i>Rencana Akademik</h5>
-      <div class="row g-3">
-        <div class="col-md-6">
-          <label class="form-label">Mendaftar Untuk Tingkat</label>
-          <select id="tingkat_masuk" class="form-select" required>
-            <option value="">-- Pilih Tingkat --</option>
-            <option value="0">Kuttab Awal 1</option>
-            <option value="1">Kuttab Awal 2</option>
-            <option value="2">Kuttab Awal 3</option>
-            <option value="3">Kuttab Qonuni 1</option>
-            <option value="4">Kuttab Qonuni 2</option>
-            <option value="5">Kuttab Qonuni 3</option>
-            <option value="6">Kuttab Qonuni 4</option>
-          </select>
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Jenis Pendaftaran</label>
-          <select id="jenis_pendaftaran" class="form-select" required>
-            <option value="">-- Pilih Jenis --</option>
-            <option value="Siswa Baru">Siswa Baru</option>
-            <option value="Pindahan">Pindahan</option>
-          </select>
-        </div>
-        <div class="col-md-12">
-          <label class="form-label">Tahun Ajaran</label>
-          <input type="text" id="tahunTampil" class="form-control" readonly>
-        </div>
-      </div>
-    </div>
+    <form id="formT2" class="card d-none" novalidate>
+      <div class="card-header">Lengkapi Data</div>
+      <div class="card-body">
+        <div id="ringkas"></div>
 
-    <div class="navigation-btns">
-      <button type="button" class="btn-prev" id="prevBtn" style="display:none;">
-        <i class="fa-solid fa-arrow-left me-2"></i> Sebelumnya
-      </button>
-      <button type="button" class="btn-next" id="nextBtn">
-        Lanjut <i class="fa-solid fa-arrow-right ms-2"></i>
-      </button>
-      <button type="submit" class="btn-submit" id="submitBtn" style="display:none;">
-        <i class="fa-solid fa-check me-2"></i> Submit Data Santri
-      </button>
-    </div>
-  </form>
+        <div class="bagian">Data Santri</div>
+        <div class="form-row">
+          <div class="col-md-6 form-group"><label class="small mb-1">Nomor registrasi akta lahir *</label>
+            <input id="akta" class="form-control" required></div>
+          <div class="col-md-6 form-group"><label class="small mb-1">Nama panggilan *</label>
+            <input id="panggilan" class="form-control" required></div>
+        </div>
+
+        <div class="bagian">Alamat Sesuai KK</div>
+        <div class="form-group"><label class="small mb-1">Apakah alamat domisili sama dengan alamat KK? *</label>
+          <select id="sama" class="form-control">
+            <option value="ya">Ya, sama dengan domisili</option>
+            <option value="tidak">Tidak, berbeda</option>
+          </select></div>
+        <div id="kkBox" class="d-none">
+          <div class="form-group"><label class="small mb-1">Alamat sesuai KK *</label>
+            <input id="alamat_kk" class="form-control"></div>
+          <div class="form-row">
+            <div class="col-4 form-group"><label class="small mb-1">RT *</label>
+              <input id="rt_kk" class="form-control" maxlength="3" inputmode="numeric"></div>
+            <div class="col-4 form-group"><label class="small mb-1">RW *</label>
+              <input id="rw_kk" class="form-control" maxlength="3" inputmode="numeric"></div>
+            <div class="col-4 form-group"><label class="small mb-1">Kode pos *</label>
+              <input id="kode_pos" class="form-control" maxlength="5" inputmode="numeric"></div>
+            <div class="col-md-6 form-group"><label class="small mb-1">Desa / Kelurahan *</label>
+              <input id="desa_kelurahan" class="form-control"></div>
+            <div class="col-md-6 form-group"><label class="small mb-1">Kecamatan *</label>
+              <input id="kecamatan" class="form-control"></div>
+          </div>
+        </div>
+
+        <div class="bagian">Data Ayah</div>
+        <div class="form-row">
+          <div class="col-md-6 form-group"><label class="small mb-1">NIK ayah kandung (16 digit) *</label>
+            <input id="nik_ayah" class="form-control" maxlength="19" inputmode="numeric" required></div>
+          <div class="col-md-6 form-group"><label class="small mb-1">Pekerjaan ayah *</label>
+            <select id="pekerjaan_ayah" class="form-control" required></select></div>
+          <div class="col-md-6 form-group"><label class="small mb-1">Penghasilan ayah *</label>
+            <select id="penghasilan_ayah" class="form-control" required></select></div>
+        </div>
+
+        <div class="bagian">Data Ibu</div>
+        <div class="form-row">
+          <div class="col-md-6 form-group"><label class="small mb-1">NIK ibu kandung (16 digit) *</label>
+            <input id="nik_ibu" class="form-control" maxlength="19" inputmode="numeric" required></div>
+          <div class="col-md-6 form-group"><label class="small mb-1">Pekerjaan ibu *</label>
+            <select id="pekerjaan_ibu" class="form-control" required></select></div>
+          <div class="col-md-6 form-group"><label class="small mb-1">Penghasilan ibu *</label>
+            <select id="penghasilan_ibu" class="form-control" required></select></div>
+        </div>
+
+        <button type="submit" class="btn btn-kuning btn-block mt-2" id="btnT2">
+          <i class="fas fa-save"></i> Simpan Data Lengkap
+        </button>
+        <div id="pesanT2" class="mt-2"></div>
+      </div>
+    </form>
+  </section>
 </div>
 
 <script>
   const SUPABASE_URL = "https://epynlmuqxumuwcjsrnsz.supabase.co";
-  const SUPABASE_ANON_KEY = "sb_publishable_Oq_to1zgHLnachvWYLV_yA_DoOTGI3s";
-  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  const SUPABASE_KEY = "sb_publishable_Oq_to1zgHLnachvWYLV_yA_DoOTGI3s";
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
   });
 
+  const WA_ADMIN = "6285121117095";
+  const TINGKAT = ["Kuttab Awal 1","Kuttab Awal 2","Kuttab Awal 3","Kuttab Qonuni 1","Kuttab Qonuni 2","Kuttab Qonuni 3","Kuttab Qonuni 4"];
+  const PEKERJAAN = ["PNS / ASN","Karyawan Swasta","Wirausaha / Dagang","Pekerja Lepas / Freelance","Tidak Bekerja"];
+  const PENGHASILAN = ["s/d 3 juta","s/d 5 juta","s/d 10 juta","s/d 15 juta",">20 juta"];
+
   const $ = id => document.getElementById(id);
-  const sections = [...document.querySelectorAll(".form-section")];
-  const steps = [...document.querySelectorAll(".step-item")];
-  let current = 0, tahunAjaran = null;
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+  const upper = s => (s || "").trim().toUpperCase();
+  const titleCase = s => (s || "").trim().toLowerCase().replace(/(^|\s)\S/g, m => m.toUpperCase());
+  const cleanNik = s => (s || "").replace(/\s/g, "");
+  const cleanKode = s => (s || "").replace(/\s/g, "").toUpperCase();
 
-  const upper = v => (v || "").trim().toUpperCase();
-  const titleCase = v => (v || "").trim().toLowerCase().replace(/(^|\s)\S/g, m => m.toUpperCase());
-  const kosong = v => { const t = (v || "").trim(); return t === "" ? null : t; };
-
-  function tampil(n) {
-    sections.forEach((s, i) => s.classList.toggle("active", i === n));
-    steps.forEach((s, i) => {
-      s.classList.toggle("active", i === n);
-      s.classList.toggle("completed", i < n);
-    });
-    $("prevBtn").style.display = n === 0 ? "none" : "inline-block";
-    $("nextBtn").style.display = n === sections.length - 1 ? "none" : "inline-block";
-    $("submitBtn").style.display = n === sections.length - 1 ? "inline-block" : "none";
-    window.scrollTo(0, 0);
+  function normHp(v) {
+    let b = (v || "").replace(/[\s\-()]/g, "");
+    if (b.startsWith("+")) b = b.slice(1);
+    if (b.startsWith("0")) b = "62" + b.slice(1);
+    return /^62[0-9]{8,13}$/.test(b) ? b : null;
   }
 
-  function validasiBagian(i) {
-    const fields = sections[i].querySelectorAll("input, select, textarea");
-    for (const f of fields) {
-      if (!f.checkValidity()) { f.reportValidity(); return false; }
-    }
-    return true;
+  function pesan(id, teks, ok = false) {
+    const el = $(id);
+    el.textContent = teks;
+    el.className = "mt-2 " + (ok ? "text-success font-weight-bold" : "text-danger font-weight-bold");
   }
 
-  function lanjut(n) {
-    if (n === 1 && !validasiBagian(current)) return;
-    current = Math.min(Math.max(current + n, 0), sections.length - 1);
-    tampil(current);
+  function isiSelect(id, list, kosong) {
+    $(id).innerHTML = `<option value="">${kosong}</option>` +
+      list.map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join("");
   }
 
-  function gabungAlamatKK() {
-    return `${$("alamat_kk").value.trim()} RT/RW ${$("rt_kk").value.trim()}/${$("rw_kk").value.trim()}, ` +
-           `${$("desa_kk").value.trim()}, ${$("kec_kk").value.trim()} ${$("pos_kk").value.trim()}`;
-  }
-
-  function updateDomisili() {
-    const sama = $("sama").value === "ya";
-    $("domisiliGroup").style.display = sama ? "none" : "block";
-    $("alamat_domisili").required = !sama;
-    if (sama) $("alamat_domisili").value = gabungAlamatKK();
-    else if ($("alamat_domisili").value.includes("RT/RW")) $("alamat_domisili").value = "";
-  }
-
-  function tampilTutup() {
-    $("loading").style.display = "none";
-    $("ppdbForm").style.display = "none";
-    $("mainStepper").style.display = "none";
-    $("thankYou").innerHTML =
-      '<h2 style="font-weight:bold;color:#333;">Pendaftaran Ditutup</h2>' +
-      '<p class="text-muted">Saat ini pendaftaran santri baru belum dibuka. Silakan hubungi admin untuk informasi lebih lanjut.</p>' +
-      '<a href="https://wa.me/6285121117095" target="_blank" class="btn btn-success">Hubungi Admin via WhatsApp</a>';
-    $("thankYou").style.display = "block";
-  }
-
+  // ===== INIT =====
   async function init() {
-    const { data: buka, error: e1 } = await sb.rpc("pendaftaran_buka");
-    const { data: ta, error: e2 } = await sb.rpc("tahun_pendaftaran");
+    isiSelect("pekerjaan_ayah", PEKERJAAN, "-- pilih --");
+    isiSelect("pekerjaan_ibu", PEKERJAAN, "-- pilih --");
+    isiSelect("penghasilan_ayah", PENGHASILAN, "-- pilih --");
+    isiSelect("penghasilan_ibu", PENGHASILAN, "-- pilih --");
+    $("tingkat_masuk").innerHTML = `<option value="">-- pilih --</option>` +
+      TINGKAT.map((t, i) => `<option value="${i}">${esc(t)}</option>`).join("");
 
-    if (e1 || e2 || !buka || !ta) {
-      tampilTutup();
+    const [b, t] = await Promise.all([sb.rpc("pendaftaran_buka"), sb.rpc("tahun_pendaftaran")]);
+    if (t.data) $("tahunLabel").textContent = "Tahun ajaran " + t.data.replace("-", "/");
+    const buka = b.data === true && !!t.data;
+    if (!buka) {
+      $("t1Tutup").classList.remove("d-none");
+      $("formT1").classList.add("d-none");
+    }
+  }
+
+  // ===== TAB =====
+  document.querySelectorAll("[data-tab]").forEach(a => a.onclick = e => {
+    e.preventDefault();
+    document.querySelectorAll("[data-tab]").forEach(x => x.classList.toggle("active", x === a));
+    $("t1").classList.toggle("d-none", a.dataset.tab !== "t1");
+    $("t2").classList.toggle("d-none", a.dataset.tab !== "t2");
+    window.scrollTo(0, 0);
+  });
+
+  // ===== TAHAP 1 =====
+  $("formT1").addEventListener("submit", async e => {
+    e.preventDefault();
+    if ($("website").value) return;
+    pesan("pesanT1", "");
+
+    if (!$("formT1").checkValidity()) {
+      $("formT1").reportValidity();
       return;
     }
 
-    tahunAjaran = ta;
-    $("tahunTampil").value = ta.replace("-", "/");
-    $("loading").style.display = "none";
-    $("ppdbForm").style.display = "block";
-    $("mainStepper").style.display = "flex";
-    updateDomisili();
-    tampil(0);
-  }
+    const nik = cleanNik($("nik").value);
+    if (!/^\d{16}$/.test(nik)) return pesan("pesanT1", "NIK harus 16 digit angka.");
 
-  async function kirim(e) {
-    e.preventDefault();
-    if ($("website").value) return;
+    const hpIbu = normHp($("hp_ibu").value);
+    const hpAyah = normHp($("hp_ayah").value);
+    if (!hpIbu) return pesan("pesanT1", "Nomor HP ibu tidak valid. Contoh: 081234567890");
+    if (!hpAyah) return pesan("pesanT1", "Nomor HP ayah tidak valid. Contoh: 081234567890");
 
-    for (let i = 0; i < sections.length; i++) {
-      if (!validasiBagian(i)) { current = i; tampil(i); validasiBagian(i); return; }
-    }
-    if ($("sama").value === "ya") updateDomisili();
-
-    const btn = $("submitBtn");
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i> Memproses...';
-
-    const tingkat = Number($("tingkat_masuk").value);
-    const row = {
+    const payload = {
       nama_lengkap: titleCase($("nama_lengkap").value),
-      nama_panggilan: upper($("nama_panggilan").value),
       jenis_kelamin: $("jenis_kelamin").value,
-      nik: $("nik").value.trim(),
-      nisn: kosong($("nisn").value),
+      nik,
+      nisn: $("nisn").value.trim() || null,
       tempat_lahir: upper($("tempat_lahir").value),
       tanggal_lahir: $("tanggal_lahir").value,
-      no_registrasi_akta: $("no_registrasi_akta").value.trim(),
-      agama: "Islam",
-      alamat_kk: $("alamat_kk").value.trim(),
-      rt_kk: $("rt_kk").value.trim(),
-      rw_kk: $("rw_kk").value.trim(),
-      desa_kelurahan: upper($("desa_kk").value),
-      kecamatan: upper($("kec_kk").value),
-      kode_pos: $("pos_kk").value.trim(),
-      alamat: $("alamat_domisili").value.trim(),
+      alamat: $("alamat").value.trim(),
+      alamat_dom_rt: $("alamat_dom_rt").value.trim(),
+      alamat_dom_rw: $("alamat_dom_rw").value.trim(),
+      alamat_dom_desa: upper($("alamat_dom_desa").value),
+      alamat_dom_kecamatan: upper($("alamat_dom_kecamatan").value),
+      alamat_dom_kodepos: $("alamat_dom_kodepos").value.trim(),
       nama_ibu: upper($("nama_ibu").value),
-      nik_ibu: $("nik_ibu").value.trim(),
+      hp_ibu: hpIbu,
       nama_ayah: upper($("nama_ayah").value),
-      nik_ayah: $("nik_ayah").value.trim(),
-      pekerjaan_ayah: $("pekerjaan_ayah").value,
-      hp_orang_tua: $("hp_orang_tua").value.trim(),
-      tingkat_masuk: tingkat,
-      tingkat_sekarang: tingkat,
-      tahun_ajaran_masuk: tahunAjaran,
-      status: "Calon Santri",
+      hp_ayah: hpAyah,
+      tingkat_masuk: $("tingkat_masuk").value,
       jenis_pendaftaran: $("jenis_pendaftaran").value
     };
 
-    const { error } = await sb.from("santri").insert(row);
-    if (error) {
-      console.error(error);
-      btn.disabled = false;
-      btn.innerHTML = '<i class="fa-solid fa-check me-2"></i> Submit Data Santri';
-      alert("Gagal menyimpan data. Periksa kembali isian Anda, atau hubungi admin.");
+    const btn = $("btnT1");
+    btn.disabled = true;
+    const { data, error } = await sb.rpc("daftar_umum", { p: payload });
+    btn.disabled = false;
+
+    if (error) return pesan("pesanT1", error.message);
+
+    $("kodeHasil").textContent = data;
+    $("formT1").classList.add("d-none");
+    $("t1Sukses").classList.remove("d-none");
+    window.scrollTo(0, 0);
+  });
+
+  $("btnSalin").onclick = () => {
+    navigator.clipboard.writeText($("kodeHasil").textContent);
+    $("btnSalin").innerHTML = '<i class="fas fa-check"></i> Tersalin';
+  };
+
+  // ===== TAHAP 2 =====
+  let tahap2 = null;
+
+  $("btnCari").onclick = async () => {
+    pesan("pesanCari", "");
+    const nik = cleanNik($("cariNik").value);
+    const kode = cleanKode($("cariKode").value);
+    if (!/^\d{16}$/.test(nik)) return pesan("pesanCari", "NIK harus 16 digit angka.");
+    if (!/^[A-Z0-9]{8}$/.test(kode)) return pesan("pesanCari", "Nomor pendaftaran terdiri dari 8 karakter.");
+
+    $("btnCari").disabled = true;
+    const { data, error } = await sb.rpc("cari_pendaftaran", { p_nik: nik, p_kode: kode });
+    $("btnCari").disabled = false;
+
+    if (error) return pesan("pesanCari", error.message);
+    if (!data) return pesan("pesanCari", "Data tidak ditemukan. Periksa NIK dan nomor pendaftaran.");
+    if (data.sudah_lengkap) {
+      return pesan("pesanCari", "Data pendaftaran ini sudah lengkap. Untuk perubahan, silakan hubungi admin.");
+    }
+
+    tahap2 = { nik, kode };
+    $("ringkas").innerHTML = `<div class="ringkas">
+      <div><strong>${esc(data.nama_lengkap)}</strong></div>
+      <div>Ibu: ${esc(data.nama_ibu)} · Ayah: ${esc(data.nama_ayah)}</div>
+      <div>Alamat: ${esc(data.alamat)}, RT ${esc(data.alamat_dom_rt)}/RW ${esc(data.alamat_dom_rw)},
+        ${esc(data.alamat_dom_desa)}, ${esc(data.alamat_dom_kecamatan)} ${esc(data.alamat_dom_kodepos)}</div>
+    </div>`;
+
+    $("formT2").classList.remove("d-none");
+    $("cardCari").classList.add("d-none");
+    window.scrollTo(0, 0);
+  };
+
+  // Bagian alamat KK hanya tampil dan wajib diisi jika berbeda dengan domisili
+  function atursama() {
+    const beda = $("sama").value === "tidak";
+    $("kkBox").classList.toggle("d-none", !beda);
+    ["alamat_kk","rt_kk","rw_kk","kode_pos","desa_kelurahan","kecamatan"].forEach(id => $(id).required = beda);
+  }
+  $("sama").onchange = atursama;
+  atursama();
+
+  $("formT2").addEventListener("submit", async e => {
+    e.preventDefault();
+    pesan("pesanT2", "");
+    if (!tahap2) return;
+
+    if (!$("formT2").checkValidity()) {
+      $("formT2").reportValidity();
       return;
     }
 
-    $("ppdbForm").style.display = "none";
-    $("mainStepper").style.display = "none";
-    $("mainHeader").style.display = "none";
-    $("thankYou").style.display = "block";
-    window.scrollTo(0, 0);
-  }
+    const nikIbu = cleanNik($("nik_ibu").value);
+    const nikAyah = cleanNik($("nik_ayah").value);
+    if (!/^\d{16}$/.test(nikIbu) || !/^\d{16}$/.test(nikAyah)) {
+      return pesan("pesanT2", "NIK ayah dan ibu harus 16 digit angka.");
+    }
 
-  $("prevBtn").addEventListener("click", () => lanjut(-1));
-  $("nextBtn").addEventListener("click", () => lanjut(1));
-  $("sama").addEventListener("change", updateDomisili);
-  ["alamat_kk", "rt_kk", "rw_kk", "desa_kk", "kec_kk", "pos_kk"].forEach(id =>
-    $(id).addEventListener("input", () => { if ($("sama").value === "ya") updateDomisili(); }));
-  $("ppdbForm").addEventListener("submit", kirim);
+    const sama = $("sama").value === "ya";
+    const payload = {
+      no_registrasi_akta: $("akta").value.trim(),
+      nama_panggilan: $("panggilan").value.trim(),
+      alamat_sama: sama,
+      alamat_kk: sama ? null : $("alamat_kk").value.trim(),
+      rt_kk: sama ? null : $("rt_kk").value.trim(),
+      rw_kk: sama ? null : $("rw_kk").value.trim(),
+      kode_pos: sama ? null : $("kode_pos").value.trim(),
+      desa_kelurahan: sama ? null : $("desa_kelurahan").value.trim(),
+      kecamatan: sama ? null : $("kecamatan").value.trim(),
+      nik_ayah: nikAyah,
+      pekerjaan_ayah: $("pekerjaan_ayah").value,
+      penghasilan_ayah: $("penghasilan_ayah").value,
+      nik_ibu: nikIbu,
+      pekerjaan_ibu: $("pekerjaan_ibu").value,
+      penghasilan_ibu: $("penghasilan_ibu").value
+    };
+
+    const btn = $("btnT2");
+    btn.disabled = true;
+    const { error } = await sb.rpc("lengkapi_pendaftaran", {
+      p_nik: tahap2.nik, p_kode: tahap2.kode, p: payload
+    });
+    btn.disabled = false;
+
+    if (error) return pesan("pesanT2", error.message);
+
+    $("btnWaAdmin").href = "https://wa.me/" + WA_ADMIN +
+      "?text=" + encodeURIComponent("Assalamu'alaikum Admin. Saya sudah melengkapi data pendaftaran tahap 2.");
+    $("formT2").classList.add("d-none");
+    $("t2Sukses").classList.remove("d-none");
+    window.scrollTo(0, 0);
+  });
 
   init();
 </script>
