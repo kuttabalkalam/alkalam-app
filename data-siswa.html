@@ -247,19 +247,40 @@
       }
 
       // ===== CALON SANTRI =====
-      async function loadCalon() {
-        const { data, error } = await sb.from("santri")
-          .select("id, nama_lengkap, tingkat_masuk, hp_orang_tua, created_at, tahun_ajaran_masuk")
-          .eq("status", "Calon Santri").order("created_at");
-        if (error) return gagal(error);
+            async function loadCalon() {
+        const [calon, tunggu] = await Promise.all([
+          sb.from("santri")
+            .select("id, nama_lengkap, tingkat_masuk, hp_orang_tua, created_at, tahun_ajaran_masuk")
+            .eq("status", "Calon Santri").order("created_at"),
+          sb.from("santri")
+            .select("id, nama_lengkap, kode_daftar, hp_ayah, hp_ibu, hp_orang_tua")
+            .eq("diterima", true).eq("data_lengkap", false)
+            .not("kode_daftar", "is", null).order("nama_lengkap")
+        ]);
+        if (calon.error) return gagal(calon.error);
+        if (tunggu.error) return gagal(tunggu.error);
 
-        const list = data || [];
+        const list = calon.data || [];
+        const menunggu = tunggu.data || [];
         namaCalon = Object.fromEntries(list.map(s => [s.id, s.nama_lengkap]));
+        const menungguById = Object.fromEntries(menunggu.map(s => [s.id, s]));
+
+        const linkDaftar = kode =>
+          new URL("lengkapi-data.html", location.href).href + "?kode=" + encodeURIComponent(kode);
+
+        const hpWa = s => {
+          const h = (s.hp_ayah || s.hp_ibu || s.hp_orang_tua || "").replace(/\D/g, "");
+          if (!h) return null;
+          return h.startsWith("0") ? "62" + h.slice(1) : h;
+        };
 
         panel("calon").innerHTML = `
-          <p class="text-muted small mb-2">${list.length} calon santri. Calon untuk tahun ajaran yang belum aktif baru bisa diaktifkan setelah tahun itu aktif.</p>
+          <p class="text-muted small mb-2">
+            ${list.length} calon santri. Menerima calon sekaligus mengaktifkannya ke kelas dan memberi NIS.
+            Calon untuk tahun ajaran yang belum aktif belum bisa diterima.
+          </p>
           ${admin ? `
-            <div class="form-row align-items-end mb-2">
+            <div class="form-row align-items-end mb-2" id="bulkBar">
               <div class="col-8 col-md-5">
                 <label class="small mb-1">Kelas untuk yang dicentang</label>
                 <select id="cRombel" class="form-control">
@@ -267,7 +288,9 @@
                   ${rombelAll.map(x => `<option value="${x.id}">${esc(x.nama)}</option>`).join("")}
                 </select>
               </div>
-              <div class="col-4"><button class="btn btn-kuning" id="cAktif"><i class="fas fa-check"></i> Aktifkan</button></div>
+              <div class="col-4">
+                <button class="btn btn-kuning" id="cAktif"><i class="fas fa-user-check"></i> Terima & Aktifkan</button>
+              </div>
             </div>` : ""}
           <div class="tabel-wrap">
             <table class="table table-sm table-bordered bg-white">
@@ -292,17 +315,60 @@
                 }).join("")}
               </tbody>
             </table>
+          </div>
+
+          <h6 class="font-weight-bold mt-4">Diterima, menunggu melengkapi data</h6>
+          <p class="text-muted small mb-2">Bagikan link ke orang tua untuk melengkapi data. Form terbuka setelah NIK santri dimasukkan.</p>
+          <div class="tabel-wrap">
+            <table class="table table-sm table-bordered bg-white">
+              <thead><tr><th>No</th><th>Nama</th><th>No. Pendaftaran</th><th>Aksi</th></tr></thead>
+              <tbody>
+                ${menunggu.length ? menunggu.map((s, i) => `<tr>
+                  <td>${i + 1}</td>
+                  <td>${esc(s.nama_lengkap)}</td>
+                  <td><code>${esc(s.kode_daftar)}</code></td>
+                  <td>
+                    <button class="btn btn-sm btn-hitam" data-salin="${s.id}"><i class="fas fa-link"></i> Salin link</button>
+                    ${hpWa(s) ? `<button class="btn btn-sm btn-outline-success ml-1" data-wa="${s.id}"><i class="fab fa-whatsapp"></i> Kirim WA</button>` : ""}
+                  </td>
+                </tr>`).join("")
+                : '<tr><td colspan="4" class="text-muted">Belum ada.</td></tr>'}
+              </tbody>
+            </table>
           </div>`;
 
         const p = panel("calon");
+
         if (admin) {
           document.getElementById("cAll").onchange = e =>
             p.querySelectorAll(".cPilih:not(:disabled)").forEach(c => c.checked = e.target.checked);
           document.getElementById("cAktif").onclick = aktifkanTerpilih;
           p.querySelectorAll("[data-edit]").forEach(b => b.onclick = () => openForm(Number(b.dataset.edit)));
         }
-      }
 
+        p.querySelectorAll("[data-salin]").forEach(b => b.onclick = async () => {
+          const s = menungguById[Number(b.dataset.salin)];
+          if (!s) return;
+          const teks = linkDaftar(s.kode_daftar);
+          try {
+            await navigator.clipboard.writeText(teks);
+            toast("Link disalin.");
+          } catch (e) {
+            peringatan("Salin manual:\n" + teks);
+          }
+        });
+
+        p.querySelectorAll("[data-wa]").forEach(b => b.onclick = () => {
+          const s = menungguById[Number(b.dataset.wa)];
+          const hp = s && hpWa(s);
+          if (!hp) return peringatan("Nomor HP orang tua belum tersedia.");
+          const teks = "Assalamu'alaikum Bapak/Ibu wali dari ananda " + s.nama_lengkap +
+            ". Alhamdulillah, ananda dinyatakan diterima di Kuttab Al-Kalam. " +
+            "Silakan melengkapi data pendaftaran melalui tautan berikut:\n" + linkDaftar(s.kode_daftar) +
+            "\n\nNomor pendaftaran: " + s.kode_daftar;
+          window.open("https://wa.me/" + hp + "?text=" + encodeURIComponent(teks), "_blank");
+        });
+      }
       async function aktifkanTerpilih() {
         const rid = Number(document.getElementById("cRombel").value);
         if (!rid) return peringatan("Pilih kelas tujuan terlebih dahulu.");
