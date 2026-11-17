@@ -67,7 +67,7 @@
         <input id="cariNik" class="form-control" maxlength="19" inputmode="numeric">
       </div>
       <button class="btn btn-hitam btn-block" id="btnCari"><i class="fas fa-unlock"></i> Lanjutkan</button>
-      <div id="pesanCari" class="mt-2"></div>
+      <div id="pesanCari" class="mt-2 text-danger font-weight-bold"></div>
     </div>
   </div>
 
@@ -76,6 +76,20 @@
     <div class="card-body">
       <div class="honeypot"><input id="website" tabindex="-1" autocomplete="off"></div>
       <div id="ringkas"></div>
+
+      <div id="blokDaftar">
+        <div class="bagian">Pendaftaran</div>
+        <div class="form-row">
+          <div class="col-md-6 form-group"><label class="small mb-1">Mendaftar untuk tingkat *</label>
+            <select id="tingkat_masuk" class="form-control"></select></div>
+          <div class="col-md-6 form-group"><label class="small mb-1">Jenis pendaftaran *</label>
+            <select id="jenis_pendaftaran" class="form-control">
+              <option value="">-- pilih --</option>
+              <option value="Siswa Baru">Siswa Baru</option>
+              <option value="Pindahan">Pindahan</option>
+            </select></div>
+        </div>
+      </div>
 
       <div class="bagian">Data Santri</div>
       <div class="form-row">
@@ -131,7 +145,7 @@
       <button type="submit" class="btn btn-kuning btn-block mt-2" id="btnSimpan">
         <i class="fas fa-save"></i> Simpan Data Lengkap
       </button>
-      <div id="pesan" class="mt-2"></div>
+      <div id="pesan" class="mt-2 text-danger font-weight-bold"></div>
     </div>
   </form>
 </div>
@@ -144,6 +158,7 @@
   });
 
   const WA_ADMIN = "6285121117095";
+  const TINGKAT = ["Kuttab Awal 1","Kuttab Awal 2","Kuttab Awal 3","Kuttab Qonuni 1","Kuttab Qonuni 2","Kuttab Qonuni 3","Kuttab Qonuni 4"];
   const PEKERJAAN = ["PNS / ASN","Karyawan Swasta","Wirausaha / Dagang","Pekerja Lepas / Freelance","Tidak Bekerja"];
   const PENGHASILAN = ["s/d 3 juta","s/d 5 juta","s/d 10 juta","s/d 15 juta",">20 juta"];
 
@@ -161,8 +176,8 @@
     el.className = "mt-2 text-danger font-weight-bold";
   }
 
-  function isiSelect(id, list) {
-    $(id).innerHTML = `<option value="">-- pilih --</option>` +
+  function isiSelect(id, list, kosong = "-- pilih --") {
+    $(id).innerHTML = `<option value="">${kosong}</option>` +
       list.map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join("");
   }
 
@@ -171,6 +186,8 @@
     isiSelect("pekerjaan_ibu", PEKERJAAN);
     isiSelect("penghasilan_ayah", PENGHASILAN);
     isiSelect("penghasilan_ibu", PENGHASILAN);
+    $("tingkat_masuk").innerHTML = `<option value="">-- pilih --</option>` +
+      TINGKAT.map((t, i) => `<option value="${i}">${esc(t)}</option>`).join("");
 
     if (!/^[A-Z0-9]{8}$/.test(KODE)) {
       $("noKode").classList.remove("d-none");
@@ -196,10 +213,24 @@
     if (data.sudah_lengkap) {
       return pesan("pesanCari", "Data pendaftaran ini sudah lengkap. Untuk perubahan, silakan hubungi admin.");
     }
+    if (!data.diterima) {
+      return pesan("pesanCari", "Data Anda belum dinyatakan diterima. Silakan menunggu kabar dari admin.");
+    }
 
     dataSantri = { nik };
+
+    // Tingkat dan jenis hanya diminta jika belum ditetapkan
+    const perluDaftar = data.tingkat_masuk === null || data.jenis_pendaftaran === null;
+    $("blokDaftar").classList.toggle("d-none", !perluDaftar);
+    $("tingkat_masuk").required = perluDaftar && data.tingkat_masuk === null;
+    $("jenis_pendaftaran").required = perluDaftar && data.jenis_pendaftaran === null;
+    if (data.tingkat_masuk === null) $("tingkat_masuk").required = true;
+    if (data.jenis_pendaftaran === null) $("jenis_pendaftaran").required = true;
+
+    const tingkatTeks = data.tingkat_masuk !== null ? TINGKAT[data.tingkat_masuk] : "belum dipilih";
     $("ringkas").innerHTML = `<div class="ringkas">
       <div><strong>${esc(data.nama_lengkap)}</strong></div>
+      <div>Mendaftar untuk: ${esc(tingkatTeks)}${data.jenis_pendaftaran ? " · " + esc(data.jenis_pendaftaran) : ""}</div>
       <div>Ibu: ${esc(data.nama_ibu)} · Ayah: ${esc(data.nama_ayah)}</div>
       <div>Alamat: ${esc(data.alamat)}, RT ${esc(data.alamat_dom_rt)}/RW ${esc(data.alamat_dom_rw)},
         ${esc(data.alamat_dom_desa)}, ${esc(data.alamat_dom_kecamatan)} ${esc(data.alamat_dom_kodepos)}</div>
@@ -233,8 +264,11 @@
       return pesan("pesan", "NIK ayah dan ibu harus 16 digit angka.");
     }
 
+    const blokTampil = !$("blokDaftar").classList.contains("d-none");
     const sama = $("sama").value === "ya";
     const payload = {
+      tingkat_masuk: blokTampil ? $("tingkat_masuk").value : null,
+      jenis_pendaftaran: blokTampil ? $("jenis_pendaftaran").value : null,
       no_registrasi_akta: $("akta").value.trim(),
       nama_panggilan: $("panggilan").value.trim(),
       alamat_sama: sama,
