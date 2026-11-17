@@ -247,10 +247,10 @@
       }
 
       // ===== CALON SANTRI =====
-            async function loadCalon() {
+               async function loadCalon() {
         const [calon, tunggu] = await Promise.all([
           sb.from("santri")
-            .select("id, nama_lengkap, tingkat_masuk, hp_orang_tua, created_at, tahun_ajaran_masuk")
+            .select("id, nama_lengkap, tingkat_masuk, hp_orang_tua, created_at, tahun_ajaran_masuk, bukti_bayar_path")
             .eq("status", "Calon Santri").order("created_at"),
           sb.from("santri")
             .select("id, nama_lengkap, kode_daftar, hp_ayah, hp_ibu, hp_orang_tua")
@@ -277,15 +277,14 @@
         panel("calon").innerHTML = `
           <p class="text-muted small mb-2">
             ${list.length} calon santri. Menerima calon sekaligus mengaktifkannya ke kelas dan memberi NIS.
-            Calon untuk tahun ajaran yang belum aktif belum bisa diterima.
+            Pilihan kelas mengikuti tingkat calon yang dicentang.
           </p>
           ${admin ? `
             <div class="form-row align-items-end mb-2" id="bulkBar">
               <div class="col-8 col-md-5">
                 <label class="small mb-1">Kelas untuk yang dicentang</label>
                 <select id="cRombel" class="form-control">
-                  <option value="">-- pilih kelas --</option>
-                  ${rombelAll.map(x => `<option value="${x.id}">${esc(x.nama)}</option>`).join("")}
+                  <option value="">-- centang calon dulu --</option>
                 </select>
               </div>
               <div class="col-4">
@@ -296,19 +295,27 @@
             <table class="table table-sm table-bordered bg-white">
               <thead><tr>
                 ${admin ? '<th><input type="checkbox" id="cAll"></th>' : ""}
-                <th>No</th><th>Nama</th><th>Mendaftar untuk</th><th>TA masuk</th><th>HP Orang Tua</th><th>Tanggal daftar</th>
+                <th>No</th><th>Nama</th><th>Mendaftar untuk</th><th>TA masuk</th><th>HP Orang Tua</th>
+                <th>Bukti bayar</th><th>Tanggal daftar</th>
                 ${admin ? "<th>Aksi</th>" : ""}
               </tr></thead>
               <tbody>
                 ${list.map((s, i) => {
                   const bisa = s.tahun_ajaran_masuk === taKode;
+                  const tingkat = s.tingkat_masuk === null ? "" : s.tingkat_masuk;
+                  const bukti = s.bukti_bayar_path
+                    ? (admin
+                        ? `<button class="btn btn-sm btn-outline-dark" data-bukti="${s.id}"><i class="fas fa-receipt"></i> Lihat</button>`
+                        : '<span class="badge badge-success">ada</span>')
+                    : '<span class="badge badge-warning">belum</span>';
                   return `<tr>
-                    ${admin ? `<td><input type="checkbox" class="cPilih" data-calon="${s.id}" data-tingkat="${s.tingkat_masuk ?? ""}" ${bisa ? "" : "disabled"}></td>` : ""}
+                    ${admin ? `<td><input type="checkbox" class="cPilih" data-calon="${s.id}" data-tingkat="${tingkat}" data-ta="${esc(s.tahun_ajaran_masuk)}" ${bisa ? "" : "disabled"}></td>` : ""}
                     <td>${i + 1}</td>
                     <td>${esc(s.nama_lengkap)}</td>
-                    <td>${esc(namaTingkat(s.tingkat_masuk))}</td>
+                    <td>${s.tingkat_masuk === null ? '<span class="text-muted">belum dipilih</span>' : esc(namaTingkat(s.tingkat_masuk))}</td>
                     <td>${esc(s.tahun_ajaran_masuk)}${bisa ? "" : ' <span class="badge badge-secondary">menunggu TA aktif</span>'}</td>
                     <td>${esc(s.hp_orang_tua || "-")}</td>
+                    <td>${bukti}</td>
                     <td>${(s.created_at || "").slice(0, 10)}</td>
                     ${admin ? `<td><button class="btn btn-sm btn-hitam" data-edit="${s.id}"><i class="fas fa-edit"></i></button></td>` : ""}
                   </tr>`;
@@ -339,11 +346,43 @@
 
         const p = panel("calon");
 
+        // Kelas mengikuti tingkat calon yang dicentang dan TA-nya
+        const isiKelas = () => {
+          const sel = document.getElementById("cRombel");
+          if (!sel) return;
+          const dicentang = [...p.querySelectorAll(".cPilih:checked")];
+          if (!dicentang.length) {
+            sel.innerHTML = '<option value="">-- centang calon dulu --</option>';
+            return;
+          }
+          if (dicentang.some(c => c.dataset.ta !== taKode)) {
+            sel.innerHTML = '<option value="">Calon untuk TA lain belum bisa diterima</option>';
+            return;
+          }
+          const tingkat = [...new Set(dicentang.map(c => c.dataset.tingkat === "" ? null : Number(c.dataset.tingkat)))];
+          const kelas = (tingkat.length === 1 && tingkat[0] !== null)
+            ? rombelAll.filter(x => x.tingkat_kode === tingkat[0])
+            : rombelAll;
+          sel.innerHTML = '<option value="">-- pilih kelas --</option>' +
+            kelas.map(x => `<option value="${x.id}">${esc(x.nama)}</option>`).join("");
+        };
+
         if (admin) {
-          document.getElementById("cAll").onchange = e =>
+          document.getElementById("cAll").onchange = e => {
             p.querySelectorAll(".cPilih:not(:disabled)").forEach(c => c.checked = e.target.checked);
+            isiKelas();
+          };
+          p.querySelectorAll(".cPilih").forEach(c => c.onchange = isiKelas);
           document.getElementById("cAktif").onclick = aktifkanTerpilih;
           p.querySelectorAll("[data-edit]").forEach(b => b.onclick = () => openForm(Number(b.dataset.edit)));
+          p.querySelectorAll("[data-bukti]").forEach(b => b.onclick = async () => {
+            const s = list.find(x => x.id === Number(b.dataset.bukti));
+            if (!s || !s.bukti_bayar_path) return;
+            const { data, error } = await sb.storage.from("bukti-bayar")
+              .createSignedUrl(s.bukti_bayar_path, 300);
+            if (error) return gagal(error);
+            window.open(data.signedUrl, "_blank");
+          });
         }
 
         p.querySelectorAll("[data-salin]").forEach(b => b.onclick = async () => {
