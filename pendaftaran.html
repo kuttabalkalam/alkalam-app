@@ -19,9 +19,6 @@
   .card-header { background: #bfe3f5; font-weight: 600; }
   .btn-kuning { background: var(--kuning); color: var(--hitam); border: none; font-weight: 600; }
   .btn-kuning:hover { background: #e0b53a; color: var(--hitam); }
-  .btn-hitam { background: var(--hitam); color: var(--kuning); border: none; font-weight: 600; }
-  .btn-hitam:hover { background: #333; color: var(--kuning); }
-  .kode-box { font-size: 30px; letter-spacing: 6px; font-weight: 800; background: #fff; border: 2px dashed var(--kuning); border-radius: 10px; padding: 14px; text-align: center; }
   .bagian { font-weight: 700; color: var(--hitam); border-bottom: 1px solid #ddd; margin: 14px 0 10px; padding-bottom: 4px; }
   .biaya { background: #fff8e1; border: 1px solid var(--kuning); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
   .honeypot { position: absolute; left: -9999px; }
@@ -42,11 +39,11 @@
 
   <div id="sukses" class="card d-none">
     <div class="card-body text-center">
-      <h4 class="font-weight-bold mb-2">Alhamdulillah, pendaftaran diterima</h4>
-      <p class="text-muted mb-3">Nomor pendaftaran ananda juga dikirim ke WhatsApp orang tua. Simpan nomor ini. Anda membutuhkannya untuk melengkapi data setelah tahap wawancara.</p>
-      <div class="kode-box" id="kodeHasil"></div>
-      <button class="btn btn-sm btn-hitam mt-3" id="btnSalin"><i class="fas fa-copy"></i> Salin nomor</button>
-      <div id="waStatus" class="small mt-3"></div>
+      <h4 class="font-weight-bold mb-2">Alhamdulillah, pendaftaran ananda telah kami terima</h4>
+      <p class="text-muted mb-3">
+        Admin akan memeriksa data dan bukti pembayaran. Informasi jadwal interview dan hasil seleksi
+        akan disampaikan melalui WhatsApp dan email orang tua.
+      </p>
       <hr>
       <p class="small text-muted mb-2">Bergabunglah dengan grup calon wali santri untuk informasi selanjutnya.</p>
       <a href="https://chat.whatsapp.com/FZ7S0GTAfRPAkJ9SExOLv5" target="_blank" class="btn btn-kuning btn-block">
@@ -55,7 +52,7 @@
     </div>
   </div>
 
-  <form id="formT1" class="card" novalidate>
+  <form id="formDaftar" class="card" novalidate>
     <div class="card-header">Formulir Pendaftaran</div>
     <div class="card-body">
       <div class="honeypot"><input id="website" tabindex="-1" autocomplete="off"></div>
@@ -64,7 +61,7 @@
       <div class="form-row">
         <div class="col-md-6 form-group"><label class="small mb-1">Nama lengkap (sesuai akta) *</label>
           <input id="nama_lengkap" class="form-control" placeholder="Sesuai akta kelahiran" required></div>
-        <div class="col-md-6 form-group"><label class="small mb-1">NIK santri *</label>
+        <div class="col-md-6 form-group"><label class="small mb-1">NIK santri Sesuai KK *</label>
           <input id="nik" class="form-control" maxlength="16" inputmode="numeric" placeholder="16 digit NIK" required></div>
         <div class="col-md-6 form-group"><label class="small mb-1">Jenis kelamin *</label>
           <select id="jenis_kelamin" class="form-control" required>
@@ -72,12 +69,22 @@
             <option value="L">Laki-laki</option>
             <option value="P">Perempuan</option>
           </select></div>
+        <div class="col-md-6 form-group"><label class="small mb-1">Jenis pendaftaran *</label>
+          <select id="jenis_pendaftaran" class="form-control" required>
+            <option value="">-- pilih --</option>
+            <option value="Siswa Baru">Siswa Baru</option>
+            <option value="Pindahan">Pindahan</option>
+          </select></div>
         <div class="col-md-6 form-group"><label class="small mb-1">NISN (jika ada)</label>
           <input id="nisn" class="form-control" inputmode="numeric" placeholder="10 digit, boleh dikosongkan"></div>
+        <div class="col-md-6 form-group"><label class="small mb-1">Nomor registrasi akta lahir *</label>
+          <input id="akta" class="form-control" placeholder="Contoh: 3674-LU-21102020-0027" required></div>
         <div class="col-md-6 form-group"><label class="small mb-1">Tempat lahir *</label>
           <input id="tempat_lahir" class="form-control" placeholder="Contoh: TANGERANG SELATAN" required></div>
         <div class="col-md-6 form-group"><label class="small mb-1">Tanggal lahir *</label>
           <input id="tanggal_lahir" type="date" class="form-control" required></div>
+        <div class="col-md-6 form-group"><label class="small mb-1">Nama panggilan *</label>
+          <input id="panggilan" class="form-control" placeholder="Contoh: FAUZAN" required></div>
       </div>
 
       <div class="bagian">Alamat Domisili (tempat tinggal saat ini)</div>
@@ -96,16 +103,55 @@
           <input id="alamat_dom_kecamatan" class="form-control" placeholder="Contoh: PAMULANG" required></div>
       </div>
 
-      <div class="bagian">Data Orang Tua</div>
+      <div class="bagian">Alamat Sesuai KK</div>
+      <div class="form-group"><label class="small mb-1">Apakah alamat domisili sama dengan alamat sesuai KK? *</label>
+        <select id="sama" class="form-control">
+          <option value="ya">Ya, sama dengan alamat domisili</option>
+          <option value="tidak">Tidak, berbeda dengan alamat domisili</option>
+        </select></div>
+      <div id="kkBox" class="d-none">
+        <div class="form-group"><label class="small mb-1">Alamat sesuai KK *</label>
+          <input id="alamat_kk" class="form-control" placeholder="Contoh: JL. MUJAIR RAYA NO. 12"></div>
+        <div class="form-row">
+          <div class="col-4 form-group"><label class="small mb-1">RT sesuai KK *</label>
+            <input id="rt_kk" class="form-control" maxlength="3" inputmode="numeric" placeholder="Contoh: 003"></div>
+          <div class="col-4 form-group"><label class="small mb-1">RW sesuai KK *</label>
+            <input id="rw_kk" class="form-control" maxlength="3" inputmode="numeric" placeholder="Contoh: 007"></div>
+          <div class="col-4 form-group"><label class="small mb-1">Kode pos *</label>
+            <input id="kode_pos" class="form-control" maxlength="5" inputmode="numeric" placeholder="Contoh: 15415"></div>
+          <div class="col-md-6 form-group"><label class="small mb-1">Desa / Kelurahan sesuai KK *</label>
+            <input id="desa_kelurahan" class="form-control" placeholder="Contoh: BAMBU APUS"></div>
+          <div class="col-md-6 form-group"><label class="small mb-1">Kecamatan sesuai KK *</label>
+            <input id="kecamatan" class="form-control" placeholder="Contoh: PAMULANG"></div>
+        </div>
+      </div>
+
+      <div class="bagian">Data Ayah</div>
+      <div class="form-row">
+        <div class="col-md-6 form-group"><label class="small mb-1">Nama ayah kandung *</label>
+          <input id="nama_ayah" class="form-control" placeholder="Sesuai KK" required></div>
+        <div class="col-md-6 form-group"><label class="small mb-1">NIK ayah kandung *</label>
+          <input id="nik_ayah" class="form-control" maxlength="16" inputmode="numeric" placeholder="16 digit NIK" required></div>
+        <div class="col-md-6 form-group"><label class="small mb-1">No. HP ayah (WhatsApp) *</label>
+          <input id="hp_ayah" type="tel" class="form-control" placeholder="Contoh: 081234567890" required></div>
+        <div class="col-md-6 form-group"><label class="small mb-1">Pekerjaan ayah *</label>
+          <select id="pekerjaan_ayah" class="form-control" required></select></div>
+        <div class="col-md-6 form-group"><label class="small mb-1">Penghasilan ayah *</label>
+          <select id="penghasilan_ayah" class="form-control" required></select></div>
+      </div>
+
+      <div class="bagian">Data Ibu</div>
       <div class="form-row">
         <div class="col-md-6 form-group"><label class="small mb-1">Nama ibu kandung *</label>
           <input id="nama_ibu" class="form-control" placeholder="Sesuai KK" required></div>
+        <div class="col-md-6 form-group"><label class="small mb-1">NIK ibu kandung *</label>
+          <input id="nik_ibu" class="form-control" maxlength="16" inputmode="numeric" placeholder="16 digit NIK" required></div>
         <div class="col-md-6 form-group"><label class="small mb-1">No. HP ibu (WhatsApp) *</label>
           <input id="hp_ibu" type="tel" class="form-control" placeholder="Contoh: 081234567890" required></div>
-        <div class="col-md-6 form-group"><label class="small mb-1">Nama ayah kandung *</label>
-          <input id="nama_ayah" class="form-control" placeholder="Sesuai KK" required></div>
-        <div class="col-md-6 form-group"><label class="small mb-1">No. HP ayah (WhatsApp) *</label>
-          <input id="hp_ayah" type="tel" class="form-control" placeholder="Contoh: 081234567890" required></div>
+        <div class="col-md-6 form-group"><label class="small mb-1">Pekerjaan ibu *</label>
+          <select id="pekerjaan_ibu" class="form-control" required></select></div>
+        <div class="col-md-6 form-group"><label class="small mb-1">Penghasilan ibu *</label>
+          <select id="penghasilan_ibu" class="form-control" required></select></div>
         <div class="col-md-12 form-group"><label class="small mb-1">Email orang tua *</label>
           <input id="email_ortu" type="email" class="form-control" placeholder="Contoh: nama@email.com" required></div>
       </div>
@@ -114,7 +160,8 @@
       <div class="biaya">
         <div class="font-weight-bold">Biaya pendaftaran: Rp 100.000</div>
         <div class="small">
-          Transfer ke <b>[NAMA BANK]</b> nomor <b>[NOMOR REKENING]</b> a.n. <b>[NAMA PENERIMA]</b>.
+          Transfer ke <b>Bank Syariah Indonesia (BSI)</b> 
+          nomor <b>712 680 3731</b> a.n. <b>KALAM QALBU</b>.
           Unggah bukti transfer di bawah ini.
         </div>
       </div>
@@ -141,11 +188,14 @@
 
   const TIPE = { "application/pdf": "pdf", "image/jpeg": "jpg", "image/png": "png" };
   const MAKS = 2 * 1024 * 1024;
+  const PEKERJAAN = ["PNS / ASN","Karyawan Swasta","Wirausaha / Dagang","Pekerja Lepas / Freelance","Tidak Bekerja"];
+  const PENGHASILAN = ["s/d 3 juta","s/d 5 juta","s/d 10 juta","s/d 15 juta",">20 juta"];
 
   const $ = id => document.getElementById(id);
   const upper = s => (s || "").trim().toUpperCase();
   const titleCase = s => (s || "").trim().toLowerCase().replace(/(^|\s)\S/g, m => m.toUpperCase());
   const cleanNik = s => (s || "").replace(/\s/g, "");
+  const val = id => $(id).value.trim();
 
   function normHp(v) {
     let b = (v || "").replace(/[\s\-()]/g, "");
@@ -157,6 +207,11 @@
   const pesan = t => { $("pesan").textContent = t; };
   const status = t => { $("status").textContent = t; };
 
+  function isiSelect(id, list) {
+    $(id).innerHTML = `<option value="">-- pilih --</option>` +
+      list.map(x => `<option value="${x}">${x}</option>`).join("");
+  }
+
   function cekBerkas(f) {
     if (!f) return "Unggah bukti transfer terlebih dahulu.";
     if (!TIPE[f.type]) return "Bukti transfer harus berupa JPG, PNG, atau PDF.";
@@ -164,6 +219,7 @@
     return null;
   }
 
+  // Berkas diunggah ke folder pending/ dulu, lalu dikaitkan saat data disimpan
   async function unggahBukti(f) {
     const path = "pending/" + crypto.randomUUID() + "/bukti." + TIPE[f.type];
     const { error } = await sb.storage.from("bukti-bayar")
@@ -172,47 +228,51 @@
     return path;
   }
 
-  async function kirimWa(nik, kode) {
-    try {
-      const r = await fetch(SUPABASE_URL + "/functions/v1/kirim-wa", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ event: "terdaftar", nik, kode })
-      });
-      const j = await r.json().catch(() => ({}));
-      return r.ok && j.terkirim > 0;
-    } catch (e) {
-      return false;
-    }
+  function atursama() {
+    const beda = $("sama").value === "tidak";
+    $("kkBox").classList.toggle("d-none", !beda);
+    ["alamat_kk","rt_kk","rw_kk","kode_pos","desa_kelurahan","kecamatan"].forEach(id => $(id).required = beda);
   }
 
   async function init() {
+    isiSelect("pekerjaan_ayah", PEKERJAAN);
+    isiSelect("pekerjaan_ibu", PEKERJAAN);
+    isiSelect("penghasilan_ayah", PENGHASILAN);
+    isiSelect("penghasilan_ibu", PENGHASILAN);
+    $("sama").onchange = atursama;
+    atursama();
+
     const [b, t] = await Promise.all([sb.rpc("pendaftaran_buka"), sb.rpc("tahun_pendaftaran")]);
     if (t.data) $("tahunLabel").textContent = "Tahun ajaran " + t.data.replace("-", "/");
     if (!(b.data === true && t.data)) {
       $("tutup").classList.remove("d-none");
-      $("formT1").classList.add("d-none");
+      $("formDaftar").classList.add("d-none");
     }
   }
 
-  $("formT1").addEventListener("submit", async e => {
+  $("formDaftar").addEventListener("submit", async e => {
     e.preventDefault();
     if ($("website").value) return;
     pesan("");
 
-    if (!$("formT1").checkValidity()) { $("formT1").reportValidity(); return; }
+    if (!$("formDaftar").checkValidity()) { $("formDaftar").reportValidity(); return; }
 
     const nik = cleanNik($("nik").value);
-    if (!/^\d{16}$/.test(nik)) return pesan("NIK harus 16 digit angka.");
+    const nikAyah = cleanNik($("nik_ayah").value);
+    const nikIbu = cleanNik($("nik_ibu").value);
+    if (!/^\d{16}$/.test(nik)) return pesan("NIK santri harus 16 digit angka.");
+    if (!/^\d{16}$/.test(nikAyah) || !/^\d{16}$/.test(nikIbu)) return pesan("NIK ayah dan ibu harus 16 digit angka.");
 
     const hpIbu = normHp($("hp_ibu").value);
     const hpAyah = normHp($("hp_ayah").value);
-    if (!hpIbu) return pesan("Nomor HP ibu tidak valid. Contoh: 081234567890");
     if (!hpAyah) return pesan("Nomor HP ayah tidak valid. Contoh: 081234567890");
+    if (!hpIbu) return pesan("Nomor HP ibu tidak valid. Contoh: 081234567890");
 
     const f = $("bukti").files[0];
     const errBerkas = cekBerkas(f);
     if (errBerkas) return pesan(errBerkas);
+
+    const sama = $("sama").value === "ya";
 
     $("btnKirim").disabled = true;
     try {
@@ -220,38 +280,47 @@
       const buktiPath = await unggahBukti(f);
 
       status("Menyimpan data pendaftaran...");
-      const { data: kode, error } = await sb.rpc("daftar_umum", {
+      const { error } = await sb.rpc("daftar_umum", {
         p: {
           nama_lengkap: titleCase($("nama_lengkap").value),
           jenis_kelamin: $("jenis_kelamin").value,
+          jenis_pendaftaran: $("jenis_pendaftaran").value,
           nik,
-          nisn: $("nisn").value.trim() || null,
+          nisn: val("nisn") || null,
+          no_registrasi_akta: val("akta"),
+          nama_panggilan: val("panggilan"),
           tempat_lahir: upper($("tempat_lahir").value),
           tanggal_lahir: $("tanggal_lahir").value,
           alamat: $("alamat").value,
-          alamat_dom_rt: $("alamat_dom_rt").value.trim(),
-          alamat_dom_rw: $("alamat_dom_rw").value.trim(),
+          alamat_dom_rt: val("alamat_dom_rt"),
+          alamat_dom_rw: val("alamat_dom_rw"),
           alamat_dom_desa: $("alamat_dom_desa").value,
           alamat_dom_kecamatan: $("alamat_dom_kecamatan").value,
-          alamat_dom_kodepos: $("alamat_dom_kodepos").value.trim(),
-          nama_ibu: $("nama_ibu").value,
-          hp_ibu: hpIbu,
+          alamat_dom_kodepos: val("alamat_dom_kodepos"),
+          alamat_sama: sama,
+          alamat_kk: sama ? null : val("alamat_kk"),
+          rt_kk: sama ? null : val("rt_kk"),
+          rw_kk: sama ? null : val("rw_kk"),
+          kode_pos: sama ? null : val("kode_pos"),
+          desa_kelurahan: sama ? null : val("desa_kelurahan"),
+          kecamatan: sama ? null : val("kecamatan"),
           nama_ayah: $("nama_ayah").value,
+          nik_ayah: nikAyah,
           hp_ayah: hpAyah,
-          email_ortu: $("email_ortu").value,
+          pekerjaan_ayah: $("pekerjaan_ayah").value,
+          penghasilan_ayah: $("penghasilan_ayah").value,
+          nama_ibu: $("nama_ibu").value,
+          nik_ibu: nikIbu,
+          hp_ibu: hpIbu,
+          pekerjaan_ibu: $("pekerjaan_ibu").value,
+          penghasilan_ibu: $("penghasilan_ibu").value,
+          email_ortu: val("email_ortu"),
           bukti_path: buktiPath
         }
       });
       if (error) throw new Error(error.message);
 
-      status("Mengirim nomor pendaftaran ke WhatsApp orang tua...");
-      const waOk = await kirimWa(nik, kode);
-
-      $("kodeHasil").textContent = kode;
-      $("waStatus").textContent = waOk
-        ? "Nomor pendaftaran juga sudah dikirim ke WhatsApp orang tua."
-        : "Nomor pendaftaran belum terkirim ke WhatsApp. Mohon simpan nomor di atas.";
-      $("formT1").classList.add("d-none");
+      $("formDaftar").classList.add("d-none");
       $("sukses").classList.remove("d-none");
       window.scrollTo(0, 0);
     } catch (err) {
@@ -261,11 +330,6 @@
       status("");
     }
   });
-
-  $("btnSalin").onclick = () => {
-    navigator.clipboard.writeText($("kodeHasil").textContent);
-    $("btnSalin").innerHTML = '<i class="fas fa-check"></i> Tersalin';
-  };
 
   init();
 </script>
