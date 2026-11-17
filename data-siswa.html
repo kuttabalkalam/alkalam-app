@@ -303,7 +303,7 @@
                 ${list.map((s, i) => {
                   const bisa = s.tahun_ajaran_masuk === taKode;
                   return `<tr>
-                    ${admin ? `<td><input type="checkbox" class="cPilih" data-calon="${s.id}" data-tingkat="${s.tingkat_masuk}" ${bisa ? "" : "disabled"}></td>` : ""}
+                    ${admin ? `<td><input type="checkbox" class="cPilih" data-calon="${s.id}" data-tingkat="${s.tingkat_masuk ?? ""}" ${bisa ? "" : "disabled"}></td>` : ""}
                     <td>${i + 1}</td>
                     <td>${esc(s.nama_lengkap)}</td>
                     <td>${esc(namaTingkat(s.tingkat_masuk))}</td>
@@ -375,10 +375,10 @@
         const kelas = rombelAll.find(x => x.id === rid);
 
         const pilih = [...panel("calon").querySelectorAll(".cPilih:checked")]
-          .map(c => ({ id: Number(c.dataset.calon), tingkat: Number(c.dataset.tingkat) }));
+          .map(c => ({ id: Number(c.dataset.calon), tingkat: c.dataset.tingkat === "" ? null : Number(c.dataset.tingkat) }));
         if (!pilih.length) return peringatan("Centang santri yang akan diaktifkan.");
 
-        const tidakCocok = pilih.filter(x => x.tingkat !== kelas.tingkat_kode);
+        const tidakCocok = pilih.filter(x => x.tingkat !== null && x.tingkat !== kelas.tingkat_kode);
         if (tidakCocok.length) {
           return peringatan("Tingkat tidak sesuai dengan " + kelas.nama + ": " +
             tidakCocok.map(x => namaCalon[x.id]).join(", ") +
