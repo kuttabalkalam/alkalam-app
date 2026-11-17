@@ -61,9 +61,9 @@
       <div class="bagian">Data Santri</div>
       <div class="form-row">
         <div class="col-md-6 form-group"><label class="small mb-1">Nama lengkap (sesuai akta) *</label>
-          <input id="nama_lengkap" class="form-control" required></div>
-        <div class="col-md-6 form-group"><label class="small mb-1">NIK santri (16 digit) *</label>
-          <input id="nik" class="form-control" maxlength="19" inputmode="numeric" required></div>
+          <input id="nama_lengkap" class="form-control" placeholder="Sesuai akta kelahiran" required></div>
+        <div class="col-md-6 form-group"><label class="small mb-1">NIK santri *</label>
+          <input id="nik" class="form-control" maxlength="19" inputmode="numeric" placeholder="16 digit NIK" required></div>
         <div class="col-md-6 form-group"><label class="small mb-1">Jenis kelamin *</label>
           <select id="jenis_kelamin" class="form-control" required>
             <option value="">-- pilih --</option>
@@ -71,39 +71,39 @@
             <option value="P">Perempuan</option>
           </select></div>
         <div class="col-md-6 form-group"><label class="small mb-1">NISN (jika ada)</label>
-          <input id="nisn" class="form-control" inputmode="numeric"></div>
+          <input id="nisn" class="form-control" inputmode="numeric" placeholder="10 digit, boleh dikosongkan"></div>
         <div class="col-md-6 form-group"><label class="small mb-1">Tempat lahir *</label>
-          <input id="tempat_lahir" class="form-control" required></div>
+          <input id="tempat_lahir" class="form-control" placeholder="Contoh: TANGERANG SELATAN" required></div>
         <div class="col-md-6 form-group"><label class="small mb-1">Tanggal lahir *</label>
           <input id="tanggal_lahir" type="date" class="form-control" required></div>
       </div>
 
-      <div class="bagian">Alamat Domisili</div>
-      <div class="form-group"><label class="small mb-1">Alamat (nama jalan / perumahan / kampung) *</label>
-        <input id="alamat" class="form-control" required></div>
+      <div class="bagian">Alamat Domisili (tempat tinggal saat ini)</div>
+      <div class="form-group"><label class="small mb-1">Alamat domisili (nama jalan / perumahan / kampung) *</label>
+        <input id="alamat" class="form-control" placeholder="Contoh: JL. MUJAIR RAYA NO. 12" required></div>
       <div class="form-row">
-        <div class="col-4 form-group"><label class="small mb-1">RT *</label>
-          <input id="alamat_dom_rt" class="form-control" maxlength="3" inputmode="numeric" required></div>
-        <div class="col-4 form-group"><label class="small mb-1">RW *</label>
-          <input id="alamat_dom_rw" class="form-control" maxlength="3" inputmode="numeric" required></div>
+        <div class="col-4 form-group"><label class="small mb-1">RT domisili *</label>
+          <input id="alamat_dom_rt" class="form-control" maxlength="3" inputmode="numeric" placeholder="Contoh: 003" required></div>
+        <div class="col-4 form-group"><label class="small mb-1">RW domisili *</label>
+          <input id="alamat_dom_rw" class="form-control" maxlength="3" inputmode="numeric" placeholder="Contoh: 007" required></div>
         <div class="col-4 form-group"><label class="small mb-1">Kode pos *</label>
-          <input id="alamat_dom_kodepos" class="form-control" maxlength="5" inputmode="numeric" required></div>
+          <input id="alamat_dom_kodepos" class="form-control" maxlength="5" inputmode="numeric" placeholder="Contoh: 15415" required></div>
         <div class="col-md-6 form-group"><label class="small mb-1">Desa / Kelurahan *</label>
-          <input id="alamat_dom_desa" class="form-control" required></div>
+          <input id="alamat_dom_desa" class="form-control" placeholder="Contoh: BAMBU APUS" required></div>
         <div class="col-md-6 form-group"><label class="small mb-1">Kecamatan *</label>
-          <input id="alamat_dom_kecamatan" class="form-control" required></div>
+          <input id="alamat_dom_kecamatan" class="form-control" placeholder="Contoh: PAMULANG" required></div>
       </div>
 
       <div class="bagian">Data Orang Tua</div>
       <div class="form-row">
         <div class="col-md-6 form-group"><label class="small mb-1">Nama ibu kandung *</label>
-          <input id="nama_ibu" class="form-control" required></div>
+          <input id="nama_ibu" class="form-control" placeholder="Sesuai KK" required></div>
         <div class="col-md-6 form-group"><label class="small mb-1">No. HP ibu (WhatsApp) *</label>
-          <input id="hp_ibu" type="tel" class="form-control" placeholder="08xxxxxxxxxx" required></div>
+          <input id="hp_ibu" type="tel" class="form-control" placeholder="Contoh: 081234567890" required></div>
         <div class="col-md-6 form-group"><label class="small mb-1">Nama ayah kandung *</label>
-          <input id="nama_ayah" class="form-control" required></div>
+          <input id="nama_ayah" class="form-control" placeholder="Sesuai KK" required></div>
         <div class="col-md-6 form-group"><label class="small mb-1">No. HP ayah (WhatsApp) *</label>
-          <input id="hp_ayah" type="tel" class="form-control" placeholder="08xxxxxxxxxx" required></div>
+          <input id="hp_ayah" type="tel" class="form-control" placeholder="Contoh: 081234567890" required></div>
       </div>
 
       <button type="submit" class="btn btn-kuning btn-block mt-2" id="btnKirim">
@@ -171,7 +171,7 @@
       nisn: $("nisn").value.trim() || null,
       tempat_lahir: upper($("tempat_lahir").value),
       tanggal_lahir: $("tanggal_lahir").value,
-      alamat: $("alamat").value.trim(),
+      alamat: upper($("alamat").value),
       alamat_dom_rt: $("alamat_dom_rt").value.trim(),
       alamat_dom_rw: $("alamat_dom_rw").value.trim(),
       alamat_dom_desa: upper($("alamat_dom_desa").value),
