@@ -28,12 +28,16 @@
 
 <script>
   const esc = KUTTAB.esc;
+  const SB_URL = "https://epynlmuqxumuwcjsrnsz.supabase.co";
 
   const TINGKAT = [
     ["0", "Kuttab Awal 1"], ["1", "Kuttab Awal 2"], ["2", "Kuttab Awal 3"],
     ["3", "Kuttab Qonuni 1"], ["4", "Kuttab Qonuni 2"], ["5", "Kuttab Qonuni 3"], ["6", "Kuttab Qonuni 4"]
   ];
   const STATUS = ["Calon Santri", "Aktif", "Lulus", "Keluar", "Pindah"];
+  const BULAN_ID = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+  const BULAN_SINGKAT = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
+  const HARI_ID = ["Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"];
 
   const FIELD = [
     ["nama_lengkap", "Nama lengkap (sesuai akta) *", "text"],
@@ -66,6 +70,27 @@
   const namaTingkat = k => (TINGKAT.find(x => x[0] === String(k)) || [])[1] || "-";
   const titleCase = v => v.trim().toLowerCase().replace(/(^|\s)\S/g, m => m.toUpperCase());
 
+  const tglIndoSingkat = iso => {
+    if (!iso) return "-";
+    const d = new Date(iso + "T00:00:00");
+    return d.getDate() + " " + BULAN_SINGKAT[d.getMonth()] + " " + d.getFullYear();
+  };
+
+  // Waktu kirim: "17 Nov 2026, 14.35"
+  const waktuIndo = iso => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    const jam = String(d.getHours()).padStart(2, "0") + "." + String(d.getMinutes()).padStart(2, "0");
+    return d.getDate() + " " + BULAN_SINGKAT[d.getMonth()] + " " + d.getFullYear() + ", " + jam;
+  };
+
+  // "2026-11-28" + "08:00" -> "Sabtu, 28 November 2026 pukul 08.00"
+  function formatJadwal(tgl, jam) {
+    const d = new Date(tgl + "T00:00:00");
+    return HARI_ID[d.getDay()] + ", " + d.getDate() + " " + BULAN_ID[d.getMonth()] + " " +
+      d.getFullYear() + " pukul " + jam.replace(":", ".");
+  }
+
   function inputHtml(k, t, o, row) {
     const v = row && row[k] != null ? row[k] : "";
     const id = "f_" + k;
@@ -77,6 +102,26 @@
     }
     if (t === "textarea") return `<textarea id="${id}" rows="2" class="form-control form-control-sm">${esc(v)}</textarea>`;
     return `<input id="${id}" type="${t}" class="form-control form-control-sm" value="${esc(v)}">`;
+  }
+
+  // Mengirim pengumuman lewat Edge Function. Mengembalikan hasil dan alasan jika gagal.
+  async function kirimNotif(body) {
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) return { ok: false, pesan: "Sesi login habis. Muat ulang halaman." };
+
+      const r = await fetch(SB_URL + "/functions/v1/kirim-wa", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
+        body: JSON.stringify(body)
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) return { ok: false, pesan: j.error || ("Server membalas HTTP " + r.status) };
+      if ((j.terkirim ?? 0) === 0) return { ok: false, pesan: (j.gagal && j.gagal[0]) || "Tidak ada nomor tujuan yang valid" };
+      return { ok: true, pesan: "" };
+    } catch (e) {
+      return { ok: false, pesan: "Gagal menghubungi server: " + e.message };
+    }
   }
 
   KUTTAB.halaman({
@@ -247,35 +292,17 @@
         toast("Absensi tersimpan untuk " + rows.length + " santri.");
       }
 
-      // ===== CALON SANTRI: DAFTAR, JADWAL, TERIMA, AKTIVASI =====
-      const SB_URL = "https://epynlmuqxumuwcjsrnsz.supabase.co";
-
-      async function kirimNotif(body) {
-        try {
-          const { data: { session } } = await sb.auth.getSession();
-          const r = await fetch(SB_URL + "/functions/v1/kirim-wa", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
-            body: JSON.stringify(body)
-          });
-          const j = await r.json().catch(() => ({}));
-          return { ok: r.ok && (j.terkirim ?? 0) > 0 };
-        } catch (e) {
-          return { ok: false };
-        }
+      // ===== CALON SANTRI: DAFTAR, JADWAL, TERIMA, PENGUMUMAN, AKTIVASI =====
+      async function catatWa(id) {
+        const { error } = await sb.from("santri")
+          .update({ wa_diumumkan_at: new Date().toISOString() }).eq("id", id);
+        if (error) gagal(error);
       }
-
-      const tglIndoSingkat = iso => {
-        if (!iso) return "-";
-        const BL = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
-        const d = new Date(iso + "T00:00:00");
-        return d.getDate() + " " + BL[d.getMonth()] + " " + d.getFullYear();
-      };
 
       async function loadCalon() {
         const [calon, peng] = await Promise.all([
           sb.from("santri")
-            .select("id, nama_lengkap, nik, tingkat_masuk, tahun_ajaran_masuk, jenis_pendaftaran, bukti_bayar_path, tahap_calon, jadwal_interview, batas_pelunasan, hp_ayah, hp_ibu, created_at")
+            .select("id, nama_lengkap, nik, tingkat_masuk, tahun_ajaran_masuk, jenis_pendaftaran, bukti_bayar_path, tahap_calon, jadwal_interview, batas_pelunasan, hp_ayah, hp_ibu, wa_diumumkan_at, created_at")
             .eq("status", "Calon Santri").order("created_at"),
           sb.from("pengaturan").select("nilai").eq("kunci", "tingkat_tertinggi_dibuka").maybeSingle()
         ]);
@@ -283,373 +310,4 @@
         if (peng.error) return gagal(peng.error);
 
         const semua = calon.data || [];
-        const belum = semua.filter(s => s.tahap_calon !== "Diterima");
-        const diterima = semua.filter(s => s.tahap_calon === "Diterima");
-        const byId = Object.fromEntries(semua.map(s => [s.id, s]));
-        const batas = Math.min(Number(peng.data?.nilai ?? 0) + 1, 6);
-
-        const hpWa = s => {
-          const h = (s.hp_ayah || s.hp_ibu || "").replace(/\D/g, "");
-          if (!h) return null;
-          return h.startsWith("0") ? "62" + h.slice(1) : h;
-        };
-
-        const BADGE = { Terdaftar: "secondary", Terjadwal: "info", Diterima: "success" };
-        const bukti = s => s.bukti_bayar_path
-          ? (admin ? `<button class="btn btn-sm btn-outline-dark" data-bukti="${s.id}"><i class="fas fa-receipt"></i> Lihat</button>`
-                   : '<span class="badge badge-success">ada</span>')
-          : '<span class="badge badge-warning">belum</span>';
-
-        panel("calon").innerHTML = `
-          <h6 class="font-weight-bold">Terdaftar dan interview (${belum.length})</h6>
-          <p class="text-muted small mb-2">Periksa data dan bukti bayar. Atur jadwal interview, lalu terima setelah interview.</p>
-          <div class="tabel-wrap mb-4">
-            <table class="table table-sm table-bordered bg-white">
-              <thead><tr><th>No</th><th>Nama</th><th>Jenis</th><th>Bukti</th><th>Tahap</th><th>Jadwal</th><th>Aksi</th></tr></thead>
-              <tbody>
-                ${belum.length ? belum.map((s, i) => `<tr>
-                  <td>${i + 1}</td>
-                  <td>${esc(s.nama_lengkap)}<br><small class="text-muted">${esc(s.nik || "")}</small></td>
-                  <td>${esc(s.jenis_pendaftaran || "-")}</td>
-                  <td>${bukti(s)}</td>
-                  <td><span class="badge badge-${BADGE[s.tahap_calon] || "secondary"}">${esc(s.tahap_calon)}</span></td>
-                  <td>${esc(s.jadwal_interview || "-")}</td>
-                  <td>${!admin ? "" : `
-                    <button class="btn btn-sm btn-outline-dark" data-jadwal="${s.id}"><i class="fas fa-calendar"></i> Jadwal</button>
-                    ${s.tahap_calon === "Terjadwal" ? `<button class="btn btn-sm btn-kuning ml-1" data-terima="${s.id}"><i class="fas fa-user-check"></i> Terima</button>` : ""}`}
-                  </td>
-                </tr>`).join("") : '<tr><td colspan="7" class="text-muted">Belum ada calon.</td></tr>'}
-              </tbody>
-            </table>
-          </div>
-
-          <h6 class="font-weight-bold">Diterima (${diterima.length})</h6>
-          <p class="text-muted small mb-2">
-            Centang untuk diaktifkan ke kelas. Calon hanya bisa diaktifkan setelah tahun ajarannya aktif.
-          </p>
-          ${admin ? `
-            <div class="form-row align-items-end mb-2">
-              <div class="col-8 col-md-5">
-                <label class="small mb-1">Kelas untuk yang dicentang</label>
-                <select id="cRombel" class="form-control"><option value="">-- centang calon dulu --</option></select>
-              </div>
-              <div class="col-4"><button class="btn btn-kuning" id="cAktif"><i class="fas fa-user-check"></i> Aktifkan</button></div>
-            </div>` : ""}
-          <div class="tabel-wrap">
-            <table class="table table-sm table-bordered bg-white">
-              <thead><tr>
-                ${admin ? '<th><input type="checkbox" id="cAll"></th>' : ""}
-                <th>No</th><th>Nama</th><th>Jenjang</th><th>TA masuk</th><th>Batas pelunasan</th><th>Aksi</th>
-              </tr></thead>
-              <tbody>
-                ${diterima.length ? diterima.map((s, i) => {
-                  const bisa = s.tahun_ajaran_masuk === taKode;
-                  return `<tr>
-                    ${admin ? `<td><input type="checkbox" class="cPilih" data-calon="${s.id}" data-tingkat="${s.tingkat_masuk}" data-ta="${esc(s.tahun_ajaran_masuk)}" ${bisa ? "" : "disabled"}></td>` : ""}
-                    <td>${i + 1}</td>
-                    <td>${esc(s.nama_lengkap)}</td>
-                    <td>${esc(namaTingkat(s.tingkat_masuk))}</td>
-                    <td>${esc(s.tahun_ajaran_masuk)}${bisa ? "" : ' <span class="badge badge-secondary">menunggu TA aktif</span>'}</td>
-                    <td>${tglIndoSingkat(s.batas_pelunasan)}</td>
-                    <td>${admin && hpWa(s) ? `<button class="btn btn-sm btn-outline-success" data-wa="${s.id}" title="Kirim ulang pengumuman"><i class="fab fa-whatsapp"></i> Kirim ulang</button>` : ""}</td>
-                  </tr>`;
-                }).join("") : '<tr><td colspan="7" class="text-muted">Belum ada calon yang diterima.</td></tr>'}
-              </tbody>
-            </table>
-          </div>`;
-
-        const p = panel("calon");
-
-        const isiKelas = () => {
-          const sel = document.getElementById("cRombel");
-          if (!sel) return;
-          const dicentang = [...p.querySelectorAll(".cPilih:checked")];
-          if (!dicentang.length) { sel.innerHTML = '<option value="">-- centang calon dulu --</option>'; return; }
-          if (dicentang.some(c => c.dataset.ta !== taKode)) {
-            sel.innerHTML = '<option value="">Calon TA lain belum bisa diaktifkan</option>';
-            return;
-          }
-          const tingkat = [...new Set(dicentang.map(c => Number(c.dataset.tingkat)))];
-          const kelas = tingkat.length === 1 ? rombelAll.filter(x => x.tingkat_kode === tingkat[0]) : [];
-          sel.innerHTML = '<option value="">-- pilih kelas --</option>' +
-            kelas.map(x => `<option value="${x.id}">${esc(x.nama)}</option>`).join("");
-        };
-
-        if (admin) {
-          document.getElementById("cAll").onchange = e => {
-            p.querySelectorAll(".cPilih:not(:disabled)").forEach(c => c.checked = e.target.checked);
-            isiKelas();
-          };
-          p.querySelectorAll(".cPilih").forEach(c => c.onchange = isiKelas);
-          document.getElementById("cAktif").onclick = aktifkanTerpilih;
-
-          p.querySelectorAll("[data-jadwal]").forEach(b => b.onclick = () => aturJadwal(byId[Number(b.dataset.jadwal)]));
-          p.querySelectorAll("[data-terima]").forEach(b => b.onclick = () => terimaCalon(byId[Number(b.dataset.terima)], batas));
-          p.querySelectorAll("[data-wa]").forEach(b => b.onclick = async () => {
-            const r = await kirimNotif({ event: "diterima", santri_id: Number(b.dataset.wa) });
-            toast(r.ok ? "Pengumuman WhatsApp terkirim." : "WhatsApp belum terkirim.");
-          });
-          p.querySelectorAll("[data-bukti]").forEach(b => b.onclick = async () => {
-            const s = byId[Number(b.dataset.bukti)];
-            const { data, error } = await sb.storage.from("bukti-bayar").createSignedUrl(s.bukti_bayar_path, 300);
-            if (error) return gagal(error);
-            window.open(data.signedUrl, "_blank");
-          });
-        }
-      }
-
-      async function aturJadwal(s) {
-        const r = await Swal.fire({
-          title: "Jadwal interview",
-          input: "text",
-          inputValue: s.jadwal_interview || "",
-          inputPlaceholder: "contoh: Sabtu, 28 November 2026 pukul 08.00",
-          showCancelButton: true,
-          confirmButtonText: "Simpan",
-          cancelButtonText: "Batal",
-          confirmButtonColor: "#1a1a1a",
-          inputValidator: v => (!v || !v.trim()) ? "Jadwal wajib diisi" : null
-        });
-        if (!r.isConfirmed) return;
-
-        const { error } = await sb.rpc("tandai_interview", { p_santri: s.id, p_jadwal: r.value.trim() });
-        if (error) return gagal(error);
-        toast("Jadwal tersimpan. Sampaikan jadwal di grup dan japri.");
-        loadCalon();
-      }
-
-      async function terimaCalon(s, batas) {
-        if (!s) return;
-        const opsi = Array.from({ length: batas }, (_, i) => `<option value="${i}">${esc(namaTingkat(i))}</option>`).join("");
-        const besok3 = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
-        const r = await Swal.fire({
-          title: "Terima " + s.nama_lengkap + "?",
-          html: `
-            <label class="small mb-1">Jenjang</label>
-            <select id="swJenjang" class="swal2-select">${opsi}</select>
-            <label class="small mb-1 mt-2">Batas pelunasan</label>
-            <input id="swBatas" type="date" class="swal2-input" value="${besok3}">
-            <p class="small text-muted mt-2">Pengumuman akan dikirim ke WhatsApp orang tua setelah diterima.</p>`,
-          showCancelButton: true,
-          confirmButtonText: "Terima santri",
-          cancelButtonText: "Batal",
-          confirmButtonColor: "#1a1a1a",
-          preConfirm: () => ({
-            tingkat: Number(document.getElementById("swJenjang").value),
-            batas: document.getElementById("swBatas").value
-          })
-        });
-        if (!r.isConfirmed) return;
-        if (!r.value.batas) return peringatan("Isi batas pelunasan.");
-
-        const { error } = await sb.rpc("terima_calon", {
-          p_santri: s.id, p_tingkat: r.value.tingkat, p_batas: r.value.batas
-        });
-        if (error) return gagal(error);
-
-        const kirim = await kirimNotif({ event: "diterima", santri_id: s.id });
-        toast(kirim.ok
-          ? "Diterima. Pengumuman WhatsApp terkirim."
-          : "Diterima, tetapi WhatsApp belum terkirim. Gunakan tombol Kirim ulang di tabel Diterima.");
-        loadCalon();
-      }
-
-      async function aktifkanTerpilih() {
-        const rid = Number(document.getElementById("cRombel").value);
-        if (!rid) return peringatan("Pilih kelas tujuan terlebih dahulu.");
-        const kelas = rombelAll.find(x => x.id === rid);
-
-        const pilih = [...panel("calon").querySelectorAll(".cPilih:checked")]
-          .map(c => ({ id: Number(c.dataset.calon), tingkat: Number(c.dataset.tingkat) }));
-        if (!pilih.length) return peringatan("Centang calon yang akan diaktifkan.");
-
-        const tidakCocok = pilih.filter(x => x.tingkat !== kelas.tingkat_kode);
-        if (tidakCocok.length) return peringatan("Jenjang tidak sesuai dengan " + kelas.nama + ". Periksa centangan Anda.");
-
-        if (!(await konfirmasi("Aktifkan " + pilih.length + " santri?",
-          "Mereka akan masuk ke " + kelas.nama + " dan mendapat NIS."))) return;
-
-        let ok = 0;
-        const galat = [];
-        for (const x of pilih) {
-          const { error } = await sb.rpc("aktifkan_santri", { p_santri: x.id, p_rombel: rid });
-          if (error) galat.push(error.message);
-          else ok++;
-        }
-        if (ok) toast("Berhasil mengaktifkan " + ok + " santri.");
-        if (galat.length) peringatan(galat.join("\n"));
-        loadCalon();
-      }
-
-      // ===== TAMBAH & EDIT =====
-      function openForm(id) {
-        editId = id || null;
-        buka("form");
-        loadForm();
-      }
-
-      async function loadForm() {
-        let row = null;
-        if (editId) {
-          const { data, error } = await sb.from("santri").select("*").eq("id", editId).maybeSingle();
-          if (error) return gagal(error);
-          row = data;
-        }
-
-        panel("form").innerHTML = `
-          <h5 class="mb-3">${row ? "Edit: " + esc(row.nama_lengkap) : "Tambah Santri Baru"}</h5>
-          <form id="fSantri">
-            <div class="row">
-              ${FIELD.map(([k, l, t, o]) => `
-                <div class="col-md-6 col-12 mb-2">
-                  <label class="small mb-1">${esc(l)}</label>
-                  ${inputHtml(k, t, o, row)}
-                </div>`).join("")}
-            </div>
-            <button class="btn btn-kuning" type="submit"><i class="fas fa-save"></i> Simpan</button>
-            <button class="btn btn-secondary" type="button" id="fBatal">Batal</button>
-          </form>`;
-
-        if (!row) document.getElementById("f_agama").value = "Islam";
-        document.getElementById("fBatal").onclick = () => { editId = null; buka("daftar"); };
-        document.getElementById("fSantri").onsubmit = simpanForm;
-      }
-
-      async function simpanForm(e) {
-        e.preventDefault();
-        const d = {};
-        FIELD.forEach(([k]) => {
-          const el = document.getElementById("f_" + k);
-          const v = el ? el.value.trim() : "";
-          d[k] = v === "" ? null : v;
-        });
-
-        if (!d.nama_lengkap || !d.jenis_kelamin) return peringatan("Nama lengkap dan jenis kelamin wajib diisi.");
-
-        d.nama_lengkap = titleCase(d.nama_lengkap);
-        if (d.tingkat_masuk !== null) d.tingkat_masuk = Number(d.tingkat_masuk);
-        if (d.email_ortu) d.email_ortu = d.email_ortu.toLowerCase();
-        ["nama_panggilan", "tempat_lahir", "desa_kelurahan", "kecamatan", "nama_ibu", "nama_ayah"]
-          .forEach(k => { if (d[k]) d[k] = d[k].toUpperCase(); });
-
-        const btn = document.querySelector("#fSantri button[type=submit]");
-        btn.disabled = true;
-
-        const wasEdit = !!editId;
-        let error;
-        if (wasEdit) {
-          ({ error } = await sb.from("santri").update(d).eq("id", editId));
-        } else {
-          Object.assign(d, {
-            nis: null, status: "Calon Santri", tanggal_aktif: null,
-            tingkat_sekarang: d.tingkat_masuk, tahun_ajaran_masuk: taKode
-          });
-          ({ error } = await sb.from("santri").insert(d));
-        }
-        btn.disabled = false;
-
-        if (error) return gagal(error);
-
-        if (wasEdit) {
-          editId = null;
-          toast("Data santri diperbarui.");
-          buka("daftar");
-          tampilDaftar();
-        } else {
-          toast("Calon santri tersimpan. Proses dilanjutkan dari tab Calon Santri.");
-          loadForm();
-        }
-      }
-
-      // ===== AKTIVASI & PINDAH (ADMIN) =====
-      const STATUS_OPSI = STATUS;
-
-      async function loadPindah() {
-        const { data } = await sb.from("santri")
-          .select("id, nis, nama_lengkap, status, tingkat_masuk, tingkat_sekarang").order("nama_lengkap");
-        daftarPindah = data || [];
-
-        panel("pindah").innerHTML = `
-          <div class="row">
-            <div class="col-md-6 mb-2">
-              <label class="small mb-1">Santri</label>
-              <select id="pSantri" class="form-control">
-                <option value="">-- pilih santri --</option>
-                ${daftarPindah.map(s => `<option value="${s.id}">${esc((s.nis || "belum ber-NIS") + " - " + s.nama_lengkap)}</option>`).join("")}
-              </select>
-            </div>
-            <div class="col-md-3 mb-2">
-              <label class="small mb-1">Status</label>
-              <select id="pStatus" class="form-control">${STATUS_OPSI.map(s => `<option>${s}</option>`).join("")}</select>
-            </div>
-            <div class="col-md-3 mb-2">
-              <label class="small mb-1">Kelas (TA aktif)</label>
-              <select id="pRombel" class="form-control"></select>
-            </div>
-          </div>
-          <button class="btn btn-kuning" id="pSimpan"><i class="fas fa-save"></i> Simpan Perubahan</button>
-          <p class="text-muted small mt-2">
-            Status Aktif membuat NIS (jika belum punya) dan memasukkan santri ke kelas.
-            Status lain melepas santri dari kelas tahun ajaran ini.
-          </p>`;
-
-        document.getElementById("pSantri").onchange = muatStatusPindah;
-        document.getElementById("pSimpan").onclick = simpanPindah;
-        isiRombelPindah(null);
-      }
-
-      function isiRombelPindah(tingkat, pilih) {
-        const sel = document.getElementById("pRombel");
-        const list = tingkat === null ? [] : rombelAll.filter(x => x.tingkat_kode === tingkat);
-        sel.innerHTML = `<option value="">(tidak di kelas)</option>` +
-          list.map(x => `<option value="${x.id}">${esc(x.nama)}</option>`).join("");
-        if (pilih) sel.value = String(pilih);
-      }
-
-      async function muatStatusPindah() {
-        const id = Number(document.getElementById("pSantri").value);
-        if (!id) return isiRombelPindah(null);
-
-        const s = daftarPindah.find(x => x.id === id);
-        const { data: kr } = await sb.from("keanggotaan_rombel").select("rombel_id")
-          .eq("santri_id", id).eq("tahun_ajaran_id", taId).maybeSingle();
-
-        document.getElementById("pStatus").value = s.status;
-        isiRombelPindah(s.tingkat_sekarang ?? s.tingkat_masuk, kr ? kr.rombel_id : null);
-      }
-
-      async function simpanPindah() {
-        const id = Number(document.getElementById("pSantri").value);
-        if (!id) return peringatan("Pilih santri terlebih dahulu.");
-        const status = document.getElementById("pStatus").value;
-        const rid = Number(document.getElementById("pRombel").value) || null;
-
-        if (status === "Aktif") {
-          if (!rid) return peringatan("Santri aktif harus dimasukkan ke kelas.");
-          const { data: nis, error } = await sb.rpc("aktifkan_santri", { p_santri: id, p_rombel: rid });
-          if (error) return peringatan(error.message);
-          toast("Tersimpan. NIS: " + nis + ".");
-        } else {
-          if (!(await konfirmasi("Ubah status menjadi " + status + "?",
-            "Santri akan dilepas dari kelas tahun ajaran ini."))) return;
-
-          const { error: e1 } = await sb.from("santri").update({ status }).eq("id", id);
-          if (e1) return gagal(e1);
-
-          const { error: e2 } = await sb.from("keanggotaan_rombel").delete()
-            .eq("santri_id", id).eq("tahun_ajaran_id", taId);
-          if (e2) return gagal(e2);
-
-          toast("Status tersimpan.");
-        }
-        await loadPindah();
-      }
-
-      // ===== MULAI =====
-      buka("daftar");
-      loadDaftar();
-    }
-  });
-</script>
-</body>
-</html>
+        const belum = semua.filter(s =>
