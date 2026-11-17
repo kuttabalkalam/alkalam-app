@@ -15,6 +15,9 @@
   .tabel-wrap input[type=number] { width: 72px; }
   .tabel-wrap td, .tabel-wrap th { white-space: nowrap; }
   .tabel-wrap td:nth-child(3) { white-space: normal; min-width: 160px; }
+  .detail-tabel th, .detail-tabel td { text-align: left; font-size: 14px; vertical-align: top; }
+  .detail-tabel th { width: 38%; color: #444; font-weight: 600; }
+  .detail-bagian td { background: #f3f6f9; font-weight: 700; color: #1a1a1a; }
 </style>
 </head>
 <body class="hold-transition sidebar-mini">
@@ -77,6 +80,12 @@
     return d.getDate() + " " + BULAN_SINGKAT[d.getMonth()] + " " + d.getFullYear();
   };
 
+  const tglLengkap = iso => {
+    if (!iso) return "-";
+    const d = new Date(iso + "T00:00:00");
+    return d.getDate() + " " + BULAN_ID[d.getMonth()] + " " + d.getFullYear();
+  };
+
   // Waktu kirim: "17 Nov 2026, 14.35"
   const waktuIndo = iso => {
     if (!iso) return "";
@@ -91,6 +100,9 @@
     return HARI_ID[d.getDay()] + ", " + d.getDate() + " " + BULAN_ID[d.getMonth()] + " " +
       d.getFullYear() + " pukul " + jam.replace(":", ".");
   }
+
+  // Menggabungkan bagian alamat yang terisi
+  const gabung = (...x) => x.filter(v => v && String(v).trim()).join(", ") || null;
 
   function inputHtml(k, t, o, row) {
     const v = row && row[k] != null ? row[k] : "";
@@ -123,6 +135,12 @@
     } catch (e) {
       return { ok: false, pesan: "Gagal menghubungi server: " + e.message };
     }
+  }
+
+  async function catatWa(id) {
+    const { error } = await sb.from("santri")
+      .update({ wa_diumumkan_at: new Date().toISOString() }).eq("id", id);
+    if (error) KUTTAB.gagal(error);
   }
 
   KUTTAB.halaman({
@@ -179,6 +197,14 @@
         buka(k);
         cargar(k);
       });
+
+      // Membuka bukti bayar dengan tautan sementara (5 menit)
+      async function bukaBukti(path) {
+        if (!path) return peringatan("Bukti bayar belum ada.");
+        const { data, error } = await sb.storage.from("bukti-bayar").createSignedUrl(path, 300);
+        if (error) return gagal(error);
+        window.open(data.signedUrl, "_blank");
+      }
 
       // ===== DAFTAR SANTRI =====
       async function loadDaftar() {
@@ -293,13 +319,83 @@
         toast("Absensi tersimpan untuk " + rows.length + " santri.");
       }
 
-      // ===== CALON SANTRI: DAFTAR, JADWAL, TERIMA, PENGUMUMAN, AKTIVASI =====
-      async function catatWa(id) {
-        const { error } = await sb.from("santri")
-          .update({ wa_diumumkan_at: new Date().toISOString() }).eq("id", id);
-        if (error) gagal(error);
+      // ===== DETAIL CALON =====
+      async function lihatDetail(id) {
+        const { data: s, error } = await sb.from("santri").select("*").eq("id", id).maybeSingle();
+        if (error) return gagal(error);
+        if (!s) return peringatan("Data calon tidak ditemukan.");
+
+        const baris = (label, nilai) =>
+          `<tr><th>${esc(label)}</th><td>${nilai != null && nilai !== "" ? esc(String(nilai)) : "-"}</td></tr>`;
+        const bagian = judul => `<tr class="detail-bagian"><td colspan="2">${esc(judul)}</td></tr>`;
+
+        const jk = s.jenis_kelamin === "L" ? "Laki-laki" : s.jenis_kelamin === "P" ? "Perempuan" : null;
+        const domisili = gabung(s.alamat,
+          s.alamat_dom_rt && "RT " + s.alamat_dom_rt,
+          s.alamat_dom_rw && "RW " + s.alamat_dom_rw,
+          s.alamat_dom_desa, s.alamat_dom_kecamatan, s.alamat_dom_kodepos);
+        const alamatKk = s.alamat_sama_kk === true
+          ? "Sama dengan alamat domisili"
+          : gabung(s.alamat_kk,
+              s.rt_kk && "RT " + s.rt_kk,
+              s.rw_kk && "RW " + s.rw_kk,
+              s.desa_kelurahan, s.kecamatan, s.kode_pos);
+
+        const html = `
+          <div class="table-responsive">
+            <table class="table table-sm table-bordered detail-tabel mb-0">
+              ${bagian("Data Santri")}
+              ${baris("Nama lengkap", s.nama_lengkap)}
+              ${baris("Nama panggilan", s.nama_panggilan)}
+              ${baris("Jenis kelamin", jk)}
+              ${baris("NIK", s.nik)}
+              ${baris("NISN", s.nisn)}
+              ${baris("Tempat, tanggal lahir", gabung(s.tempat_lahir, tglLengkap(s.tanggal_lahir)))}
+              ${baris("Nomor registrasi akta", s.no_registrasi_akta)}
+              ${baris("Agama", s.agama)}
+              ${bagian("Alamat")}
+              ${baris("Alamat domisili", domisili)}
+              ${baris("Alamat sesuai KK", alamatKk)}
+              ${bagian("Orang Tua")}
+              ${baris("Nama ayah", s.nama_ayah)}
+              ${baris("NIK ayah", s.nik_ayah)}
+              ${baris("No. HP ayah", s.hp_ayah)}
+              ${baris("Pekerjaan ayah", s.pekerjaan_ayah)}
+              ${baris("Penghasilan ayah", s.penghasilan_ayah)}
+              ${baris("Nama ibu", s.nama_ibu)}
+              ${baris("NIK ibu", s.nik_ibu)}
+              ${baris("No. HP ibu", s.hp_ibu)}
+              ${baris("Pekerjaan ibu", s.pekerjaan_ibu)}
+              ${baris("Penghasilan ibu", s.penghasilan_ibu)}
+              ${baris("Email orang tua", s.email_ortu)}
+              ${bagian("Pendaftaran")}
+              ${baris("Mendaftar untuk", namaTingkat(s.tingkat_masuk))}
+              ${baris("Jenis pendaftaran", s.jenis_pendaftaran)}
+              ${baris("Tahun ajaran masuk", s.tahun_ajaran_masuk)}
+              ${baris("Tahap", s.tahap_calon)}
+              ${baris("Jadwal interview", s.jadwal_interview)}
+              ${baris("Batas pelunasan", tglLengkap(s.batas_pelunasan))}
+              ${baris("Data lengkap", s.data_lengkap ? "Sudah" : "Belum")}
+              ${baris("Pengumuman WhatsApp", s.wa_diumumkan_at ? "Terkirim, " + waktuIndo(s.wa_diumumkan_at) : "Belum dikirim")}
+              ${baris("Didaftarkan pada", waktuIndo(s.created_at))}
+            </table>
+          </div>`;
+
+        const r = await Swal.fire({
+          title: s.nama_lengkap,
+          html,
+          width: 680,
+          showConfirmButton: true,
+          confirmButtonText: "Tutup",
+          confirmButtonColor: "#1a1a1a",
+          showDenyButton: admin && !!s.bukti_bayar_path,
+          denyButtonText: "Lihat bukti bayar",
+          denyButtonColor: "#6c757d"
+        });
+        if (r.isDenied) bukaBukti(s.bukti_bayar_path);
       }
 
+      // ===== CALON SANTRI: DAFTAR, JADWAL, TERIMA, PENGUMUMAN, AKTIVASI =====
       async function loadCalon() {
         const [calon, peng] = await Promise.all([
           sb.from("santri")
@@ -347,9 +443,11 @@
                   <td>${bukti(s)}</td>
                   <td><span class="badge badge-${BADGE[s.tahap_calon] || "secondary"}">${esc(s.tahap_calon)}</span></td>
                   <td>${esc(s.jadwal_interview || "-")}</td>
-                  <td>${!admin ? "" : `
-                    <button class="btn btn-sm btn-outline-dark" data-jadwal="${s.id}"><i class="fas fa-calendar"></i> Jadwal</button>
-                    ${s.tahap_calon === "Terjadwal" ? `<button class="btn btn-sm btn-kuning ml-1" data-terima="${s.id}"><i class="fas fa-user-check"></i> Terima</button>` : ""}`}
+                  <td>
+                    <button class="btn btn-sm btn-outline-secondary" data-detail="${s.id}"><i class="fas fa-eye"></i> Detail</button>
+                    ${!admin ? "" : `
+                      <button class="btn btn-sm btn-outline-dark ml-1" data-jadwal="${s.id}"><i class="fas fa-calendar"></i> Jadwal</button>
+                      ${s.tahap_calon === "Terjadwal" ? `<button class="btn btn-sm btn-kuning ml-1" data-terima="${s.id}"><i class="fas fa-user-check"></i> Terima</button>` : ""}`}
                   </td>
                 </tr>`).join("") : '<tr><td colspan="7" class="text-muted">Belum ada calon.</td></tr>'}
               </tbody>
@@ -386,10 +484,13 @@
                     <td>${esc(s.tahun_ajaran_masuk)}${bisa ? "" : ' <span class="badge badge-secondary">menunggu TA aktif</span>'}</td>
                     <td>${tglIndoSingkat(s.batas_pelunasan)}</td>
                     <td>${statusWa(s)}</td>
-                    <td>${admin && adaHp ? `
-                      <button class="btn btn-sm btn-outline-success" data-wa="${s.id}" title="${s.wa_diumumkan_at ? "Kirim ulang pengumuman" : "Kirim pengumuman"}">
-                        <i class="fab fa-whatsapp"></i> ${s.wa_diumumkan_at ? "Kirim ulang" : "Kirim"}
-                      </button>` : (admin ? '<small class="text-danger">No. HP kosong</small>' : "")}</td>
+                    <td>
+                      <button class="btn btn-sm btn-outline-secondary" data-detail="${s.id}"><i class="fas fa-eye"></i> Detail</button>
+                      ${admin && adaHp ? `
+                        <button class="btn btn-sm btn-outline-success ml-1" data-wa="${s.id}" title="${s.wa_diumumkan_at ? "Kirim ulang pengumuman" : "Kirim pengumuman"}">
+                          <i class="fab fa-whatsapp"></i> ${s.wa_diumumkan_at ? "Kirim ulang" : "Kirim"}
+                        </button>` : (admin ? '<small class="text-danger ml-1">No. HP kosong</small>' : "")}
+                    </td>
                   </tr>`;
                 }).join("") : '<tr><td colspan="8" class="text-muted">Belum ada calon yang diterima.</td></tr>'}
               </tbody>
@@ -413,6 +514,9 @@
             kelas.map(x => `<option value="${x.id}">${esc(x.nama)}</option>`).join("");
         };
 
+        // Tombol detail tersedia untuk admin dan staf
+        p.querySelectorAll("[data-detail]").forEach(b => b.onclick = () => lihatDetail(Number(b.dataset.detail)));
+
         if (admin) {
           document.getElementById("cAll").onchange = e => {
             p.querySelectorAll(".cPilih:not(:disabled)").forEach(c => c.checked = e.target.checked);
@@ -424,13 +528,14 @@
           p.querySelectorAll("[data-jadwal]").forEach(b => b.onclick = () => aturJadwal(byId[Number(b.dataset.jadwal)]));
           p.querySelectorAll("[data-terima]").forEach(b => b.onclick = () => terimaCalon(byId[Number(b.dataset.terima)], batas));
           p.querySelectorAll("[data-wa]").forEach(b => b.onclick = () => kirimUlang(byId[Number(b.dataset.wa)]));
-          p.querySelectorAll("[data-bukti]").forEach(b => b.onclick = async () => {
-            const s = byId[Number(b.dataset.bukti)];
-            const { data, error } = await sb.storage.from("bukti-bayar").createSignedUrl(s.bukti_bayar_path, 300);
-            if (error) return gagal(error);
-            window.open(data.signedUrl, "_blank");
-          });
+          p.querySelectorAll("[data-bukti]").forEach(b => b.onclick = () => bukaBukti(byId[Number(b.dataset.bukti)].bukti_bayar_path));
         }
+      }
+
+      function statusWa(s) {
+        return s.wa_diumumkan_at
+          ? `<span class="badge badge-success"><i class="fab fa-whatsapp"></i> Terkirim</span><br><small class="text-muted">${esc(waktuIndo(s.wa_diumumkan_at))}</small>`
+          : '<span class="badge badge-warning">Belum dikirim</span>';
       }
 
       async function kirimUlang(s) {
