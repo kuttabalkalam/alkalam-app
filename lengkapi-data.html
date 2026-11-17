@@ -51,13 +51,6 @@
     </div>
   </div>
 
-  <div class="card d-none" id="cardKode">
-    <div class="card-body">
-      <p class="small text-muted mb-2 text-center">Nomor pendaftaran</p>
-      <div class="kode-box" id="kodeTampil"></div>
-    </div>
-  </div>
-
   <div class="card d-none" id="cardCari">
     <div class="card-header">Verifikasi</div>
     <div class="card-body">
@@ -77,18 +70,14 @@
       <div class="honeypot"><input id="website" tabindex="-1" autocomplete="off"></div>
       <div id="ringkas"></div>
 
-      <div id="blokDaftar">
+      <div id="blokJenis" class="d-none">
         <div class="bagian">Pendaftaran</div>
-        <div class="form-row">
-          <div class="col-md-6 form-group"><label class="small mb-1">Mendaftar untuk tingkat *</label>
-            <select id="tingkat_masuk" class="form-control"></select></div>
-          <div class="col-md-6 form-group"><label class="small mb-1">Jenis pendaftaran *</label>
-            <select id="jenis_pendaftaran" class="form-control">
-              <option value="">-- pilih --</option>
-              <option value="Siswa Baru">Siswa Baru</option>
-              <option value="Pindahan">Pindahan</option>
-            </select></div>
-        </div>
+        <div class="form-group"><label class="small mb-1">Jenis pendaftaran *</label>
+          <select id="jenis_pendaftaran" class="form-control">
+            <option value="">-- pilih --</option>
+            <option value="Siswa Baru">Siswa Baru</option>
+            <option value="Pindahan">Pindahan</option>
+          </select></div>
       </div>
 
       <div class="bagian">Data Santri</div>
@@ -166,18 +155,13 @@
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
   const cleanNik = s => (s || "").replace(/\s/g, "");
 
-  const KODE = (new URLSearchParams(location.search).get("kode") || "")
-    .replace(/\s/g, "").toUpperCase();
-  let dataSantri = null;
+  const KODE = (new URLSearchParams(location.search).get("kode") || "").replace(/\s/g, "").toUpperCase();
+  let nikTerverifikasi = null;
 
-  function pesan(id, teks) {
-    const el = $(id);
-    el.textContent = teks;
-    el.className = "mt-2 text-danger font-weight-bold";
-  }
+  const pesan = (id, t) => { $(id).textContent = t; };
 
-  function isiSelect(id, list, kosong = "-- pilih --") {
-    $(id).innerHTML = `<option value="">${kosong}</option>` +
+  function isiSelect(id, list) {
+    $(id).innerHTML = `<option value="">-- pilih --</option>` +
       list.map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join("");
   }
 
@@ -186,21 +170,16 @@
     isiSelect("pekerjaan_ibu", PEKERJAAN);
     isiSelect("penghasilan_ayah", PENGHASILAN);
     isiSelect("penghasilan_ibu", PENGHASILAN);
-    $("tingkat_masuk").innerHTML = `<option value="">-- pilih --</option>` +
-      TINGKAT.map((t, i) => `<option value="${i}">${esc(t)}</option>`).join("");
 
     if (!/^[A-Z0-9]{8}$/.test(KODE)) {
       $("noKode").classList.remove("d-none");
       return;
     }
-    $("kodeTampil").textContent = KODE;
-    $("cardKode").classList.remove("d-none");
     $("cardCari").classList.remove("d-none");
   }
 
-  // Verifikasi NIK, lalu tampilkan data yang sudah diisi di tahap 1
   $("btnCari").onclick = async () => {
-    $("pesanCari").textContent = "";
+    pesan("pesanCari", "");
     const nik = cleanNik($("cariNik").value);
     if (!/^\d{16}$/.test(nik)) return pesan("pesanCari", "NIK harus 16 digit angka.");
 
@@ -217,19 +196,15 @@
       return pesan("pesanCari", "Data Anda belum dinyatakan diterima. Silakan menunggu kabar dari admin.");
     }
 
-    dataSantri = { nik };
+    nikTerverifikasi = nik;
 
-    // Tingkat dan jenis hanya diminta jika belum ditetapkan
-    const perluTingkat = data.tingkat_masuk === null;
     const perluJenis = data.jenis_pendaftaran === null;
-    $("blokDaftar").classList.toggle("d-none", !(perluTingkat || perluJenis));
-    $("tingkat_masuk").required = perluTingkat;
+    $("blokJenis").classList.toggle("d-none", !perluJenis);
     $("jenis_pendaftaran").required = perluJenis;
 
-    const tingkatTeks = perluTingkat ? "belum dipilih" : TINGKAT[data.tingkat_masuk];
     $("ringkas").innerHTML = `<div class="ringkas">
       <div><strong>${esc(data.nama_lengkap)}</strong></div>
-      <div>Mendaftar untuk: ${esc(tingkatTeks)}${data.jenis_pendaftaran ? " · " + esc(data.jenis_pendaftaran) : ""}</div>
+      <div>Mendaftar untuk: ${esc(TINGKAT[data.tingkat_masuk] ?? "-")}${data.jenis_pendaftaran ? " · " + esc(data.jenis_pendaftaran) : ""}</div>
       <div>Ibu: ${esc(data.nama_ibu)} · Ayah: ${esc(data.nama_ayah)}</div>
       <div><strong>Alamat domisili</strong> (dari formulir pendaftaran):
         ${esc(data.alamat)}, RT ${esc(data.alamat_dom_rt)}/RW ${esc(data.alamat_dom_rw)},
@@ -241,7 +216,6 @@
     window.scrollTo(0, 0);
   };
 
-  // Alamat KK hanya tampil dan wajib diisi jika berbeda dengan domisili
   function atursama() {
     const beda = $("sama").value === "tidak";
     $("kkBox").classList.toggle("d-none", !beda);
@@ -253,8 +227,8 @@
   $("formT2").addEventListener("submit", async e => {
     e.preventDefault();
     if ($("website").value) return;
-    $("pesan").textContent = "";
-    if (!dataSantri) return;
+    pesan("pesan", "");
+    if (!nikTerverifikasi) return;
 
     if (!$("formT2").checkValidity()) { $("formT2").reportValidity(); return; }
 
@@ -264,11 +238,10 @@
       return pesan("pesan", "NIK ayah dan ibu harus 16 digit angka.");
     }
 
-    const blokTampil = !$("blokDaftar").classList.contains("d-none");
+    const perluJenis = !$("blokJenis").classList.contains("d-none");
     const sama = $("sama").value === "ya";
     const payload = {
-      tingkat_masuk: blokTampil && $("tingkat_masuk").value !== "" ? $("tingkat_masuk").value : null,
-      jenis_pendaftaran: blokTampil && $("jenis_pendaftaran").value !== "" ? $("jenis_pendaftaran").value : null,
+      jenis_pendaftaran: perluJenis ? $("jenis_pendaftaran").value : null,
       no_registrasi_akta: $("akta").value.trim(),
       nama_panggilan: $("panggilan").value.trim(),
       alamat_sama: sama,
@@ -288,7 +261,7 @@
 
     $("btnSimpan").disabled = true;
     const { error } = await sb.rpc("lengkapi_pendaftaran", {
-      p_nik: dataSantri.nik, p_kode: KODE, p: payload
+      p_nik: nikTerverifikasi, p_kode: KODE, p: payload
     });
     $("btnSimpan").disabled = false;
 
@@ -297,7 +270,6 @@
     $("btnWaAdmin").href = "https://wa.me/" + WA_ADMIN +
       "?text=" + encodeURIComponent("Assalamu'alaikum Admin. Saya sudah melengkapi data pendaftaran. Nomor pendaftaran: " + KODE);
     $("formT2").classList.add("d-none");
-    $("cardKode").classList.add("d-none");
     $("sukses").classList.remove("d-none");
     window.scrollTo(0, 0);
   });
