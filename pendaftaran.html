@@ -22,6 +22,7 @@
   .bagian { font-weight: 700; color: var(--hitam); border-bottom: 1px solid #ddd; margin: 14px 0 10px; padding-bottom: 4px; }
   .biaya { background: #fff8e1; border: 1px solid var(--kuning); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
   .honeypot { position: absolute; left: -9999px; }
+  .hint { font-size: 12px; color: #6c757d; margin-bottom: 6px; }
 </style>
 </head>
 <body>
@@ -98,6 +99,7 @@
         <div class="col-4 form-group"><label class="small mb-1">Kode pos *</label>
           <input id="alamat_dom_kodepos" class="form-control" maxlength="5" inputmode="numeric" placeholder="Contoh: 15415" required></div>
       </div>
+      <div class="hint">Pilih provinsi dan kota/kabupaten untuk mempersempit daftar. Keduanya hanya untuk memilih wilayah dan tidak disimpan.</div>
       <div id="domWil"></div>
 
       <div class="bagian">Alamat Sesuai KK</div>
@@ -184,16 +186,13 @@
   const PEKERJAAN = ["PNS / ASN","Karyawan Swasta","Wirausaha / Dagang","Pekerja Lepas / Freelance","Tidak Bekerja"];
   const PENGHASILAN = ["s/d 3 juta","s/d 5 juta","s/d 10 juta","s/d 15 juta",">20 juta"];
 
-  // Data wilayah dari layanan publik. Default: Banten, Kota Tangerang Selatan
+  // Wilayah dari layanan publik. Default: Banten, Kota Tangerang Selatan
   const WIL = "https://emsifa.github.io/api-wilayah-indonesia/api/";
   const DEF_PROV = "36";
   const DEF_KOTA = "3674";
   const LAIN = "__lain";
-  const LEVEL = [["prov","Provinsi"],["kota","Kota/Kabupaten"],["kec","Kecamatan"],["desa","Desa/Kelurahan"]];
-  const ANAK = { prov: "kota", kota: "kec", kec: "desa" };
-  const PATH = { prov: "regencies", kota: "districts", kec: "villages" };
   const NAMA = { prov: "provinsi", kota: "kota/kabupaten", kec: "kecamatan", desa: "desa/kelurahan" };
-  const KOSONG = { prov: "-- pilih provinsi --", kota: "-- pilih kota/kabupaten --", kec: "-- pilih kecamatan --", desa: "-- pilih desa/kelurahan --" };
+  const URUT = ["prov", "kota", "kec", "desa"];
 
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
@@ -235,109 +234,144 @@
 
   // ===== WILAYAH: provinsi > kota/kabupaten > kecamatan > desa/kelurahan =====
   function blokWilayah(p) {
-    return `<div class="form-row">${LEVEL.map(([lv, label]) => `
-      <div class="col-md-6 form-group">
-        <label class="small mb-1">${label} *</label>
-        <select id="${p}_${lv}" class="form-control" disabled><option value="">Memuat...</option></select>
-        <input id="${p}_${lv}_lain" class="form-control mt-1 d-none" placeholder="Tulis ${label.toLowerCase()}">
-      </div>`).join("")}</div>`;
+    return `
+      <div class="form-row">
+        <div class="col-md-6 form-group">
+          <label class="small mb-1">Provinsi</label>
+          <select id="${p}_prov" class="form-control" disabled><option value="">Memuat...</option></select>
+        </div>
+        <div class="col-md-6 form-group">
+          <label class="small mb-1">Kota/Kabupaten</label>
+          <select id="${p}_kota" class="form-control" disabled><option value="">-- pilih provinsi dulu --</option></select>
+        </div>
+        <div class="col-md-6 form-group">
+          <label class="small mb-1">Kecamatan *</label>
+          <select id="${p}_kec" class="form-control" disabled><option value="">-- pilih kota dulu --</option></select>
+          <input id="${p}_kec_lain" class="form-control mt-1 d-none" placeholder="Tulis nama kecamatan">
+        </div>
+        <div class="col-md-6 form-group">
+          <label class="small mb-1">Desa / Kelurahan *</label>
+          <select id="${p}_desa" class="form-control" disabled><option value="">-- pilih kecamatan dulu --</option></select>
+          <input id="${p}_desa_lain" class="form-control mt-1 d-none" placeholder="Tulis nama desa/kelurahan">
+        </div>
+      </div>
+      <div class="small text-danger d-none" id="${p}_err">
+        Daftar wilayah belum bisa dimuat. <a href="#" id="${p}_retry">Muat ulang</a>.
+      </div>`;
   }
 
   async function ambil(path) {
-    const r = await fetch(WIL + path);
-    if (!r.ok) throw new Error("gagal memuat wilayah");
-    return r.json();
-  }
-
-  const opsiDaftar = (list, kosong) =>
-    `<option value="">${kosong}</option>` +
-    list.map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join("") +
-    `<option value="${LAIN}">Lainnya (ketik manual)</option>`;
-
-  const setLain = (p, lv, aktif) => $(p + "_" + lv + "_lain").classList.toggle("d-none", !aktif);
-
-  // Mengosongkan level dan turunannya, menunggu pilihan induk
-  function resetDari(p, lv) {
-    for (let x = lv; x; x = ANAK[x]) {
-      const sel = $(p + "_" + x);
-      sel.innerHTML = `<option value="">-- pilih ${NAMA[x]} dulu --</option>`;
-      sel.value = "";
-      sel.disabled = true;
-      setLain(p, x, false);
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    try {
+      const r = await fetch(WIL + path, { signal: ctrl.signal });
+      if (!r.ok) throw new Error("gagal");
+      return await r.json();
+    } finally {
+      clearTimeout(timer);
     }
   }
 
-  // Level dan turunannya menjadi isian manual
-  function manualDari(p, lv) {
-    for (let x = lv; x; x = ANAK[x]) {
-      const sel = $(p + "_" + x);
-      sel.innerHTML = `<option value="${LAIN}">Tulis manual</option>`;
-      sel.value = LAIN;
-      sel.disabled = true;
-      setLain(p, x, true);
-    }
+  function opsi(list, kosong, bolehLain) {
+    return `<option value="">${kosong}</option>` +
+      list.map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join("") +
+      (bolehLain ? `<option value="${LAIN}">Lainnya (ketik manual)</option>` : "");
   }
 
-  // Mengisi level anak dari pilihan induk
-  async function isiAnak(p, induk, idInduk) {
-    const anak = ANAK[induk];
-    if (!anak) return;
-    resetDari(p, anak);
-    if (!idInduk) return;
-    if (idInduk === LAIN) return manualDari(p, anak);
+  function setErr(p, on) { $(p + "_err").classList.toggle("d-none", !on); }
 
-    const sel = $(p + "_" + anak);
+  // Mengisi satu level. Jika gagal, tampilkan pesan dan tombol muat ulang
+  async function isiLevel(p, lv, path, kosong, bolehLain) {
+    const sel = $(p + "_" + lv);
+    sel.disabled = true;
     sel.innerHTML = `<option value="">Memuat...</option>`;
     try {
-      const list = await ambil(PATH[induk] + "/" + idInduk + ".json");
-      sel.innerHTML = opsiDaftar(list, KOSONG[anak]);
+      const list = await ambil(path);
+      sel.innerHTML = opsi(list, kosong, bolehLain);
       sel.disabled = false;
+      setErr(p, false);
+      return true;
     } catch (e) {
-      manualDari(p, anak);
+      sel.innerHTML = `<option value="">-- gagal memuat --</option>` +
+        (bolehLain ? `<option value="${LAIN}">Lainnya (ketik manual)</option>` : "");
+      sel.disabled = false;
+      setErr(p, true);
+      return false;
     }
   }
 
-  function pasangHandler(p) {
-    LEVEL.forEach(([lv]) => {
-      $(p + "_" + lv).onchange = () => {
-        const v = $(p + "_" + lv).value;
-        setLain(p, lv, v === LAIN);
-        isiAnak(p, lv, v);
-      };
+  // Mengosongkan level dari lv ke bawah
+  function resetDari(p, lv) {
+    URUT.slice(URUT.indexOf(lv)).forEach(x => {
+      const sel = $(p + "_" + x);
+      sel.innerHTML = `<option value="">-- pilih ${NAMA[URUT[URUT.indexOf(x) - 1]] || "provinsi"} dulu --</option>`;
+      sel.value = "";
+      sel.disabled = true;
+      if (x === "kec" || x === "desa") $(p + "_" + x + "_lain").classList.add("d-none");
     });
   }
 
+  async function muatKota(p, provId) {
+    resetDari(p, "kota");
+    if (!provId) return;
+    await isiLevel(p, "kota", "regencies/" + provId + ".json", "-- pilih kota/kabupaten --", false);
+  }
+
+  async function muatKec(p, kotaId) {
+    resetDari(p, "kec");
+    if (!kotaId) return;
+    await isiLevel(p, "kec", "districts/" + kotaId + ".json", "-- pilih kecamatan --", true);
+  }
+
+  async function muatDesa(p, kecId) {
+    resetDari(p, "desa");
+    if (!kecId) return;
+    if (kecId === LAIN) return desaManual(p);
+    await isiLevel(p, "desa", "villages/" + kecId + ".json", "-- pilih desa/kelurahan --", true);
+  }
+
+  function desaManual(p) {
+    const sel = $(p + "_desa");
+    sel.innerHTML = `<option value="${LAIN}">Lainnya (ketik manual)</option>`;
+    sel.value = LAIN;
+    sel.disabled = true;
+    $(p + "_desa_lain").classList.remove("d-none");
+  }
+
+  // Memuat seluruh rantai dari provinsi, dengan default Banten > Tangerang Selatan
   async function initWilayah(p) {
-    const prov = $(p + "_prov");
-    try {
-      const list = await ambil("provinces.json");
-      prov.innerHTML = opsiDaftar(list, KOSONG.prov);
-      prov.disabled = false;
-    } catch (e) {
-      return manualDari(p, "prov");
-    }
-
-    pasangHandler(p);
-    prov.value = DEF_PROV;
-    await isiAnak(p, "prov", DEF_PROV);
-
-    const kota = $(p + "_kota");
-    if (kota.querySelector(`option[value="${DEF_KOTA}"]`)) {
-      kota.value = DEF_KOTA;
-      await isiAnak(p, "kota", DEF_KOTA);
+    setErr(p, false);
+    const ok = await isiLevel(p, "prov", "provinces.json", "-- pilih provinsi --", false);
+    if (!ok) return;
+    $(p + "_prov").value = DEF_PROV;
+    await muatKota(p, DEF_PROV);
+    if ($(p + "_kota").querySelector(`option[value="${DEF_KOTA}"]`)) {
+      $(p + "_kota").value = DEF_KOTA;
+      await muatKec(p, DEF_KOTA);
     }
   }
 
-  // Nama wilayah yang dipilih, atau isian manual
-  function namaTerpilih(p, lv) {
-    const sel = $(p + "_" + lv);
-    if (sel.value === LAIN) return val(p + "_" + lv + "_lain");
-    if (!sel.value) return "";
-    return sel.selectedOptions[0].textContent.trim();
+  function pasangWilayah(p) {
+    $(p + "_retry").onclick = e => { e.preventDefault(); initWilayah(p); };
+    $(p + "_prov").onchange = () => muatKota(p, $(p + "_prov").value);
+    $(p + "_kota").onchange = () => muatKec(p, $(p + "_kota").value);
+    $(p + "_kec").onchange = () => {
+      const v = $(p + "_kec").value;
+      $(p + "_kec_lain").classList.toggle("d-none", v !== LAIN);
+      muatDesa(p, v);
+    };
+    $(p + "_desa").onchange = () =>
+      $(p + "_desa_lain").classList.toggle("d-none", $(p + "_desa").value !== LAIN);
   }
 
+  // Hanya nama kecamatan dan desa yang disimpan, dari daftar atau isian manual
   function wilayahDari(p) {
-    return Object.fromEntries(LEVEL.map(([lv]) => [lv, namaTerpilih(p, lv)]));
+    const kecSel = $(p + "_kec"), desaSel = $(p + "_desa");
+    const kec = kecSel.value === LAIN ? val(p + "_kec_lain")
+      : (kecSel.value ? kecSel.selectedOptions[0].textContent.trim() : "");
+    const desa = desaSel.value === LAIN ? val(p + "_desa_lain")
+      : (desaSel.value ? desaSel.selectedOptions[0].textContent.trim() : "");
+    return { kec, desa };
   }
 
   function atursama() {
@@ -356,6 +390,8 @@
 
     $("domWil").innerHTML = blokWilayah("dom");
     $("kkWil").innerHTML = blokWilayah("kk");
+    pasangWilayah("dom");
+    pasangWilayah("kk");
     initWilayah("dom");
     initWilayah("kk");
 
@@ -386,15 +422,11 @@
     if (!hpIbu) return pesan("Nomor HP ibu tidak valid. Contoh: 081234567890");
 
     const dom = wilayahDari("dom");
-    if (!dom.prov || !dom.kota || !dom.kec || !dom.desa) {
-      return pesan("Lengkapi provinsi, kota/kabupaten, kecamatan, dan desa/kelurahan domisili.");
-    }
+    if (!dom.kec || !dom.desa) return pesan("Pilih kecamatan dan desa/kelurahan domisili.");
 
     const sama = $("sama").value === "ya";
     const kk = sama ? null : wilayahDari("kk");
-    if (kk && (!kk.prov || !kk.kota || !kk.kec || !kk.desa)) {
-      return pesan("Lengkapi provinsi, kota/kabupaten, kecamatan, dan desa/kelurahan sesuai KK.");
-    }
+    if (kk && (!kk.kec || !kk.desa)) return pesan("Pilih kecamatan dan desa/kelurahan sesuai KK.");
 
     const f = $("bukti").files[0];
     const errBerkas = cekBerkas(f);
