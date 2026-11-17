@@ -23,6 +23,7 @@
   .btn-hitam:hover { background: #333; color: var(--kuning); }
   .kode-box { font-size: 30px; letter-spacing: 6px; font-weight: 800; background: #fff; border: 2px dashed var(--kuning); border-radius: 10px; padding: 14px; text-align: center; }
   .bagian { font-weight: 700; color: var(--hitam); border-bottom: 1px solid #ddd; margin: 14px 0 10px; padding-bottom: 4px; }
+  .biaya { background: #fff8e1; border: 1px solid var(--kuning); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
   .honeypot { position: absolute; left: -9999px; }
 </style>
 </head>
@@ -41,15 +42,29 @@
 
   <div id="sukses" class="card d-none">
     <div class="card-body text-center">
-      <h4 class="font-weight-bold mb-2">Alhamdulillah, pendaftaran diterima</h4>
-      <p class="text-muted mb-3">Simpan nomor pendaftaran ini. Anda membutuhkannya untuk melengkapi data setelah wawancara.</p>
+      <div id="okMsg">
+        <h4 class="font-weight-bold mb-2">Alhamdulillah, pendaftaran diterima</h4>
+        <p class="text-muted mb-3">Simpan nomor pendaftaran ini. Anda membutuhkannya untuk melengkapi data setelah wawancara.</p>
+      </div>
       <div class="kode-box" id="kodeHasil"></div>
       <button class="btn btn-sm btn-hitam mt-3" id="btnSalin"><i class="fas fa-copy"></i> Salin nomor</button>
-      <hr>
-      <p class="small text-muted mb-2">Bergabunglah dengan grup calon wali santri untuk informasi selanjutnya.</p>
-      <a href="https://chat.whatsapp.com/FZ7S0GTAfRPAkJ9SExOLv5" target="_blank" class="btn btn-kuning btn-block">
-        <i class="fab fa-whatsapp"></i> Gabung Group Calon Wali Santri
-      </a>
+
+      <div id="retryBox" class="d-none text-left mt-3">
+        <div class="alert alert-warning">
+          Data pendaftaran sudah tersimpan, tetapi bukti pembayaran belum terunggah. Unggah ulang bukti di bawah ini.
+        </div>
+        <input type="file" id="buktiUlang" class="form-control-file mb-2" accept="image/jpeg,image/png,application/pdf">
+        <button class="btn btn-kuning btn-block" id="btnUlang"><i class="fas fa-upload"></i> Unggah Bukti</button>
+        <div id="pesanUlang" class="mt-2 text-danger font-weight-bold"></div>
+      </div>
+
+      <div id="grupBox">
+        <hr>
+        <p class="small text-muted mb-2">Bergabunglah dengan grup calon wali santri untuk informasi selanjutnya.</p>
+        <a href="https://chat.whatsapp.com/FZ7S0GTAfRPAkJ9SExOLv5" target="_blank" class="btn btn-kuning btn-block">
+          <i class="fab fa-whatsapp"></i> Gabung Group Calon Wali Santri
+        </a>
+      </div>
     </div>
   </div>
 
@@ -106,6 +121,19 @@
           <input id="hp_ayah" type="tel" class="form-control" placeholder="Contoh: 081234567890" required></div>
       </div>
 
+      <div class="bagian">Biaya dan Bukti Pembayaran</div>
+      <div class="biaya">
+        <div class="font-weight-bold">Biaya pendaftaran: Rp 100.000</div>
+        <div class="small">
+          Transfer ke <b>BSI</b> nomor <b>712 680 3731</b> a.n. <b>Kalam Qalbu</b>.
+          Unggah bukti transfer di bawah ini.
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="small mb-1">Bukti transfer * (JPG, PNG, atau PDF, maks. 2 MB)</label>
+        <input type="file" id="bukti" class="form-control-file" accept="image/jpeg,image/png,application/pdf" required>
+      </div>
+
       <button type="submit" class="btn btn-kuning btn-block mt-2" id="btnKirim">
         <i class="fas fa-paper-plane"></i> Kirim Pendaftaran
       </button>
@@ -121,8 +149,10 @@
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
   });
 
+  const TIPE = { "application/pdf": "pdf", "image/jpeg": "jpg", "image/png": "png" };
+  const MAKS_BYTE = 2 * 1024 * 1024;
+
   const $ = id => document.getElementById(id);
-  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
   const upper = s => (s || "").trim().toUpperCase();
   const titleCase = s => (s || "").trim().toLowerCase().replace(/(^|\s)\S/g, m => m.toUpperCase());
   const cleanNik = s => (s || "").replace(/\s/g, "");
@@ -134,11 +164,32 @@
     return /^62[0-9]{8,13}$/.test(b) ? b : null;
   }
 
+  function cekBerkas(f) {
+    if (!f) return "Unggah bukti transfer terlebih dahulu.";
+    if (!TIPE[f.type]) return "Bukti transfer harus berupa JPG, PNG, atau PDF.";
+    if (f.size > MAKS_BYTE) return "Ukuran bukti transfer maksimal 2 MB.";
+    return null;
+  }
+
   function pesan(teks) {
     const el = $("pesan");
     el.textContent = teks;
     el.className = "mt-2 text-danger font-weight-bold";
   }
+
+  // Berkas diunggah setelah data tersimpan, lalu dikaitkan dengan calon
+  async function unggahBukti(nik, kode, f) {
+    const path = kode + "/bukti-" + Date.now() + "." + TIPE[f.type];
+    const { error: e1 } = await sb.storage.from("bukti-bayar")
+      .upload(path, f, { contentType: f.type, upsert: false });
+    if (e1) return "Gagal mengunggah bukti: " + e1.message;
+
+    const { error: e2 } = await sb.rpc("simpan_bukti_bayar", { p_nik: nik, p_kode: kode, p_path: path });
+    if (e2) return e2.message;
+    return null;
+  }
+
+  let pending = null;
 
   async function init() {
     const [b, t] = await Promise.all([sb.rpc("pendaftaran_buka"), sb.rpc("tahun_pendaftaran")]);
@@ -158,6 +209,10 @@
 
     const nik = cleanNik($("nik").value);
     if (!/^\d{16}$/.test(nik)) return pesan("NIK harus 16 digit angka.");
+
+    const f = $("bukti").files[0];
+    const errBerkas = cekBerkas(f);
+    if (errBerkas) return pesan(errBerkas);
 
     const hpIbu = normHp($("hp_ibu").value);
     const hpAyah = normHp($("hp_ayah").value);
@@ -184,16 +239,44 @@
     };
 
     $("btnKirim").disabled = true;
-    const { data, error } = await sb.rpc("daftar_umum", { p: payload });
+    const { data: kode, error } = await sb.rpc("daftar_umum", { p: payload });
+    if (error) {
+      $("btnKirim").disabled = false;
+      return pesan(error.message);
+    }
+
+    const gagalUnggah = await unggahBukti(nik, kode, f);
     $("btnKirim").disabled = false;
 
-    if (error) return pesan(error.message);
-
-    $("kodeHasil").textContent = data;
+    $("kodeHasil").textContent = kode;
+    pending = { nik, kode };
     $("formT1").classList.add("d-none");
     $("sukses").classList.remove("d-none");
+
+    if (gagalUnggah) {
+      $("okMsg").classList.add("d-none");
+      $("retryBox").classList.remove("d-none");
+      $("pesanUlang").textContent = gagalUnggah;
+    }
     window.scrollTo(0, 0);
   });
+
+  $("btnUlang").onclick = async () => {
+    $("pesanUlang").textContent = "";
+    const f = $("buktiUlang").files[0];
+    const err = cekBerkas(f);
+    if (err) return $("pesanUlang").textContent = err;
+
+    $("btnUlang").disabled = true;
+    const gagalUnggah = await unggahBukti(pending.nik, pending.kode, f);
+    $("btnUlang").disabled = false;
+
+    if (gagalUnggah) return $("pesanUlang").textContent = gagalUnggah;
+
+    $("retryBox").classList.add("d-none");
+    $("okMsg").classList.remove("d-none");
+    window.scrollTo(0, 0);
+  };
 
   $("btnSalin").onclick = () => {
     navigator.clipboard.writeText($("kodeHasil").textContent);
