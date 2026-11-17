@@ -106,18 +106,6 @@
           <input id="hp_ayah" type="tel" class="form-control" placeholder="08xxxxxxxxxx" required></div>
       </div>
 
-      <div class="bagian">Pendaftaran</div>
-      <div class="form-row">
-        <div class="col-md-6 form-group"><label class="small mb-1">Mendaftar untuk tingkat *</label>
-          <select id="tingkat_masuk" class="form-control" required></select></div>
-        <div class="col-md-6 form-group"><label class="small mb-1">Jenis pendaftaran *</label>
-          <select id="jenis_pendaftaran" class="form-control" required>
-            <option value="">-- pilih --</option>
-            <option value="Siswa Baru">Siswa Baru</option>
-            <option value="Pindahan">Pindahan</option>
-          </select></div>
-      </div>
-
       <button type="submit" class="btn btn-kuning btn-block mt-2" id="btnKirim">
         <i class="fas fa-paper-plane"></i> Kirim Pendaftaran
       </button>
@@ -132,8 +120,6 @@
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
   });
-
-  const TINGKAT = ["Kuttab Awal 1","Kuttab Awal 2","Kuttab Awal 3","Kuttab Qonuni 1","Kuttab Qonuni 2","Kuttab Qonuni 3","Kuttab Qonuni 4"];
 
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
@@ -155,9 +141,6 @@
   }
 
   async function init() {
-    $("tingkat_masuk").innerHTML = `<option value="">-- pilih --</option>` +
-      TINGKAT.map((t, i) => `<option value="${i}">${esc(t)}</option>`).join("");
-
     const [b, t] = await Promise.all([sb.rpc("pendaftaran_buka"), sb.rpc("tahun_pendaftaran")]);
     if (t.data) $("tahunLabel").textContent = "Tahun ajaran " + t.data.replace("-", "/");
     if (!(b.data === true && t.data)) {
@@ -197,9 +180,7 @@
       nama_ibu: upper($("nama_ibu").value),
       hp_ibu: hpIbu,
       nama_ayah: upper($("nama_ayah").value),
-      hp_ayah: hpAyah,
-      tingkat_masuk: $("tingkat_masuk").value,
-      jenis_pendaftaran: $("jenis_pendaftaran").value
+      hp_ayah: hpAyah
     };
 
     $("btnKirim").disabled = true;
