@@ -15,6 +15,9 @@
   .total-box { font-size: 18px; }
   .badge-skor { background: #1a1a1a; color: #f2c94c; font-size: 13px; }
   .jenis-tag { font-size: 12px; }
+  .nav-tabs .nav-link { color: #1a1a1a; }
+  .nav-tabs .nav-link.active { background: #f2c94c; border-color: #d4a52a; color: #1a1a1a; font-weight: 600; }
+  .hasil-iman { background: #fff; border: 1px dashed #f2c94c; border-radius: 6px; padding: 10px; font-size: 15px; }
 </style>
 </head>
 <body class="hold-transition sidebar-mini">
@@ -38,10 +41,12 @@
       }
 
       const $ = id => document.getElementById(id);
+      const f2 = v => Number(v).toFixed(2);
 
-      // Mapel yang dinilai dengan form aspek (fashohah, tajwid, kelancaran).
-      // Kitabah tidak termasuk karena hanya punya satu nilai akhir.
+      // Tahfidz dan tilawah: form aspek (fashohah, tajwid, kelancaran)
       const KODE_ASPEK = ["tahfidz", "tilawah"];
+      // Iman: tertulis (PG, isian, essay) dan lisan (5 soal), nilai akhir = rata-rata
+      const KODE_IMAN = "iman";
 
       const aturanUas = t => t <= 1
         ? { pgBobot: 5, isi: 5, isiMax: 10, essay: 0, essayMax: 0,
@@ -61,7 +66,6 @@
       const rombelMap = new Map(rb.data.map(r => [r.id, r]));
       const mapelUas = new Set((bn.data || []).filter(b => b.komponen && b.komponen.kode === "uas").map(b => b.mapel_id));
 
-      // Mapel yang bisa dinilai: mapel dengan komponen UAS, atau Tahfidz/Tilawah
       const penugasan = (pm.data || []).filter(x =>
         x.mapel && rombelMap.has(x.rombel_id) &&
         (me.peran === "admin" || x.pegawai_id === me.id) &&
@@ -100,7 +104,8 @@
           </div>
         </div>`;
 
-      let rombelId = null, mapel = null, santriList = [], nilaiMap = {}, curId = null;
+      let rombelId = null, mapel = null, santriList = [];
+      let nilaiMap = {}, lisanMap = {}, curId = null, tabIman = "tulis";
 
       $("rombel").innerHTML = rombelOpts.map(r => `<option value="${r.id}">${esc(r.nama)}</option>`).join("");
       $("rombel").onchange = () => { isiMapel(); muatKelas(); };
@@ -113,7 +118,7 @@
         $("mapel").innerHTML = list.map(m => `<option value="${m.id}" data-kode="${m.kode}">${esc(m.nama)}</option>`).join("");
       }
 
-      const jenisDari = m => KODE_ASPEK.includes(m.kode) ? "aspek" : "uas";
+      const jenisDari = m => KODE_ASPEK.includes(m.kode) ? "aspek" : (m.kode === KODE_IMAN ? "iman" : "uas");
 
       async function muatKelas() {
         rombelId = Number($("rombel").value);
@@ -122,31 +127,54 @@
         mapel = { id: Number(opt.value), kode: opt.dataset.kode };
         mapel.jenis = jenisDari(mapel);
 
-        $("jenisInfo").innerHTML = mapel.jenis === "aspek"
-          ? '<span class="badge badge-warning jenis-tag">UAS</span> Isi fashohah, tajwid, dan kelancaran. Hasilnya masuk ke komponen UAS.'
-          : '<span class="badge badge-dark jenis-tag">UAS</span> Isi PG, isian, dan essay. Hasilnya masuk ke komponen UAS.';
+        if (mapel.jenis === "aspek") {
+          $("jenisInfo").innerHTML = '<span class="badge badge-dark jenis-tag">UAS</span> Isi fashohah, tajwid, dan kelancaran. Hasilnya masuk ke komponen UAS.';
+        } else if (mapel.jenis === "iman") {
+          $("jenisInfo").innerHTML = '<span class="badge badge-dark jenis-tag">UAS Iman</span> Isi nilai tertulis dan lisan. Nilai UAS adalah rata-rata keduanya.';
+        } else {
+          $("jenisInfo").innerHTML = '<span class="badge badge-dark jenis-tag">UAS</span> Isi PG, isian, dan essay. Hasilnya masuk ke komponen UAS.';
+        }
 
         $("daftar").innerHTML = '<div class="p-3 text-muted">Memuat...</div>';
 
-        const [kr, nl] = await Promise.all([
+        const [kr, nl, ll] = await Promise.all([
           sb.from("keanggotaan_rombel").select("santri:santri_id(id, nis, nama_lengkap, tingkat_sekarang)")
             .eq("rombel_id", rombelId).eq("tahun_ajaran_id", sem.tahun_ajaran_id),
           mapel.jenis === "aspek"
             ? sb.from("penilaian_aspek").select("santri_id, fashohah, tajwid, kelancaran, jilid, skor")
                 .eq("semester_id", sem.id).eq("mapel_id", mapel.id)
             : sb.from("uas_koreksi").select("santri_id, pg_benar, isian, essay, skor")
+                .eq("semester_id", sem.id).eq("mapel_id", mapel.id),
+          mapel.jenis === "iman"
+            ? sb.from("uas_lisan").select("santri_id, soal, skor")
                 .eq("semester_id", sem.id).eq("mapel_id", mapel.id)
+            : Promise.resolve({ data: [] })
         ]);
         if (kr.error) return gagal(kr.error);
         if (nl.error) return gagal(nl.error);
+        if (ll.error) return gagal(ll.error);
 
         santriList = (kr.data || []).map(x => x.santri).filter(Boolean)
           .sort((a, b) => a.nama_lengkap.localeCompare(b.nama_lengkap));
+
         nilaiMap = {};
         (nl.data || []).forEach(u => nilaiMap[u.santri_id] = u);
+        lisanMap = {};
+        (ll.data || []).forEach(u => lisanMap[u.santri_id] = u);
+
         curId = null;
         renderDaftar();
         kosongkanForm();
+      }
+
+      // Skor yang tampil di daftar. Untuk Iman, hanya muncul jika tertulis dan lisan sudah terisi.
+      function skorTampil(id) {
+        if (mapel.jenis === "iman") {
+          const t = nilaiMap[id] ? nilaiMap[id].skor : null;
+          const l = lisanMap[id] ? lisanMap[id].skor : null;
+          return (t != null && l != null) ? f2((Number(t) + Number(l)) / 2) : null;
+        }
+        return nilaiMap[id] ? f2(nilaiMap[id].skor) : null;
       }
 
       function renderDaftar() {
@@ -154,15 +182,15 @@
           $("daftar").innerHTML = '<div class="p-3 text-muted">Belum ada santri di kelas ini.</div>';
           return;
         }
-        const sudah = santriList.filter(s => nilaiMap[s.id]).length;
+        const sudah = santriList.filter(s => skorTampil(s.id) !== null).length;
         $("daftar").innerHTML = `
           <div class="px-3 pt-2 small text-muted">${sudah} dari ${santriList.length} santri sudah dinilai</div>
           <div class="list-group list-group-flush">
             ${santriList.map((s, i) => {
-              const n = nilaiMap[s.id];
+              const skor = skorTampil(s.id);
               return `<button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center ${s.id === curId ? "aktif" : ""}" data-id="${s.id}">
                 <span>${i + 1}. ${esc(s.nama_lengkap)}<br><small class="text-muted">${esc(s.nis || "-")}</small></span>
-                ${n ? `<span class="badge badge-skor">${Number(n.skor).toFixed(2)}</span>`
+                ${skor !== null ? `<span class="badge badge-skor">${skor}</span>`
                     : '<span class="badge badge-light border">belum</span>'}
               </button>`;
             }).join("")}
@@ -180,10 +208,17 @@
         const s = santriList.find(x => x.id === id);
         if (!s) return kosongkanForm();
         if (mapel.jenis === "aspek") return formAspek(s);
+        if (mapel.jenis === "iman") return formIman(s, tabIman);
         return formUas(s);
       }
 
-      // ===== FORM UAS (PG, isian, essay) =====
+      const angkaDalam = (v, maks) => {
+        const n = Number(v);
+        if (v === "" || !Number.isFinite(n) || n < 0 || n > maks) return null;
+        return n;
+      };
+
+      // ===== FORM UAS BIASA (PG, isian, essay) =====
       function formUas(s) {
         const a = aturanUas(s.tingkat_sekarang);
         const u = nilaiMap[s.id] || {};
@@ -197,7 +232,19 @@
           </div>
           <div class="card-body">
             <div class="aturan-box mb-3">${esc(a.label)}</div>
+            ${bagianTertulis(a, u, isian, essay)}
+            <button class="btn btn-kuning" id="uSimpan"><i class="fas fa-save"></i> Simpan skor UAS</button>
+          </div>`;
 
+        const hitung = () => hitungTertulis(a);
+        document.querySelectorAll("#form input").forEach(i => i.oninput = hitung);
+        hitung();
+        $("uSimpan").onclick = () => simpanUas(s, a);
+      }
+
+      // Bagian input tertulis (dipakai untuk UAS biasa dan Iman)
+      function bagianTertulis(a, u, isian, essay) {
+        return `
             <div class="form-group">
               <label class="font-weight-bold">Pilihan ganda: jumlah benar (0–10)</label>
               <div class="input-group" style="max-width:240px">
@@ -229,26 +276,16 @@
               </div>
             </div>` : ""}
 
-            <div class="total-box mb-3">Total skor: <strong id="uTotal">0.00</strong> / 100</div>
-            <button class="btn btn-kuning" id="uSimpan"><i class="fas fa-save"></i> Simpan skor UAS</button>
-          </div>`;
-
-        const hitung = () => {
-          const pg = Number($("uPg").value) || 0;
-          const isiSum = [...document.querySelectorAll(".uIsi")].reduce((t, x) => t + (Number(x.value) || 0), 0);
-          const esSum = [...document.querySelectorAll(".uEssay")].reduce((t, x) => t + (Number(x.value) || 0), 0);
-          $("uTotal").textContent = (pg * a.pgBobot + isiSum + esSum).toFixed(2);
-        };
-        document.querySelectorAll("#form input").forEach(i => i.oninput = hitung);
-        hitung();
-        $("uSimpan").onclick = () => simpanUas(s, a);
+            <div class="total-box mb-3">Total skor: <strong id="uTotal">0.00</strong> / 100</div>`;
       }
 
-      const angkaDalam = (v, maks) => {
-        const n = Number(v);
-        if (v === "" || !Number.isFinite(n) || n < 0 || n > maks) return null;
-        return n;
-      };
+      function hitungTertulis(a) {
+        const pg = Number(document.getElementById("uPg") ? document.getElementById("uPg").value : 0) || 0;
+        const isiSum = [...document.querySelectorAll(".uIsi")].reduce((t, x) => t + (Number(x.value) || 0), 0);
+        const esSum = [...document.querySelectorAll(".uEssay")].reduce((t, x) => t + (Number(x.value) || 0), 0);
+        const el = document.getElementById("uTotal");
+        if (el) el.textContent = (pg * a.pgBobot + isiSum + esSum).toFixed(2);
+      }
 
       async function simpanUas(s, a) {
         document.querySelectorAll("#form input").forEach(i => i.classList.remove("is-invalid"));
@@ -287,13 +324,122 @@
         if (error) return gagal(error);
 
         nilaiMap[s.id] = { santri_id: s.id, pg_benar: pgN, isian, essay, skor: total };
-        toast("Skor UAS " + s.nama_lengkap + ": " + total.toFixed(2) + " tersimpan.");
+        toast("Skor tertulis " + s.nama_lengkap + ": " + total.toFixed(2) + " tersimpan.");
+        pilihSantri(s.id);
+      }
+
+      // ===== FORM IMAN (TERTULIS + LISAN) =====
+      function formIman(s, tab) {
+        tabIman = tab || "tulis";
+        const a = aturanUas(s.tingkat_sekarang);
+        const u = nilaiMap[s.id] || {};
+        const l = lisanMap[s.id] || {};
+        const isian = Array.isArray(u.isian) ? u.isian : [];
+        const essay = Array.isArray(u.essay) ? u.essay : [];
+        const soal = Array.isArray(l.soal) ? l.soal : [];
+
+        $("form").innerHTML = `
+          <div class="card-header">
+            <strong>${esc(s.nama_lengkap)}</strong>
+            <span class="text-muted small ml-2">NIS ${esc(s.nis || "-")}</span>
+          </div>
+          <div class="card-body">
+            <ul class="nav nav-tabs mb-3">
+              <li class="nav-item"><a class="nav-link" href="#" data-itab="tulis">Tertulis</a></li>
+              <li class="nav-item"><a class="nav-link" href="#" data-itab="lisan">Lisan</a></li>
+            </ul>
+
+            <div id="paneTulis">
+              <div class="aturan-box mb-3">${esc(a.label)}</div>
+              ${bagianTertulis(a, u, isian, essay)}
+              <button class="btn btn-kuning" id="uSimpan"><i class="fas fa-save"></i> Simpan tertulis</button>
+            </div>
+
+            <div id="paneLisan" style="display:none">
+              <div class="aturan-box mb-3">5 soal, masing-masing 0 sampai 20. Total 100.</div>
+              <div class="form-row">
+                ${Array.from({ length: 5 }, (_, i) => `
+                  <div class="col-6 col-md-4 mb-2">
+                    <small class="text-muted">Soal ${i + 1}</small>
+                    <input type="number" class="form-control lSoal" min="0" max="20" step="0.5" value="${soal[i] ?? ""}">
+                  </div>`).join("")}
+              </div>
+              <div class="total-box mb-3">Total skor lisan: <strong id="lTotal">0.00</strong> / 100</div>
+              <button class="btn btn-kuning" id="lSimpan"><i class="fas fa-save"></i> Simpan lisan</button>
+            </div>
+
+            <div class="hasil-iman mt-4" id="hasilIman"></div>
+          </div>`;
+
+        const pilih = nama => {
+          tabIman = nama;
+          document.querySelectorAll("[data-itab]").forEach(x => x.classList.toggle("active", x.dataset.itab === nama));
+          $("paneTulis").style.display = nama === "tulis" ? "" : "none";
+          $("paneLisan").style.display = nama === "lisan" ? "" : "none";
+        };
+        document.querySelectorAll("[data-itab]").forEach(x => x.onclick = e => {
+          e.preventDefault();
+          pilih(x.dataset.itab);
+        });
+        pilih(tabIman);
+
+        const hitungLisan = () => {
+          const sum = [...document.querySelectorAll(".lSoal")].reduce((t, x) => t + (Number(x.value) || 0), 0);
+          $("lTotal").textContent = sum.toFixed(2);
+        };
+        const hitungT = () => hitungTertulis(a);
+
+        document.querySelectorAll("#paneTulis input").forEach(i => i.oninput = hitungT);
+        document.querySelectorAll(".lSoal").forEach(i => i.oninput = hitungLisan);
+        hitungT();
+        hitungLisan();
+
+        $("uSimpan").onclick = () => simpanUas(s, a);
+        $("lSimpan").onclick = () => simpanLisan(s);
+        $("hasilIman").innerHTML = hasilIman(s.id);
+      }
+
+      function hasilIman(id) {
+        const t = nilaiMap[id] ? nilaiMap[id].skor : null;
+        const l = lisanMap[id] ? lisanMap[id].skor : null;
+        const tTxt = t == null ? "belum" : f2(t);
+        const lTxt = l == null ? "belum" : f2(l);
+        if (t == null || l == null) {
+          return `Tertulis: <strong>${tTxt}</strong> &middot; Lisan: <strong>${lTxt}</strong><br>
+            <small class="text-muted">Nilai UAS iman dihitung setelah tertulis dan lisan sama-sama terisi.</small>`;
+        }
+        return `Tertulis: <strong>${f2(t)}</strong> &middot; Lisan: <strong>${f2(l)}</strong><br>
+          Nilai UAS iman = (${f2(t)} + ${f2(l)}) ÷ 2 = <strong>${f2((Number(t) + Number(l)) / 2)}</strong>`;
+      }
+
+      async function simpanLisan(s) {
+        const els = [...document.querySelectorAll(".lSoal")];
+        els.forEach(i => i.classList.remove("is-invalid"));
+
+        const soal = els.map(x => angkaDalam(x.value.trim(), 20));
+        if (soal.some(v => v === null)) {
+          els.forEach((x, i) => { if (soal[i] === null) x.classList.add("is-invalid"); });
+          return peringatan("Isi semua soal lisan dengan angka 0 sampai 20. Isi 0 jika salah.");
+        }
+
+        const total = soal.reduce((t, v) => t + v, 0);
+
+        const btn = $("lSimpan");
+        btn.disabled = true;
+        const { error } = await sb.from("uas_lisan").upsert({
+          santri_id: s.id, semester_id: sem.id, mapel_id: mapel.id,
+          soal, diisi_oleh: me.id, updated_at: new Date().toISOString()
+        }, { onConflict: "santri_id,semester_id,mapel_id" });
+        btn.disabled = false;
+        if (error) return gagal(error);
+
+        lisanMap[s.id] = { santri_id: s.id, soal, skor: total };
+        toast("Skor lisan " + s.nama_lengkap + ": " + total.toFixed(2) + " tersimpan.");
         pilihSantri(s.id);
       }
 
       // ===== FORM ASPEK (TAHFIDZ / TILAWAH) =====
       async function formAspek(s) {
-        // Jilid tilawah diambil dari jurnal tilawati terakhir
         let jilid = null;
         if (mapel.kode === "tilawah") {
           const { data, error } = await sb.rpc("jilid_tilawah_terakhir", { p_santri: s.id });
