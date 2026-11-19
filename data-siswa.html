@@ -28,6 +28,7 @@
 <script src="https://cdn.jsdelivr.net/npm/admin-lte@3.2.0/dist/js/adminlte.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="ui.js"></script>
+<script src="ekspor.js"></script>
 
 <script>
   const esc = KUTTAB.esc;
@@ -218,9 +219,15 @@
             </div>
             <div class="col-4"><button class="btn btn-kuning" id="dTampil"><i class="fas fa-search"></i> Tampilkan</button></div>
           </div>`;
-        panel("daftar").innerHTML = pilihKelas +
-          `<p class="text-muted small mb-2" id="dInfo"></p><div class="tabel-wrap" id="dTabel"></div>`;
-
+                panel("daftar").innerHTML = pilihKelas +
+          `<div class="d-flex justify-content-between align-items-center mb-2">
+             <p class="text-muted small mb-0" id="dInfo"></p>
+             <button class="btn btn-sm btn-outline-dark" onclick="EKSPOR.unduh('Daftar Santri', document.querySelector('#dTabel table'), 'daftar-santri')">
+               <i class="fas fa-file-export"></i> Ekspor
+             </button>
+           </div>
+           <div class="tabel-wrap" id="dTabel"></div>`;
+        
         if (!staf) {
           if (!rombelTampil.length) {
             document.getElementById("dTabel").innerHTML = '<p class="text-muted">Anda belum punya kelas di tahun ajaran ini.</p>';
