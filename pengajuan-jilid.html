@@ -4,378 +4,454 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pengajuan Ujian Jilid - Kuttab Al-Kalam</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.4/css/all.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2.0/dist/css/adminlte.min.css">
+<link rel="stylesheet" href="ui.css">
 <style>
-  * { box-sizing: border-box; }
-  body { font-family: Arial, sans-serif; font-size: 15px; margin: 0; padding-bottom: 30px; background: #f7f7f7; color: #111; }
-  header { background: #222; color: #f2c94c; padding: 12px 16px; }
-  header a { color: #f2c94c; text-decoration: none; }
-  main { max-width: 720px; margin: 0 auto; padding: 12px; }
-  .tabs { display: flex; gap: 6px; margin-bottom: 12px; }
-  .tabs button { flex: 1; padding: 10px; border: 1px solid #bbb; background: #fff; border-radius: 6px; font-size: 14px; }
-  .tabs button.aktif { background: #f2c94c; border-color: #d4a52a; font-weight: bold; }
-  .tabs button[hidden] { display: none; }
-  .panel { display: none; }
-  .panel.aktif { display: block; }
-  .box { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
-  label { display: block; font-size: 13px; color: #444; margin-bottom: 10px; }
-  select, input, textarea { width: 100%; padding: 9px; font-size: 15px; border: 1px solid #bbb; border-radius: 6px; margin-top: 4px; font-family: inherit; }
-  .btn { padding: 11px; font-size: 15px; border: none; border-radius: 6px; background: #28a745; color: #fff; width: 100%; }
-  .btn.kecil { width: auto; padding: 8px 12px; margin: 4px 4px 0 0; font-size: 14px; }
-  .btn.merah { background: #dc3545; }
-  .btn:disabled { background: #aaa; }
-  .kartu { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
-  .kartu .judul { font-weight: bold; font-size: 16px; }
-  .kartu .detail { font-size: 14px; color: #444; margin-top: 3px; }
-  .kartu .form { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #ccc; }
-  .status { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 10px; background: #eee; }
-  .status.Diajukan { background: #f0ad4e; color: #fff; }
-  .status.Dijadwalkan { background: #2a6fdb; color: #fff; }
-  .status.Lulus { background: #28a745; color: #fff; }
-  .status.BelumLulus { background: #dc3545; color: #fff; }
-  .status.Dibatalkan { background: #888; color: #fff; }
-  .baris { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
-  .baris input[type=checkbox] { width: auto; margin: 0; }
-  .muted { color: #666; font-size: 13px; }
-  #pesan { font-weight: bold; min-height: 20px; margin: 8px 0; }
+  .nav-tabs .nav-link { color: #1a1a1a; }
+  .nav-tabs .nav-link.active { background: #f2c94c; border-color: #d4a52a; color: #1a1a1a; font-weight: 600; }
+  .st-Diajukan { background: #f0ad4e; color: #fff; }
+  .st-Dijadwalkan { background: #2a6fdb; color: #fff; }
+  .st-Lulus { background: #28a745; color: #fff; }
+  .st-BelumLulus { background: #dc3545; color: #fff; }
+  .st-Ditolak { background: #6f42c1; color: #fff; }
+  .st-Dibatalkan { background: #888; color: #fff; }
+  .kartu-pengajuan { border-left: 4px solid #f2c94c; }
 </style>
 </head>
-<body>
-<header><a href="dashboard.html">← Dashboard</a> &nbsp; <strong>Pengajuan Ujian Kenaikan Jilid</strong></header>
+<body class="hold-transition sidebar-mini">
 
-<main>
-  <p class="muted" id="info"></p>
-  <div class="tabs">
-    <button id="tAjukan" class="aktif">Ajukan</button>
-    <button id="tDaftar">Daftar</button>
-    <button id="tPenguji">Penguji</button>
-  </div>
-  <p id="pesan"></p>
-
-  <section class="panel aktif" id="pAjukan">
-    <div class="box">
-      <label>Kelas <select id="aRombel"></select></label>
-      <label>Santri <select id="aSantri"></select></label>
-      <label>Jenis
-        <select id="aJenis">
-          <option value="Tilawati">Tilawati</option>
-          <option value="Quran">Quran</option>
-        </select>
-      </label>
-      <label>Jilid / Juz <select id="aJilid"></select></label>
-      <button class="btn" id="aKirim">Ajukan</button>
-    </div>
-  </section>
-
-  <section class="panel" id="pDaftar">
-    <div class="box">
-      <label>Filter status
-        <select id="fStatus">
-          <option value="">Semua</option>
-          <option value="Diajukan">Diajukan</option>
-          <option value="Dijadwalkan">Dijadwalkan</option>
-          <option value="Lulus">Lulus</option>
-          <option value="Belum Lulus">Belum Lulus</option>
-          <option value="Dibatalkan">Dibatalkan</option>
-        </select>
-      </label>
-    </div>
-    <div id="dList"></div>
-  </section>
-
-  <section class="panel" id="pPenguji">
-    <div class="box">
-      <p class="muted">Centang pegawai yang boleh ditetapkan sebagai penguji ujian jilid.</p>
-      <div id="pList"></div>
-    </div>
-  </section>
-</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/admin-lte@3.2.0/dist/js/adminlte.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="ui.js"></script>
+<script src="wa.js"></script>
 
 <script>
-  const SUPABASE_URL = "https://epynlmuqxumuwcjsrnsz.supabase.co";
-  const SUPABASE_ANON_KEY = "sb_publishable_Oq_to1zgHLnachvWYLV_yA_DoOTGI3s";
-  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-  const $ = id => document.getElementById(id);
-  const pesan = t => $("pesan").textContent = t;
-  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  const BULAN = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
-  const tglIndo = iso => { const d = new Date(iso + "T00:00:00"); return d.getDate() + " " + BULAN[d.getMonth()] + " " + d.getFullYear(); };
-  const KODE_QURAN = ["tilawah", "tahfidz", "kitabah"];
-
-  // Pilihan jilid dan juz (tetap, tidak diketik bebas)
-  const PILIHAN = {
-    Tilawati: Array.from({ length: 4 }, (_, i) => "Jilid " + (i + 1)),
-    Quran: Array.from({ length: 30 }, (_, i) => "Juz " + (i + 1))
-  };
-
-  // Slot jam ujian: 07.30 sampai 11.30, interval 30 menit
-  const JAM_UJIAN = (() => {
-    const out = [];
-    for (let m = 7 * 60 + 30; m <= 11 * 60 + 30; m += 30) {
-      const h = Math.floor(m / 60), mm = m % 60;
-      out.push(String(h).padStart(2, "0") + ":" + String(mm).padStart(2, "0"));
-    }
-    return out;
-  })();
-
-  const STATUS_KELAS = { "Diajukan": "Diajukan", "Dijadwalkan": "Dijadwalkan", "Lulus": "Lulus", "Belum Lulus": "BelumLulus", "Dibatalkan": "Dibatalkan" };
-
-  let me = null, sem = null, rombelAll = [], rombelQuran = [];
-  let rows = [], penguji = [];
-
-  async function init() {
-    const { data: { session } } = await sb.auth.getSession();
-    if (!session) { location.href = "login.html"; return; }
-
-    const { data: p, error: eP } = await sb.from("pegawai")
-      .select("id, nama_lengkap, peran").eq("auth_user_id", session.user.id).maybeSingle();
-    if (eP) return pesan("Gagal memuat akun: " + eP.message);
-    if (!p || !["admin","kepala","guru"].includes(p.peran)) return pesan("Halaman ini tidak tersedia untuk akun Anda.");
-    me = p;
-
-    const { data: s } = await sb.from("semester")
-      .select("id, nomor, tahun_ajaran_id, tahun_ajaran:tahun_ajaran_id(kode)")
-      .eq("aktif", true).maybeSingle();
-    if (!s) return pesan("Belum ada semester aktif.");
-    sem = s;
-    $("info").textContent = "TA " + s.tahun_ajaran.kode + " · Semester " + (s.nomor === 1 ? "Ganjil" : "Genap");
-
-    const [{ data: r }, { data: pm }] = await Promise.all([
-      sb.from("rombel").select("id, nama").eq("tahun_ajaran_id", s.tahun_ajaran_id).order("nama"),
-      sb.from("penugasan_mapel").select("rombel_id, pegawai_id, mapel:mapel_id(kode)")
-    ]);
-    rombelAll = r || [];
-    const quranSet = new Set((pm || [])
-      .filter(x => x.pegawai_id === me.id && KODE_QURAN.includes(x.mapel?.kode))
-      .map(x => x.rombel_id));
-    rombelQuran = me.peran === "admin" ? rombelAll : rombelAll.filter(x => quranSet.has(x.id));
-
-    const bisaAjukan = me.peran === "admin" || rombelQuran.length > 0;
-    $("tAjukan").hidden = !bisaAjukan;
-    $("tPenguji").hidden = me.peran !== "admin";
-
-    $("aRombel").innerHTML = rombelQuran.map(x => `<option value="${x.id}">${esc(x.nama)}</option>`).join("");
-    $("aRombel").onchange = isiSantriAjukan;
-    $("aJenis").onchange = isiJilid;
-    $("aKirim").onclick = ajukan;
-    $("fStatus").onchange = muatDaftar;
-    $("tAjukan").onclick = () => bukaTab("ajukan");
-    $("tDaftar").onclick = () => bukaTab("daftar");
-    $("tPenguji").onclick = () => bukaTab("penguji");
-
-    isiJilid();
-    await isiSantriAjukan();
-    await muatPenguji();
-    bukaTab("daftar");
-  }
-
-  function bukaTab(nama) {
-    ["ajukan", "daftar", "penguji"].forEach(n => {
-      const cap = n[0].toUpperCase() + n.slice(1);
-      $("t" + cap).classList.toggle("aktif", n === nama);
-      $("p" + cap).classList.toggle("aktif", n === nama);
-    });
-    pesan("");
-    if (nama === "daftar") muatDaftar();
-    if (nama === "penguji") muatPengujiTab();
-  }
-
-  function isiJilid() {
-    const jenis = $("aJenis").value;
-    $("aJilid").innerHTML = PILIHAN[jenis].map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join("");
-  }
-
-  // ===== AJUKAN =====
-  async function isiSantriAjukan() {
-    const rid = Number($("aRombel").value);
-    if (!rid) { $("aSantri").innerHTML = ""; return; }
-    const [{ data: kr }, { data: pend }] = await Promise.all([
-      sb.from("keanggotaan_rombel").select("santri:santri_id(id, nis, nama_lengkap)")
-        .eq("rombel_id", rid).eq("tahun_ajaran_id", sem.tahun_ajaran_id),
-      sb.from("pengajuan_jilid").select("santri_id").in("status", ["Diajukan", "Dijadwalkan"])
-    ]);
-    const sibuk = new Set((pend || []).map(x => x.santri_id));
-    const list = (kr || []).map(x => x.santri).filter(s => s && !sibuk.has(s.id))
-      .sort((a, b) => a.nama_lengkap.localeCompare(b.nama_lengkap));
-    $("aSantri").innerHTML = `<option value="">-- pilih santri --</option>` +
-      list.map(s => `<option value="${s.id}">${esc(s.nama_lengkap)} (${esc(s.nis || "-")})</option>`).join("");
-  }
-
-  async function ajukan() {
-    const sid = Number($("aSantri").value), rid = Number($("aRombel").value);
-    const jilid = $("aJilid").value, jenis = $("aJenis").value;
-    if (!sid || !rid) return pesan("Pilih kelas dan santri.");
-    if (!jilid) return pesan("Pilih jilid atau juz.");
-
-    $("aKirim").disabled = true;
-    const { error } = await sb.from("pengajuan_jilid").insert({
-      santri_id: sid, rombel_id: rid, jenis, jilid_juz: jilid,
-      pengaju_id: me.id, diubah_oleh: me.id
-    });
-    $("aKirim").disabled = false;
-    if (error) return pesan("Gagal mengajukan: " + error.message);
-
-    pesan("Pengajuan tersimpan.");
-    await isiSantriAjukan();
-    muatDaftar();
-  }
-
-  // ===== DAFTAR =====
-  async function muatPenguji() {
-    const { data } = await sb.from("penguji_jilid")
-      .select("pegawai_id, pegawai:pegawai_id(nama_lengkap)").eq("aktif", true);
-    penguji = (data || []).map(x => ({ id: x.pegawai_id, nama: x.pegawai?.nama_lengkap || "-" }));
-  }
-
-  async function muatDaftar() {
-    const status = $("fStatus").value;
-    let q = sb.from("pengajuan_jilid")
-      .select("id, santri_id, rombel_id, jenis, jilid_juz, status, tanggal_ujian, jam_ujian, tanggal_final, catatan, penguji_id, pengaju_id, updated_at, santri:santri_id(nis, nama_lengkap), rombel:rombel_id(nama), penguji:penguji_id(nama_lengkap)")
-      .order("created_at", { ascending: false });
-    if (status) q = q.eq("status", status);
-    const { data, error } = await q;
-    if (error) return pesan("Gagal memuat: " + error.message);
-    rows = data || [];
-    renderDaftar();
-  }
-
-  function aksiUntuk(p) {
-    const admin = me.peran === "admin";
-    const sayaPenguji = p.penguji_id === me.id;
-    const a = [];
-    if (admin && ["Diajukan", "Dijadwalkan"].includes(p.status))
-      a.push(["jadwal", p.status === "Diajukan" ? "Jadwalkan" : "Ubah jadwal"]);
-    if ((admin || sayaPenguji) && p.status === "Dijadwalkan") a.push(["hasil", "Isi hasil"]);
-    if (admin && p.status === "Diajukan") a.push(["batal", "Batalkan"]);
-    return a;
-  }
-
-  function renderDaftar() {
-    const box = $("dList");
-    if (!rows.length) { box.innerHTML = `<p class="muted">Belum ada pengajuan.</p>`; return; }
-    box.innerHTML = rows.map(p => {
-      const aksi = aksiUntuk(p);
-      return `<div class="kartu" data-id="${p.id}">
-        <div class="judul">${esc(p.santri?.nama_lengkap || "-")} <span class="muted">(${esc(p.santri?.nis || "-")})</span></div>
-        <div class="detail">${esc(p.rombel?.nama || "-")} · ${esc(p.jenis)} · ${esc(p.jilid_juz)}</div>
-        <div class="detail"><span class="status ${STATUS_KELAS[p.status] || ""}">${esc(p.status)}</span>
-          ${p.tanggal_ujian ? " · Ujian " + tglIndo(p.tanggal_ujian) + (p.jam_ujian ? " pukul " + p.jam_ujian.slice(0, 5) : "") : ""}</div>
-        ${p.penguji?.nama_lengkap ? `<div class="detail">Penguji: ${esc(p.penguji.nama_lengkap)}</div>` : ""}
-        ${p.tanggal_final ? `<div class="detail">Tanggal final: ${tglIndo(p.tanggal_final)}${p.catatan ? " · " + esc(p.catatan) : ""}</div>` : ""}
-        <div class="detail muted">Terakhir diubah: ${(p.updated_at || "").slice(0, 10)}</div>
-        <div>${aksi.map(([k, l]) => `<button class="btn kecil ${k === "batal" ? "merah" : ""}" data-act="${k}" data-id="${p.id}">${l}</button>`).join("")}</div>
-        <div class="form" id="form-${p.id}"></div>
-      </div>`;
-    }).join("");
-
-    box.querySelectorAll("button[data-act]").forEach(b => b.onclick = () => aksiKlik(b.dataset.act, Number(b.dataset.id)));
-  }
-
-  function aksiKlik(act, id) {
-    const p = rows.find(x => x.id === id);
-    if (!p) return;
-    if (act === "batal") return batalkan(id);
-    const box = $("form-" + id);
-
-    if (act === "jadwal") {
-      if (!penguji.length) return pesan("Belum ada penguji. Tambahkan dulu di tab Penguji.");
-      const jamTerpilih = p.jam_ujian ? p.jam_ujian.slice(0, 5) : "08:00";
-      box.innerHTML = `
-        <label>Penguji
-          <select class="penguji">${penguji.map(x => `<option value="${x.id}" ${x.id === p.penguji_id ? "selected" : ""}>${esc(x.nama)}</option>`).join("")}</select>
-        </label>
-        <label>Tanggal ujian <input type="date" class="tgl" value="${p.tanggal_ujian || ""}"></label>
-        <label>Jam ujian
-          <select class="jam">${JAM_UJIAN.map(j => `<option value="${j}" ${j === jamTerpilih ? "selected" : ""}>${j}</option>`).join("")}</select>
-        </label>
-        <button class="btn kecil" data-simpan="jadwal">Simpan jadwal</button>`;
-      box.querySelector("[data-simpan]").onclick = () => simpanJadwal(id);
-    }
-
-    if (act === "hasil") {
-      box.innerHTML = `
-        <label>Hasil
-          <select class="hasil">
-            <option value="Lulus">Lulus</option>
-            <option value="Belum Lulus">Belum Lulus</option>
-          </select>
-        </label>
-        <label>Tanggal final <input type="date" class="tglFinal" value=""></label>
-        <label>Catatan <textarea class="catatan"></textarea></label>
-        <button class="btn kecil" data-simpan="hasil">Simpan hasil</button>`;
-      box.querySelector("[data-simpan]").onclick = () => simpanHasil(id);
-    }
-  }
-
-  async function simpanJadwal(id) {
-    const box = $("form-" + id);
-    const pen = Number(box.querySelector(".penguji").value);
-    const tgl = box.querySelector(".tgl").value;
-    const jam = box.querySelector(".jam").value;
-    if (!pen || !tgl || !jam) return pesan("Lengkapi penguji, tanggal, dan jam.");
-
-    const { error } = await sb.from("pengajuan_jilid").update({
-      penguji_id: pen, tanggal_ujian: tgl, jam_ujian: jam,
-      status: "Dijadwalkan", diubah_oleh: me.id, updated_at: new Date().toISOString()
-    }).eq("id", id);
-    if (error) return pesan("Gagal menyimpan jadwal: " + error.message);
-    pesan("Jadwal tersimpan.");
-    muatDaftar();
-  }
-
-  async function simpanHasil(id) {
-    const box = $("form-" + id);
-    const status = box.querySelector(".hasil").value;
-    const tglFinal = box.querySelector(".tglFinal").value;
-    const catatan = box.querySelector(".catatan").value.trim() || null;
-    if (!tglFinal) return pesan("Isi tanggal final.");
-
-    const { error } = await sb.from("pengajuan_jilid").update({
-      status, tanggal_final: tglFinal, catatan,
-      diubah_oleh: me.id, updated_at: new Date().toISOString()
-    }).eq("id", id);
-    if (error) return pesan("Gagal menyimpan hasil: " + error.message);
-    pesan("Hasil tersimpan.");
-    muatDaftar();
-  }
-
-  async function batalkan(id) {
-    if (!confirm("Batalkan pengajuan ini?")) return;
-    const { error } = await sb.from("pengajuan_jilid").update({
-      status: "Dibatalkan", diubah_oleh: me.id, updated_at: new Date().toISOString()
-    }).eq("id", id);
-    if (error) return pesan("Gagal membatalkan: " + error.message);
-    pesan("Pengajuan dibatalkan.");
-    muatDaftar();
-  }
-
-  // ===== PENGUJI (ADMIN) =====
-  async function muatPengujiTab() {
-    const [{ data: pg }, { data: pj }] = await Promise.all([
-      sb.from("pegawai").select("id, nama_lengkap, peran").eq("status_aktif", true).order("nama_lengkap"),
-      sb.from("penguji_jilid").select("pegawai_id").eq("aktif", true)
-    ]);
-    const set = new Set((pj || []).map(x => x.pegawai_id));
-    $("pList").innerHTML = (pg || []).map(p =>
-      `<label class="baris"><input type="checkbox" data-id="${p.id}" ${set.has(p.id) ? "checked" : ""}>
-        ${esc(p.nama_lengkap)} <span class="muted">(${esc(p.peran)})</span></label>`).join("");
-
-    $("pList").querySelectorAll("input[type=checkbox]").forEach(cb => cb.onchange = async () => {
-      const id = Number(cb.dataset.id);
-      let error;
-      if (cb.checked) {
-        ({ error } = await sb.from("penguji_jilid").upsert({ pegawai_id: id, aktif: true }, { onConflict: "pegawai_id" }));
-      } else {
-        ({ error } = await sb.from("penguji_jilid").delete().eq("pegawai_id", id));
+  KUTTAB.halaman({
+    aktif: "pengajuan-jilid",
+    judul: "Pengajuan Ujian Jilid",
+    roles: ["admin", "kepala", "guru"],
+    render: async ({ sb, me, sem, konten, toast, gagal, peringatan, konfirmasi, esc }) => {
+      if (!sem) {
+        konten.innerHTML = '<div class="alert alert-warning">Belum ada semester aktif.</div>';
+        return;
       }
-      if (error) { cb.checked = !cb.checked; return pesan("Gagal: " + error.message); }
-      pesan("Daftar penguji diperbarui.");
-      await muatPenguji();
-    });
-  }
 
-  init();
+      const $ = id => document.getElementById(id);
+      const KODE_QURAN = ["tilawah", "tahfidz", "kitabah"];
+      const PILIHAN = {
+        Tilawati: Array.from({ length: 4 }, (_, i) => "Jilid " + (i + 1)),
+        Quran: Array.from({ length: 30 }, (_, i) => "Juz " + (i + 1))
+      };
+      const JAM_UJIAN = (() => {
+        const out = [];
+        for (let m = 7 * 60 + 30; m <= 11 * 60 + 30; m += 30) {
+          out.push(String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"));
+        }
+        return out;
+      })();
+      const BULAN = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+      const tglIndo = iso => { const d = new Date(iso + "T00:00:00"); return d.getDate() + " " + BULAN[d.getMonth()] + " " + d.getFullYear(); };
+      const hariIni = () => {
+        const d = new Date();
+        return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+      };
+      const kelasStatus = s => ({
+        "Diajukan": "st-Diajukan", "Dijadwalkan": "st-Dijadwalkan", "Lulus": "st-Lulus",
+        "Belum Lulus": "st-BelumLulus", "Ditolak": "st-Ditolak", "Dibatalkan": "st-Dibatalkan"
+      })[s] || "";
+
+      const admin = me.peran === "admin";
+      const sayaPenguji = p => p.penguji_id === me.id;
+      const sayaPengaju = p => p.pengaju_id === me.id;
+
+      const [rb, pm, pd] = await Promise.all([
+        sb.from("rombel").select("id, nama, tingkat_kode, wali_kelas_id").eq("tahun_ajaran_id", sem.tahun_ajaran_id).order("nama"),
+        sb.from("penugasan_mapel").select("rombel_id, pegawai_id, mapel:mapel_id(kode)"),
+        sb.rpc("penguji_default")
+      ]);
+      if (rb.error) return gagal(rb.error);
+      if (pm.error) return gagal(pm.error);
+
+      const pengujiDefault = (!pd.error && pd.data && pd.data.length)
+        ? { id: pd.data[0].id, nama: pd.data[0].nama } : null;
+
+      const rombelAll = rb.data || [];
+      const quranSet = new Set((pm.data || [])
+        .filter(x => x.pegawai_id === me.id && KODE_QURAN.includes(x.mapel?.kode))
+        .map(x => x.rombel_id));
+      const rombelQuran = admin ? rombelAll : rombelAll.filter(x => quranSet.has(x.id));
+      const bisaAjukan = admin || rombelQuran.length > 0;
+
+      const tabs = [];
+      if (bisaAjukan) tabs.push(["ajukan", "Ajukan"]);
+      tabs.push(["daftar", "Daftar"]);
+      if (admin) tabs.push(["penguji", "Penguji"]);
+
+      konten.innerHTML = `
+        <p class="small text-muted mb-2">TA ${esc(sem.tahun_ajaran.kode)} · Semester ${sem.nomor === 1 ? "Ganjil" : "Genap"}</p>
+        <ul class="nav nav-tabs mb-3">
+          ${tabs.map(([k, l]) => `<li class="nav-item"><a class="nav-link" href="#" data-tab="${k}">${l}</a></li>`).join("")}
+        </ul>
+        ${tabs.map(([k]) => `<div class="panel" id="p-${k}" style="display:none"></div>`).join("")}`;
+
+      let penguji = [];
+      let rows = [];
+
+      // ===== AJUKAN (guru tahsin menentukan tanggal dan jam) =====
+      if (bisaAjukan) {
+        $("p-ajukan").innerHTML = `
+          <div class="card card-outline card-warning"><div class="card-body">
+            ${pengujiDefault ? "" : '<div class="alert alert-warning small">Belum ada penguji default. Hubungi admin.</div>'}
+            <div class="form-row">
+              <div class="col-md-6 form-group"><label class="small mb-1">Kelas</label>
+                <select id="aRombel" class="form-control"></select></div>
+              <div class="col-md-6 form-group"><label class="small mb-1">Santri</label>
+                <select id="aSantri" class="form-control"></select></div>
+              <div class="col-md-6 form-group"><label class="small mb-1">Jenis</label>
+                <select id="aJenis" class="form-control">
+                  <option value="Tilawati">Tilawati</option>
+                  <option value="Quran">Quran</option>
+                </select></div>
+              <div class="col-md-6 form-group"><label class="small mb-1">Jilid / Juz</label>
+                <select id="aJilid" class="form-control"></select></div>
+              <div class="col-md-4 form-group"><label class="small mb-1">Tanggal ujian</label>
+                <input type="date" id="aTgl" class="form-control" min="${hariIni()}" value="${hariIni()}"></div>
+              <div class="col-md-4 form-group"><label class="small mb-1">Jam ujian</label>
+                <select id="aJam" class="form-control">
+                  ${JAM_UJIAN.map(j => `<option value="${j}">${j}</option>`).join("")}
+                </select></div>
+              <div class="col-md-4 form-group"><label class="small mb-1">Penguji</label>
+                <input class="form-control" value="${esc(pengujiDefault ? pengujiDefault.nama : "-")}" disabled></div>
+            </div>
+            <button class="btn btn-kuning" id="aKirim" ${pengujiDefault ? "" : "disabled"}>
+              <i class="fas fa-paper-plane"></i> Ajukan
+            </button>
+            <p class="small text-muted mt-2 mb-0">Penguji akan diberi tahu lewat WhatsApp untuk menyetujui atau menolak.</p>
+          </div></div>`;
+
+        const rombelUntukAjukan = admin ? rombelAll : rombelQuran;
+        $("aRombel").innerHTML = rombelUntukAjukan.map(x => `<option value="${x.id}">${esc(x.nama)}</option>`).join("");
+        $("aRombel").onchange = isiSantriAjukan;
+        $("aJenis").onchange = isiJilid;
+        $("aKirim").onclick = ajukan;
+      }
+
+      // ===== DAFTAR =====
+      $("p-daftar").innerHTML = `
+        <div class="card card-outline card-info"><div class="card-body">
+          <div class="form-group mb-0">
+            <label class="small mb-1">Filter status</label>
+            <select id="fStatus" class="form-control" style="max-width:280px">
+              <option value="">Semua</option>
+              <option value="Diajukan">Menunggu persetujuan</option>
+              <option value="Dijadwalkan">Dijadwalkan</option>
+              <option value="Lulus">Lulus</option>
+              <option value="Belum Lulus">Belum Lulus</option>
+              <option value="Ditolak">Ditolak</option>
+              <option value="Dibatalkan">Dibatalkan</option>
+            </select>
+          </div>
+        </div></div>
+        <div id="dList"></div>`;
+      $("fStatus").onchange = muatDaftar;
+
+      // ===== PENGUJI (ADMIN) =====
+      if (admin) {
+        $("p-penguji").innerHTML = `
+          <div class="card card-outline card-info"><div class="card-body">
+            <p class="small text-muted">Centang pegawai yang boleh ditetapkan sebagai penguji ujian jilid.</p>
+            <div id="pList"></div>
+          </div></div>`;
+      }
+
+      function bukaTab(k) {
+        konten.querySelectorAll("[data-tab]").forEach(a => a.classList.toggle("active", a.dataset.tab === k));
+        konten.querySelectorAll(".panel").forEach(p => p.style.display = p.id === "p-" + k ? "" : "none");
+        if (k === "ajukan") { isiJilid(); isiSantriAjukan(); }
+        if (k === "daftar") muatDaftar();
+        if (k === "penguji") muatPengujiTab();
+      }
+
+      konten.querySelectorAll("[data-tab]").forEach(a => a.onclick = e => {
+        e.preventDefault();
+        bukaTab(a.dataset.tab);
+      });
+
+      function isiJilid() {
+        const jenis = $("aJenis").value;
+        $("aJilid").innerHTML = PILIHAN[jenis].map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join("");
+      }
+
+      async function isiSantriAjukan() {
+        const rid = Number($("aRombel").value);
+        if (!rid) { $("aSantri").innerHTML = ""; return; }
+        const [kr, pend] = await Promise.all([
+          sb.from("keanggotaan_rombel").select("santri:santri_id(id, nis, nama_lengkap)")
+            .eq("rombel_id", rid).eq("tahun_ajaran_id", sem.tahun_ajaran_id),
+          sb.from("pengajuan_jilid").select("santri_id").in("status", ["Diajukan", "Dijadwalkan"])
+        ]);
+        if (kr.error) return gagal(kr.error);
+        const sibuk = new Set((pend.data || []).map(x => x.santri_id));
+        const list = (kr.data || []).map(x => x.santri)
+          .filter(s => s && !sibuk.has(s.id))
+          .sort((a, b) => a.nama_lengkap.localeCompare(b.nama_lengkap));
+        $("aSantri").innerHTML = `<option value="">-- pilih santri --</option>` +
+          list.map(s => `<option value="${s.id}">${esc(s.nama_lengkap)} (${esc(s.nis || "-")})</option>`).join("");
+      }
+
+      async function ajukan() {
+        const sid = Number($("aSantri").value), rid = Number($("aRombel").value);
+        const jilid = $("aJilid").value, jenis = $("aJenis").value;
+        const tgl = $("aTgl").value, jam = $("aJam").value;
+        if (!sid || !rid) return peringatan("Pilih kelas dan santri.");
+        if (!jilid) return peringatan("Pilih jilid atau juz.");
+        if (!tgl) return peringatan("Pilih tanggal ujian.");
+        if (!pengujiDefault) return peringatan("Belum ada penguji default. Hubungi admin.");
+
+        $("aKirim").disabled = true;
+        const { data: baru, error } = await sb.from("pengajuan_jilid").insert({
+          santri_id: sid, rombel_id: rid, jenis, jilid_juz: jilid,
+          status: "Diajukan", tanggal_ujian: tgl, jam_ujian: jam,
+          penguji_id: pengujiDefault.id,
+          pengaju_id: me.id, diubah_oleh: me.id
+        }).select("id").single();
+        $("aKirim").disabled = false;
+        if (error) return gagal(error);
+
+        const r = await WA.kirim("pengajuan_baru", { pengajuan_id: baru.id });
+        if (r.ok) toast("Pengajuan tersimpan. Penguji sudah diberi tahu.");
+        else peringatan("Pengajuan tersimpan, tetapi WhatsApp ke penguji belum terkirim: " + r.pesan);
+
+        await isiSantriAjukan();
+        bukaTab("daftar");
+      }
+
+      // ===== DAFTAR: tombol sesuai status dan peran =====
+      async function muatPenguji() {
+        const { data } = await sb.from("penguji_jilid")
+          .select("pegawai_id, pegawai:pegawai_id(nama_lengkap)").eq("aktif", true);
+        penguji = (data || []).map(x => ({ id: x.pegawai_id, nama: x.pegawai?.nama_lengkap || "-" }));
+      }
+
+      async function muatDaftar() {
+        const status = $("fStatus").value;
+        let q = sb.from("pengajuan_jilid")
+          .select("id, santri_id, rombel_id, jenis, jilid_juz, status, tanggal_ujian, jam_ujian, tanggal_final, catatan, penguji_id, pengaju_id, updated_at, santri:santri_id(nis, nama_lengkap), rombel:rombel_id(nama), penguji:penguji_id(nama_lengkap), pengaju:pengaju_id(nama_lengkap)")
+          .order("created_at", { ascending: false });
+        if (status) q = q.eq("status", status);
+        const { data, error } = await q;
+        if (error) return gagal(error);
+        rows = data || [];
+        renderDaftar();
+      }
+
+      function aksiUntuk(p) {
+        const a = [];
+        const bisaPenguji = admin || sayaPenguji(p);
+        if (p.status === "Diajukan" && bisaPenguji) {
+          a.push(["setujui", "Setujui"], ["jadwal", "Ubah jadwal"], ["tolak", "Tolak"]);
+        }
+        if (p.status === "Dijadwalkan" && bisaPenguji) {
+          a.push(["jadwal", "Ubah jadwal"], ["hasil", "Isi hasil"]);
+        }
+        if (p.status === "Diajukan" && (admin || sayaPengaju(p))) {
+          a.push(["batal", "Batalkan"]);
+        }
+        return a;
+      }
+
+      function renderDaftar() {
+        const box = $("dList");
+        if (!rows.length) { box.innerHTML = '<p class="text-muted">Belum ada pengajuan.</p>'; return; }
+        box.innerHTML = rows.map(p => {
+          const aksi = aksiUntuk(p);
+          const labelStatus = p.status === "Diajukan" ? "Menunggu persetujuan" : p.status;
+          return `<div class="card kartu-pengajuan mb-2"><div class="card-body py-2">
+            <div class="font-weight-bold">${esc(p.santri?.nama_lengkap || "-")}
+              <span class="text-muted small">(${esc(p.santri?.nis || "-")})</span></div>
+            <div class="small">${esc(p.rombel?.nama || "-")} · ${esc(p.jenis)} · ${esc(p.jilid_juz)}</div>
+            <div class="small mt-1"><span class="badge ${kelasStatus(p.status)}">${esc(labelStatus)}</span>
+              ${p.tanggal_ujian ? " · " + tglIndo(p.tanggal_ujian) + (p.jam_ujian ? " pukul " + p.jam_ujian.slice(0, 5) : "") : ""}</div>
+            ${p.penguji?.nama_lengkap ? `<div class="small">Penguji: ${esc(p.penguji.nama_lengkap)}</div>` : ""}
+            ${p.pengaju?.nama_lengkap ? `<div class="small text-muted">Diajukan oleh: ${esc(p.pengaju.nama_lengkap)}</div>` : ""}
+            ${p.catatan ? `<div class="small">Catatan: ${esc(p.catatan)}</div>` : ""}
+            ${p.tanggal_final ? `<div class="small">Tanggal final: ${tglIndo(p.tanggal_final)}</div>` : ""}
+            <div class="mt-2">${aksi.map(([k, l]) =>
+              `<button class="btn btn-sm ${k === "tolak" || k === "batal" ? "btn-danger" : (k === "setujui" ? "btn-kuning" : "btn-outline-dark")} mr-1 mb-1" data-act="${k}" data-id="${p.id}">${l}</button>`).join("")}</div>
+            <div class="mt-2" id="form-${p.id}"></div>
+          </div></div>`;
+        }).join("");
+
+        box.querySelectorAll("button[data-act]").forEach(b =>
+          b.onclick = () => aksiKlik(b.dataset.act, Number(b.dataset.id)));
+      }
+
+      function aksiKlik(act, id) {
+        const p = rows.find(x => x.id === id);
+        if (!p) return;
+        if (act === "setujui") return setujui(id);
+        if (act === "batal") return batalkan(id);
+        const box = $("form-" + id);
+
+        if (act === "jadwal") {
+          const jamTerpilih = p.jam_ujian ? p.jam_ujian.slice(0, 5) : "08:00";
+          box.innerHTML = `
+            <div class="form-row">
+              <div class="col-md-6 form-group"><label class="small mb-1">Tanggal ujian</label>
+                <input type="date" class="form-control tgl" min="${hariIni()}" value="${p.tanggal_ujian || hariIni()}"></div>
+              <div class="col-md-6 form-group"><label class="small mb-1">Jam ujian</label>
+                <select class="form-control jam">${JAM_UJIAN.map(j =>
+                  `<option value="${j}" ${j === jamTerpilih ? "selected" : ""}>${j}</option>`).join("")}</select></div>
+            </div>
+            <button class="btn btn-kuning btn-sm" data-simpan="jadwal">Simpan jadwal</button>
+            <small class="text-muted d-block mt-1">Jadwal yang diubah langsung disetujui.</small>`;
+          box.querySelector("[data-simpan]").onclick = () => simpanJadwal(id);
+        }
+
+        if (act === "tolak") {
+          box.innerHTML = `
+            <div class="form-group"><label class="small mb-1">Alasan penolakan *</label>
+              <textarea class="form-control catatan" rows="2" placeholder="Contoh: jadwal bentrok dengan kegiatan kuttab"></textarea></div>
+            <button class="btn btn-danger btn-sm" data-simpan="tolak">Tolak pengajuan</button>`;
+          box.querySelector("[data-simpan]").onclick = () => tolak(id);
+        }
+
+        if (act === "hasil") {
+          box.innerHTML = `
+            <div class="form-row">
+              <div class="col-md-4 form-group"><label class="small mb-1">Hasil</label>
+                <select class="form-control hasil">
+                  <option value="Lulus">Lulus</option>
+                  <option value="Belum Lulus">Belum Lulus</option>
+                </select></div>
+              <div class="col-md-4 form-group"><label class="small mb-1">Tanggal final</label>
+                <input type="date" class="form-control tglFinal" value="${hariIni()}"></div>
+              <div class="col-md-4 form-group"><label class="small mb-1">Catatan</label>
+                <textarea class="form-control catatan" rows="1"></textarea></div>
+            </div>
+            <button class="btn btn-kuning btn-sm" data-simpan="hasil">Simpan hasil</button>`;
+          box.querySelector("[data-simpan]").onclick = () => simpanHasil(id);
+        }
+      }
+
+      // Penguji menyetujui jadwal yang sudah diusulkan guru
+      async function setujui(id) {
+        const ok = await konfirmasi("Setujui jadwal ini?", "Orang tua dan guru pengaju akan menerima pemberitahuan.");
+        if (!ok) return;
+
+        const { error } = await sb.from("pengajuan_jilid").update({
+          status: "Dijadwalkan", diubah_oleh: me.id, updated_at: new Date().toISOString()
+        }).eq("id", id);
+        if (error) return gagal(error);
+
+        const r = await WA.kirim("jadwal_jilid", { pengajuan_id: id });
+        if (r.ok) toast("Jadwal disetujui. WhatsApp terkirim.");
+        else peringatan("Jadwal disetujui, tetapi WhatsApp belum terkirim: " + r.pesan);
+        muatDaftar();
+      }
+
+      // Penguji atau admin mengubah jadwal. Perubahan langsung berstatus Dijadwalkan.
+      async function simpanJadwal(id) {
+        const box = $("form-" + id);
+        const tgl = box.querySelector(".tgl").value;
+        const jam = box.querySelector(".jam").value;
+        if (!tgl || !jam) return peringatan("Lengkapi tanggal dan jam.");
+
+        const { error } = await sb.from("pengajuan_jilid").update({
+          tanggal_ujian: tgl, jam_ujian: jam,
+          status: "Dijadwalkan", diubah_oleh: me.id, updated_at: new Date().toISOString()
+        }).eq("id", id);
+        if (error) return gagal(error);
+
+        const r = await WA.kirim("jadwal_jilid", { pengajuan_id: id });
+        if (r.ok) toast("Jadwal diubah. WhatsApp terkirim.");
+        else peringatan("Jadwal diubah, tetapi WhatsApp belum terkirim: " + r.pesan);
+        muatDaftar();
+      }
+
+      // Penguji menolak. Guru pengaju diberi tahu.
+      async function tolak(id) {
+        const box = $("form-" + id);
+        const catatan = box.querySelector(".catatan").value.trim();
+        if (!catatan) return peringatan("Isi alasan penolakan.");
+
+        const { error } = await sb.from("pengajuan_jilid").update({
+          status: "Ditolak", catatan, diubah_oleh: me.id, updated_at: new Date().toISOString()
+        }).eq("id", id);
+        if (error) return gagal(error);
+
+        const r = await WA.kirim("tolak_jilid", { pengajuan_id: id });
+        if (r.ok) toast("Pengajuan ditolak. Guru pengaju sudah diberi tahu.");
+        else peringatan("Pengajuan ditolak, tetapi WhatsApp belum terkirim: " + r.pesan);
+        muatDaftar();
+      }
+
+      async function simpanHasil(id) {
+        const box = $("form-" + id);
+        const status = box.querySelector(".hasil").value;
+        const tglFinal = box.querySelector(".tglFinal").value;
+        const catatan = box.querySelector(".catatan").value.trim() || null;
+        if (!tglFinal) return peringatan("Isi tanggal final.");
+
+        const { error } = await sb.from("pengajuan_jilid").update({
+          status, tanggal_final: tglFinal, catatan,
+          diubah_oleh: me.id, updated_at: new Date().toISOString()
+        }).eq("id", id);
+        if (error) return gagal(error);
+
+        const r = await WA.kirim("hasil_jilid", { pengajuan_id: id });
+        if (r.ok) toast("Hasil tersimpan. WhatsApp ke orang tua terkirim.");
+        else peringatan("Hasil tersimpan, tetapi WhatsApp belum terkirim: " + r.pesan);
+        muatDaftar();
+      }
+
+      async function batalkan(id) {
+        if (!(await konfirmasi("Batalkan pengajuan ini?", "Pengajuan tidak bisa dijadwalkan lagi."))) return;
+        const { error } = await sb.from("pengajuan_jilid").update({
+          status: "Dibatalkan", diubah_oleh: me.id, updated_at: new Date().toISOString()
+        }).eq("id", id);
+        if (error) return gagal(error);
+        toast("Pengajuan dibatalkan.");
+        muatDaftar();
+      }
+
+      // ===== PENGUJI (ADMIN) =====
+      async function muatPengujiTab() {
+        const [pg, pj] = await Promise.all([
+          sb.from("pegawai").select("id, nama_lengkap, peran").eq("status_aktif", true).order("nama_lengkap"),
+          sb.from("penguji_jilid").select("pegawai_id").eq("aktif", true)
+        ]);
+        if (pg.error) return gagal(pg.error);
+        const set = new Set((pj.data || []).map(x => x.pegawai_id));
+        $("pList").innerHTML = (pg.data || []).map(p =>
+          `<div class="custom-control custom-checkbox mb-1">
+             <input class="custom-control-input" type="checkbox" id="pg-${p.id}" data-id="${p.id}" ${set.has(p.id) ? "checked" : ""}>
+             <label class="custom-control-label" for="pg-${p.id}">${esc(p.nama_lengkap)} <span class="text-muted small">(${esc(p.peran)})</span></label>
+           </div>`).join("");
+
+        $("pList").querySelectorAll("input[type=checkbox]").forEach(cb => cb.onchange = async () => {
+          const id = Number(cb.dataset.id);
+          let error;
+          if (cb.checked) {
+            ({ error } = await sb.from("penguji_jilid").upsert({ pegawai_id: id, aktif: true }, { onConflict: "pegawai_id" }));
+          } else {
+            ({ error } = await sb.from("penguji_jilid").delete().eq("pegawai_id", id));
+          }
+          if (error) { cb.checked = !cb.checked; return gagal(error); }
+          toast("Daftar penguji diperbarui.");
+          await muatPenguji();
+        });
+      }
+
+      await muatPenguji();
+      bukaTab(bisaAjukan ? "ajukan" : "daftar");
+    }
+  });
 </script>
 </body>
 </html>
