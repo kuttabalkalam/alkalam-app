@@ -29,6 +29,7 @@
 </script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="ui.js"></script>
+<script src="ekspor.js"></script>
 
 <script>
   // Label kolom: untuk tahfidz dan tilawah, komponen tertentu punya nama tampilan sendiri
@@ -106,6 +107,11 @@
             </div>
             <p class="small text-muted mb-0" id="info"></p>
           </div>
+        </div>
+                <div class="text-right mb-2">
+          <button class="btn btn-sm btn-outline-dark" onclick="EKSPOR.unduh('Rekap Nilai', document.querySelector('#tabel table'), 'rekap-nilai')">
+            <i class="fas fa-file-export"></i> Ekspor
+          </button>
         </div>
         <div class="tabel-wrap" id="tabel"></div>
         <div class="rumus mt-2">
