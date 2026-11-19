@@ -47,6 +47,8 @@
       const KODE_ASPEK = ["tahfidz", "tilawah"];
       // Iman: tertulis (PG, isian, essay) dan lisan (5 soal), nilai akhir = rata-rata
       const KODE_IMAN = "iman";
+      // Olahraga: mental, skill, endurance
+      const KODE_OLAHRAGA = "olahraga";
 
       const aturanUas = t => t <= 1
         ? { pgBobot: 5, isi: 5, isiMax: 10, essay: 0, essayMax: 0,
@@ -118,7 +120,12 @@
         $("mapel").innerHTML = list.map(m => `<option value="${m.id}" data-kode="${m.kode}">${esc(m.nama)}</option>`).join("");
       }
 
-      const jenisDari = m => KODE_ASPEK.includes(m.kode) ? "aspek" : (m.kode === KODE_IMAN ? "iman" : "uas");
+      const jenisDari = m => {
+        if (KODE_ASPEK.includes(m.kode)) return "aspek";
+        if (m.kode === KODE_IMAN) return "iman";
+        if (m.kode === KODE_OLAHRAGA) return "olahraga";
+        return "uas";
+      };
 
       async function muatKelas() {
         rombelId = Number($("rombel").value);
@@ -127,13 +134,13 @@
         mapel = { id: Number(opt.value), kode: opt.dataset.kode };
         mapel.jenis = jenisDari(mapel);
 
-        if (mapel.jenis === "aspek") {
-          $("jenisInfo").innerHTML = '<span class="badge badge-dark jenis-tag">UAS</span> Isi fashohah, tajwid, dan kelancaran. Hasilnya masuk ke komponen UAS.';
-        } else if (mapel.jenis === "iman") {
-          $("jenisInfo").innerHTML = '<span class="badge badge-dark jenis-tag">UAS Iman</span> Isi nilai tertulis dan lisan. Nilai UAS adalah rata-rata keduanya.';
-        } else {
-          $("jenisInfo").innerHTML = '<span class="badge badge-dark jenis-tag">UAS</span> Isi PG, isian, dan essay. Hasilnya masuk ke komponen UAS.';
-        }
+        const info = {
+          aspek: '<span class="badge badge-dark jenis-tag">UAS</span> Isi fashohah, tajwid, dan kelancaran. Hasilnya masuk ke komponen UAS.',
+          iman: '<span class="badge badge-dark jenis-tag">UAS Iman</span> Isi nilai tertulis dan lisan. Nilai UAS adalah rata-rata keduanya.',
+          olahraga: '<span class="badge badge-dark jenis-tag">UAS Olahraga</span> Isi mental, skill, dan endurance. Hasilnya masuk ke komponen UAS.',
+          uas: '<span class="badge badge-dark jenis-tag">UAS</span> Isi PG, isian, dan essay. Hasilnya masuk ke komponen UAS.'
+        };
+        $("jenisInfo").innerHTML = info[mapel.jenis];
 
         $("daftar").innerHTML = '<div class="p-3 text-muted">Memuat...</div>';
 
@@ -143,7 +150,10 @@
           mapel.jenis === "aspek"
             ? sb.from("penilaian_aspek").select("santri_id, fashohah, tajwid, kelancaran, jilid, skor")
                 .eq("semester_id", sem.id).eq("mapel_id", mapel.id)
-            : sb.from("uas_koreksi").select("santri_id, pg_benar, isian, essay, skor")
+          : mapel.jenis === "olahraga"
+            ? sb.from("penilaian_olahraga").select("santri_id, mental, skill, endurance, skor")
+                .eq("semester_id", sem.id).eq("mapel_id", mapel.id)
+          : sb.from("uas_koreksi").select("santri_id, pg_benar, isian, essay, skor")
                 .eq("semester_id", sem.id).eq("mapel_id", mapel.id),
           mapel.jenis === "iman"
             ? sb.from("uas_lisan").select("santri_id, soal, skor")
@@ -209,6 +219,7 @@
         if (!s) return kosongkanForm();
         if (mapel.jenis === "aspek") return formAspek(s);
         if (mapel.jenis === "iman") return formIman(s, tabIman);
+        if (mapel.jenis === "olahraga") return formOlahraga(s);
         return formUas(s);
       }
 
@@ -280,7 +291,8 @@
       }
 
       function hitungTertulis(a) {
-        const pg = Number(document.getElementById("uPg") ? document.getElementById("uPg").value : 0) || 0;
+        const pgEl = document.getElementById("uPg");
+        const pg = pgEl ? (Number(pgEl.value) || 0) : 0;
         const isiSum = [...document.querySelectorAll(".uIsi")].reduce((t, x) => t + (Number(x.value) || 0), 0);
         const esSum = [...document.querySelectorAll(".uEssay")].reduce((t, x) => t + (Number(x.value) || 0), 0);
         const el = document.getElementById("uTotal");
@@ -387,11 +399,9 @@
           const sum = [...document.querySelectorAll(".lSoal")].reduce((t, x) => t + (Number(x.value) || 0), 0);
           $("lTotal").textContent = sum.toFixed(2);
         };
-        const hitungT = () => hitungTertulis(a);
-
-        document.querySelectorAll("#paneTulis input").forEach(i => i.oninput = hitungT);
+        document.querySelectorAll("#paneTulis input").forEach(i => i.oninput = () => hitungTertulis(a));
         document.querySelectorAll(".lSoal").forEach(i => i.oninput = hitungLisan);
-        hitungT();
+        hitungTertulis(a);
         hitungLisan();
 
         $("uSimpan").onclick = () => simpanUas(s, a);
@@ -435,6 +445,78 @@
 
         lisanMap[s.id] = { santri_id: s.id, soal, skor: total };
         toast("Skor lisan " + s.nama_lengkap + ": " + total.toFixed(2) + " tersimpan.");
+        pilihSantri(s.id);
+      }
+
+      // ===== FORM OLAHRAGA (MENTAL, SKILL, ENDURANCE) =====
+      function formOlahraga(s) {
+        const u = nilaiMap[s.id] || {};
+
+        $("form").innerHTML = `
+          <div class="card-header">
+            <strong>${esc(s.nama_lengkap)}</strong>
+            <span class="text-muted small ml-2">NIS ${esc(s.nis || "-")}</span>
+          </div>
+          <div class="card-body">
+            <div class="aturan-box mb-3">Mental 30%, skill 35%, endurance 35%. Skor 0 sampai 100.</div>
+
+            <div class="form-row">
+              <div class="col-12 col-md-4 mb-2">
+                <label class="font-weight-bold">Mental <small class="text-muted">(30%)</small></label>
+                <input type="number" id="oMental" class="form-control" min="0" max="100" step="0.5" value="${u.mental ?? ""}">
+              </div>
+              <div class="col-12 col-md-4 mb-2">
+                <label class="font-weight-bold">Skill <small class="text-muted">(35%)</small></label>
+                <input type="number" id="oSkill" class="form-control" min="0" max="100" step="0.5" value="${u.skill ?? ""}">
+              </div>
+              <div class="col-12 col-md-4 mb-2">
+                <label class="font-weight-bold">Endurance <small class="text-muted">(35%)</small></label>
+                <input type="number" id="oEndurance" class="form-control" min="0" max="100" step="0.5" value="${u.endurance ?? ""}">
+              </div>
+            </div>
+
+            <div class="total-box mb-3">Skor UAS: <strong id="oTotal">0.00</strong> / 100</div>
+            <button class="btn btn-kuning" id="oSimpan"><i class="fas fa-save"></i> Simpan penilaian</button>
+          </div>`;
+
+        const hitung = () => {
+          const m = Number($("oMental").value) || 0;
+          const k = Number($("oSkill").value) || 0;
+          const e = Number($("oEndurance").value) || 0;
+          $("oTotal").textContent = (m * 0.30 + k * 0.35 + e * 0.35).toFixed(2);
+        };
+        document.querySelectorAll("#form input").forEach(i => i.oninput = hitung);
+        hitung();
+
+        $("oSimpan").onclick = () => simpanOlahraga(s);
+      }
+
+      async function simpanOlahraga(s) {
+        const isian = [
+          ["oMental", "Mental"], ["oSkill", "Skill"], ["oEndurance", "Endurance"]
+        ].map(([id, label]) => {
+          const el = $(id);
+          el.classList.remove("is-invalid");
+          const n = angkaDalam(el.value.trim(), 100);
+          if (n === null) el.classList.add("is-invalid");
+          return { n, label };
+        });
+
+        const salah = isian.find(x => x.n === null);
+        if (salah) return peringatan(salah.label + " harus angka 0 sampai 100.");
+
+        const btn = $("oSimpan");
+        btn.disabled = true;
+        const { data: baru, error } = await sb.from("penilaian_olahraga").upsert({
+          santri_id: s.id, semester_id: sem.id, mapel_id: mapel.id,
+          mental: isian[0].n, skill: isian[1].n, endurance: isian[2].n,
+          diisi_oleh: me.id, updated_at: new Date().toISOString()
+        }, { onConflict: "santri_id,semester_id,mapel_id" }).select().single();
+        btn.disabled = false;
+        if (error) return gagal(error);
+
+        nilaiMap[s.id] = baru;
+        toast("Penilaian " + s.nama_lengkap + " tersimpan. Skor UAS: " + f2(baru.skor));
         pilihSantri(s.id);
       }
 
