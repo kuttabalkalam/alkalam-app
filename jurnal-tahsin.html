@@ -305,17 +305,17 @@
       }
 
       // ===== PENDAFTARAN UJIAN JILID DARI JURNAL =====
-      async function daftarUjian(sid) {
+            async function daftarUjian(sid) {
         const sk = santri.find(s => s.id === sid);
         if (!sk) return;
 
         const terakhir = lastKitab[sid + "|" + kitab];
         if (!terakhir) return peringatan("Belum ada jurnal " + KITAB[kitab] + " untuk " + sk.nama_lengkap + ".");
+        if (!pengujiDefault) return peringatan("Belum ada penguji default. Hubungi admin.");
 
         const jenis = kitab === "quran" ? "Quran" : "Tilawati";
         const jilid = namaUnit(kitab, terakhir.unit);
 
-        // Cek pengajuan yang masih berjalan
         const { data: aktif, error: e1 } = await sb.from("pengajuan_jilid")
           .select("id, status, jilid_juz")
           .eq("santri_id", sid).in("status", ["Diajukan", "Dijadwalkan"]).maybeSingle();
@@ -325,31 +325,50 @@
             " berstatus " + aktif.status + ". Selesaikan atau batalkan dulu.");
         }
 
-        const teksPenguji = pengujiDefault
-          ? "Penguji: " + pengujiDefault.nama
-          : "Belum ada penguji default. Admin akan menentukan penguji saat menjadwalkan.";
+        const hariIni = fmt(new Date());
+        const jamOpsi = [];
+        for (let m = 7 * 60 + 30; m <= 11 * 60 + 30; m += 30) {
+          jamOpsi.push(String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"));
+        }
 
-        const ok = await konfirmasi(
-          "Daftarkan ujian " + jenis + "?",
-          sk.nama_lengkap + " · " + jilid + " · " + teksPenguji + " · Admin akan menjadwalkan tanggal dan jam."
-        );
-        if (!ok) return;
-
-        const { error } = await sb.from("pengajuan_jilid").insert({
-          santri_id: sid,
-          rombel_id: rid(),
-          jenis,
-          jilid_juz: jilid,
-          status: "Diajukan",
-          penguji_id: pengujiDefault ? pengujiDefault.id : null,
-          pengaju_id: me.id,
-          diubah_oleh: me.id
+        const r = await Swal.fire({
+          title: "Daftarkan ujian " + jenis + "?",
+          html: `
+            <div class="text-left small mb-2">${esc(sk.nama_lengkap)} · ${esc(jilid)}<br>
+              Penguji: <b>${esc(pengujiDefault.nama)}</b></div>
+            <label class="small mb-1">Tanggal ujian</label>
+            <input id="swTgl" type="date" class="swal2-input" min="${hariIni}" value="${hariIni}">
+            <label class="small mb-1 mt-2">Jam ujian</label>
+            <select id="swJam" class="swal2-select">
+              ${jamOpsi.map(j => `<option value="${j}">${j}</option>`).join("")}
+            </select>
+            <p class="small text-muted mt-2">Penguji akan menyetujui, mengubah jadwal, atau menolak.</p>`,
+          showCancelButton: true,
+          confirmButtonText: "Daftarkan",
+          cancelButtonText: "Batal",
+          confirmButtonColor: "#1a1a1a",
+          preConfirm: () => {
+            const tgl = document.getElementById("swTgl").value;
+            const jam = document.getElementById("swJam").value;
+            if (!tgl) { Swal.showValidationMessage("Pilih tanggal ujian."); return false; }
+            return { tgl, jam };
+          }
         });
+        if (!r.isConfirmed) return;
+
+        const { data: baru, error } = await sb.from("pengajuan_jilid").insert({
+          santri_id: sid, rombel_id: rid(), jenis, jilid_juz: jilid,
+          status: "Diajukan",
+          tanggal_ujian: r.value.tgl, jam_ujian: r.value.jam,
+          penguji_id: pengujiDefault.id,
+          pengaju_id: me.id, diubah_oleh: me.id
+        }).select("id").single();
         if (error) return gagal(error);
 
-        toast("Ujian " + jenis + " " + sk.nama_lengkap + " didaftarkan.");
+        const w = await WA.kirim("pengajuan_baru", { pengajuan_id: baru.id });
+        if (w.ok) toast("Ujian " + jenis + " " + sk.nama_lengkap + " didaftarkan. Penguji sudah diberi tahu.");
+        else peringatan("Ujian didaftarkan, tetapi WhatsApp ke penguji belum terkirim: " + w.pesan);
       }
-
       async function muat() {
         const id = rid();
         if (!id) return;
