@@ -309,7 +309,7 @@
                   `<option value="${j}" ${j === jamTerpilih ? "selected" : ""}>${j}</option>`).join("")}</select></div>
             </div>
             <button class="btn btn-kuning btn-sm" data-simpan="jadwal">Simpan jadwal</button>
-            <small class="text-muted d-block mt-1">Jadwal yang diubah langsung disetujui.</small>`;
+            <small class="text-muted d-block mt-1">Jadwal yang diubah langsung berstatus Dijadwalkan.</small>`;
           box.querySelector("[data-simpan]").onclick = () => simpanJadwal(id);
         }
 
@@ -339,9 +339,9 @@
         }
       }
 
-      // Penguji menyetujui jadwal yang sudah diusulkan guru
+      // Penguji menyetujui jadwal yang sudah diusulkan guru. Hanya guru pengaju yang diberi tahu.
       async function setujui(id) {
-        const ok = await konfirmasi("Setujui jadwal ini?", "Orang tua dan guru pengaju akan menerima pemberitahuan.");
+        const ok = await konfirmasi("Setujui jadwal ini?", "Guru pengaju akan menerima pemberitahuan WhatsApp.");
         if (!ok) return;
 
         const { error } = await sb.from("pengajuan_jilid").update({
@@ -349,13 +349,14 @@
         }).eq("id", id);
         if (error) return gagal(error);
 
-        const r = await WA.kirim("jadwal_jilid", { pengajuan_id: id });
-        if (r.ok) toast("Jadwal disetujui. WhatsApp terkirim.");
+        const r = await WA.kirim("setujui_jilid", { pengajuan_id: id });
+        if (r.ok) toast("Jadwal disetujui. WhatsApp ke guru pengaju terkirim.");
         else peringatan("Jadwal disetujui, tetapi WhatsApp belum terkirim: " + r.pesan);
         muatDaftar();
       }
 
       // Penguji atau admin mengubah jadwal. Perubahan langsung berstatus Dijadwalkan.
+      // Hanya guru pengaju yang diberi tahu.
       async function simpanJadwal(id) {
         const box = $("form-" + id);
         const tgl = box.querySelector(".tgl").value;
@@ -368,8 +369,8 @@
         }).eq("id", id);
         if (error) return gagal(error);
 
-        const r = await WA.kirim("jadwal_jilid", { pengajuan_id: id });
-        if (r.ok) toast("Jadwal diubah. WhatsApp terkirim.");
+        const r = await WA.kirim("reschedule_jilid", { pengajuan_id: id });
+        if (r.ok) toast("Jadwal diubah. WhatsApp ke guru pengaju terkirim.");
         else peringatan("Jadwal diubah, tetapi WhatsApp belum terkirim: " + r.pesan);
         muatDaftar();
       }
@@ -391,6 +392,7 @@
         muatDaftar();
       }
 
+      // Hasil ujian. Orang tua diberi tahu.
       async function simpanHasil(id) {
         const box = $("form-" + id);
         const status = box.querySelector(".hasil").value;
