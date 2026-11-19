@@ -22,6 +22,7 @@
 <script src="https://cdn.jsdelivr.net/npm/admin-lte@3.2.0/dist/js/adminlte.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="ui.js"></script>
+<script src="ekspor.js"></script>
 
 <script>
   KUTTAB.halaman({
@@ -41,6 +42,7 @@
               <input id="cari" class="form-control" placeholder="ketik untuk mencari">
             </div>
             <div class="col-12 col-md-6 mb-2 text-md-right">
+              <button class="btn btn-outline-dark mr-1" id="btnEkspor"><i class="fas fa-file-export"></i> Ekspor</button>
               <button class="btn btn-kuning" id="btnTambah"><i class="fas fa-user-plus"></i> Tambah pegawai</button>
             </div>
           </div>
@@ -51,6 +53,8 @@
           Pegawai yang baru ditambahkan belum bisa login. Buat akunnya di Supabase
           (Authentication, Add user, centang Auto Confirm User) dengan email yang sama.
         </p>`;
+
+      $("btnEkspor").onclick = () => EKSPOR.unduh("Data Pegawai", document.querySelector("#tabel table"), "data-pegawai");
 
       async function muat() {
         const { data, error } = await sb.from("pegawai")
@@ -70,7 +74,7 @@
 
         $("tabel").innerHTML = `
           <table class="table table-sm mb-0">
-            <thead><tr><th>Nama</th><th>Email</th><th>No. HP</th><th>Peran</th><th>Aktif</th><th>Akun login</th><th></th></tr></thead>
+            <thead><tr><th>Nama</th><th>Email</th><th>No. HP</th><th>Peran</th><th>Aktif</th><th>Akun login</th><th>Aksi</th></tr></thead>
             <tbody>
               ${list.map(r => `<tr data-id="${r.id}">
                 <td><input class="form-control form-control-sm nama" data-f="nama_lengkap" value="${esc(r.nama_lengkap)}"></td>
