@@ -84,7 +84,7 @@
     aktif: "jurnal-tahsin",
     judul: "Jurnal Tahsin",
     roles: ["admin", "guru"],
-    render: async ({ sb, me, sem, konten, toast, gagal, peringatan, esc }) => {
+    render: async ({ sb, me, sem, konten, toast, gagal, peringatan, konfirmasi, esc }) => {
       if (!sem) {
         konten.innerHTML = '<div class="alert alert-warning">Belum ada semester aktif.</div>';
         return;
@@ -106,6 +106,13 @@
       if (!rombelList.length) {
         konten.innerHTML = '<div class="alert alert-info">Jurnal tahsin hanya tersedia untuk guru Quran di kelas tahun ajaran ini.</div>';
         return;
+      }
+
+      // Penguji default untuk pendaftaran ujian jilid
+      let pengujiDefault = null;
+      const pd = await sb.rpc("penguji_default");
+      if (!pd.error && pd.data && pd.data.length) {
+        pengujiDefault = { id: pd.data[0].id, nama: pd.data[0].nama };
       }
 
       konten.innerHTML = `
@@ -165,17 +172,21 @@
       const rid = () => Number($("rombel").value);
 
       let tab = "jurnal", kitab = "tilawati";
-      let santri = [], jurnalRaw = [], lastMap = {}, todayMap = {}, catatanMap = {};
+      let santri = [], jurnalRaw = [];
+      let lastMap = {}, lastKitab = {}, todayMap = {}, catatanMap = {};
 
       $("tanggal").value = fmt(new Date());
       $("cTanggal").value = fmt(new Date());
 
-      // Peta: jurnal terakhir per santri, dan jurnal hari ini untuk kitab yang dipilih
+      // lastMap: jurnal terakhir per santri (semua kitab)
+      // lastKitab: jurnal terakhir per santri per kitab (dipakai untuk jilid/juz/surat)
+      // todayMap: jurnal hari ini untuk kitab yang dipilih
       function hitungMap() {
-        lastMap = {};
-        todayMap = {};
+        lastMap = {}; lastKitab = {}; todayMap = {};
         jurnalRaw.forEach(j => {
           if (!lastMap[j.santri_id]) lastMap[j.santri_id] = j;
+          const kk = j.santri_id + "|" + j.kitab;
+          if (!lastKitab[kk]) lastKitab[kk] = j;
           if (j.kitab === kitab && j.tanggal === tgl() && !todayMap[j.santri_id]) todayMap[j.santri_id] = j;
         });
       }
@@ -192,8 +203,12 @@
           $("panelJurnal").innerHTML = '<div class="alert alert-light">Belum ada santri di kelas ini.</div>';
           return;
         }
+        const bisaDaftar = kitab === "tilawati" || kitab === "quran";
+
         $("panelJurnal").innerHTML = santri.map((s, i) => {
-          const hari = todayMap[s.id], last = lastMap[s.id];
+          const hari = todayMap[s.id];
+          const last = lastMap[s.id];
+          const lastK = lastKitab[s.id + "|" + kitab];
           return `<div class="card mb-2">
             <div class="card-body py-2">
               <div class="d-flex justify-content-between align-items-start">
@@ -207,6 +222,10 @@
               <button class="btn btn-sm btn-kuning mt-2" data-buka="${s.id}">
                 <i class="fas fa-pen"></i> ${hari ? "Ubah" : "Isi"} ${esc(lbl.angka.toLowerCase())} ${esc(KITAB[kitab])}
               </button>
+              ${bisaDaftar && lastK ? `
+              <button class="btn btn-sm btn-outline-dark mt-2 ml-1" data-daftar="${s.id}">
+                <i class="fas fa-award"></i> Daftarkan ujian ${esc(KITAB[kitab])}
+              </button>` : ""}
               <div class="form-jurnal mt-2" id="form-${s.id}" style="display:none"></div>
             </div>
           </div>`;
@@ -214,6 +233,8 @@
 
         $("panelJurnal").querySelectorAll("[data-buka]").forEach(b =>
           b.onclick = () => bukaForm(Number(b.dataset.buka)));
+        $("panelJurnal").querySelectorAll("[data-daftar]").forEach(b =>
+          b.onclick = () => daftarUjian(Number(b.dataset.daftar)));
       }
 
       function bukaForm(sid) {
@@ -281,6 +302,52 @@
         const nama = (santri.find(s => s.id === sid) || {}).nama_lengkap || "";
         toast("Jurnal " + nama + " tersimpan.");
         await muat();
+      }
+
+      // ===== PENDAFTARAN UJIAN JILID DARI JURNAL =====
+      async function daftarUjian(sid) {
+        const sk = santri.find(s => s.id === sid);
+        if (!sk) return;
+
+        const terakhir = lastKitab[sid + "|" + kitab];
+        if (!terakhir) return peringatan("Belum ada jurnal " + KITAB[kitab] + " untuk " + sk.nama_lengkap + ".");
+
+        const jenis = kitab === "quran" ? "Quran" : "Tilawati";
+        const jilid = namaUnit(kitab, terakhir.unit);
+
+        // Cek pengajuan yang masih berjalan
+        const { data: aktif, error: e1 } = await sb.from("pengajuan_jilid")
+          .select("id, status, jilid_juz")
+          .eq("santri_id", sid).in("status", ["Diajukan", "Dijadwalkan"]).maybeSingle();
+        if (e1) return gagal(e1);
+        if (aktif) {
+          return peringatan(sk.nama_lengkap + " masih punya pengajuan " + aktif.jilid_juz +
+            " berstatus " + aktif.status + ". Selesaikan atau batalkan dulu.");
+        }
+
+        const teksPenguji = pengujiDefault
+          ? "Penguji: " + pengujiDefault.nama
+          : "Belum ada penguji default. Admin akan menentukan penguji saat menjadwalkan.";
+
+        const ok = await konfirmasi(
+          "Daftarkan ujian " + jenis + "?",
+          sk.nama_lengkap + " · " + jilid + " · " + teksPenguji + " · Admin akan menjadwalkan tanggal dan jam."
+        );
+        if (!ok) return;
+
+        const { error } = await sb.from("pengajuan_jilid").insert({
+          santri_id: sid,
+          rombel_id: rid(),
+          jenis,
+          jilid_juz: jilid,
+          status: "Diajukan",
+          penguji_id: pengujiDefault ? pengujiDefault.id : null,
+          pengaju_id: me.id,
+          diubah_oleh: me.id
+        });
+        if (error) return gagal(error);
+
+        toast("Ujian " + jenis + " " + sk.nama_lengkap + " didaftarkan.");
       }
 
       async function muat() {
