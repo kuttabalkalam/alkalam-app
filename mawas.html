@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MAWAS - Kuttab Al-Kalam</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.4/css/all.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2.0/dist/css/adminlte.min.css">
+<link rel="stylesheet" href="ui.css">
+<style>
+  .nav-tabs .nav-link { color: #1a1a1a; }
+  .nav-tabs .nav-link.active { background: #f2c94c; border-color: #d4a52a; color: #1a1a1a; font-weight: 600; }
+  .tabel-wrap { overflow-x: auto; }
+  .tabel-wrap th, .tabel-wrap td { white-space: nowrap; vertical-align: middle; }
+</style>
+</head>
+<body class="hold-transition sidebar-mini">
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/admin-lte@3.2.0/dist/js/adminlte.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="ui.js"></script>
+
+<script>
+  KUTTAB.halaman({
+    aktif: "mawas",
+    judul: "MAWAS (Majelis Ilmu Wali Santri)",
+    roles: ["admin"],
+    render: async ({ sb, me, sem, konten, toast, gagal, peringatan, konfirmasi, esc }) => {
+      if (!sem) {
+        konten.innerHTML = '<div class="alert alert-warning">Belum ada semester aktif.</div>';
+        return;
+      }
+
+      const $ = id => document.getElementById(id);
+      const BULAN = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+      const tglIndo = iso => { if (!iso) return "-"; const d = new Date(iso + "T00:00:00"); return d.getDate() + " " + BULAN[d.getMonth()] + " " + d.getFullYear(); };
+      const hariIni = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
+      const EXT = { "application/pdf": "pdf", "image/jpeg": "jpg", "image/png": "png" };
+      const MAKS = 5 * 1024 * 1024;
+      const BUCKET = "kehadiran-mawas";
+
+      let sesi = [];
+      let kIds = [];
+      let aktifSesi = null;
+
+      const { data: rb, error: eRb } = await sb.from("rombel").select("id, nama")
+        .eq("tahun_ajaran_id", sem.tahun_ajaran_id).order("nama");
+      if (eRb) return gagal(eRb);
+      const rombelTA = rb || [];
+
+      konten.innerHTML = `
+        <ul class="nav nav-tabs mb-3">
+          <li class="nav-item"><a class="nav-link active" href="#" data-tab="sesi">Sesi & Kehadiran</a></li>
+          <li class="nav-item"><a class="nav-link" href="#" data-tab="rekap">Rekap per Kelas</a></li>
+        </ul>
+
+        <div id="pSesi">
+          <div class="card card-outline card-warning"><div class="card-body">
+            <h6 class="font-weight-bold">Tambah sesi MAWAS</h6>
+            <div class="form-row">
+              <div class="col-md-3 form-group"><label class="small mb-1">Tanggal</label>
+                <input type="date" id="sTgl" class="form-control" value="${hariIni()}"></div>
+              <div class="col-md-4 form-group"><label class="small mb-1">Judul / tema kajian</label>
+                <input id="sTema" class="form-control"></div>
+              <div class="col-md-3 form-group"><label class="small mb-1">Pemateri</label>
+                <input id="sPemateri" class="form-control"></div>
+              <div class="col-md-2 form-group"><label class="small mb-1">&nbsp;</label>
+                <button class="btn btn-kuning btn-block" id="sTambah"><i class="fas fa-plus"></i> Tambah</button></div>
+            </div>
+            <div class="form-group mb-0">
+              <label class="small mb-1">File kehadiran (opsional, PDF/JPG/PNG, maks. 5 MB)</label>
+              <input type="file" id="sFile" class="form-control-file" accept="image/jpeg,image/png,application/pdf">
+            </div>
+          </div></div>
+
+          <div class="card"><div class="card-body p-0"><div class="tabel-wrap" id="sTabel"></div></div></div>
+
+          <div class="card card-outline card-info" id="kPanel" style="display:none">
+            <div class="card-header"><h3 class="card-title" id="kJudul"></h3></div>
+            <div class="card-body">
+              <div class="form-group">
+                <label class="small mb-1">Kelas</label>
+                <select id="kRombel" class="form-control" style="max-width:360px"></select>
+              </div>
+              <p class="small text-muted mb-2">Centang ayah atau bunda yang hadir. Yang tidak dicentang dianggap tidak hadir.</p>
+              <div class="tabel-wrap" id="kTabel"></div>
+              <button class="btn btn-kuning mt-3" id="kSimpan" style="display:none"><i class="fas fa-save"></i> Simpan kehadiran</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="pRekap" style="display:none">
+          <div class="card card-outline card-info"><div class="card-body">
+            <div class="form-row align-items-end">
+              <div class="col-md-6 form-group mb-0">
+                <label class="small mb-1">Kelas</label>
+                <select id="rRombel" class="form-control">
+                  ${rombelTA.map(r => `<option value="${r.id}">${esc(r.nama)}</option>`).join("")}
+                </select>
+              </div>
+              <div class="col-md-3 form-group mb-0">
+                <button class="btn btn-kuning btn-block" id="rTampil"><i class="fas fa-table"></i> Tampilkan</button>
+              </div>
+            </div>
+          </div></div>
+          <div class="card"><div class="card-body p-0"><div class="tabel-wrap" id="rTabel"></div></div></div>
+        </div>`;
+
+      function cekFile(f) {
+        if (!f) return null;
+        if (!EXT[f.type]) return "File harus PDF, JPG, atau PNG.";
+        if (f.size > MAKS) return "Ukuran file maksimal 5 MB.";
+        return null;
+      }
+
+      // Unggah file kehadiran dan simpan jalurnya di sesi
+      async function unggahFile(id, f, lama) {
+        const path = "sesi-" + id + "/kehadiran-" + Date.now() + "." + EXT[f.type];
+        const { error } = await sb.storage.from(BUCKET).upload(path, f, { contentType: f.type, upsert: false });
+        if (error) throw new Error("Gagal mengunggah file: " + error.message);
+        if (lama) await sb.storage.from(BUCKET).remove([lama]);
+        const { error: e2 } = await sb.from("mawas_sesi").update({ file_path: path }).eq("id", id);
+        if (e2) throw new Error(e2.message);
+      }
+
+      async function lihatFile(path) {
+        const { data, error } = await sb.storage.from(BUCKET).createSignedUrl(path, 300);
+        if (error) return gagal(error);
+        window.open(data.signedUrl, "_blank");
+      }
+
+      async function muatSesi() {
+        const { data, error } = await sb.from("mawas_sesi")
+          .select("id, tanggal, tema, pemateri, file_path")
+          .eq("semester_id", sem.id).order("tanggal");
+        if (error) return gagal(error);
+        sesi = data || [];
+
+        $("sTabel").innerHTML = sesi.length ? `
+          <table class="table table-sm mb-0">
+            <thead><tr><th>No</th><th>Tanggal</th><th>Tema kajian</th><th>Pemateri</th><th>File</th><th>Aksi</th></tr></thead>
+            <tbody>
+              ${sesi.map((x, i) => `<tr>
+                <td>${i + 1}</td>
+                <td>${tglIndo(x.tanggal)}</td>
+                <td>${esc(x.tema)}</td>
+                <td>${esc(x.pemateri)}</td>
+                <td>${x.file_path
+                  ? `<button class="btn btn-sm btn-outline-dark" data-lihat="${x.id}"><i class="fas fa-file"></i> Lihat</button>`
+                  : '<span class="badge badge-warning">belum</span>'}</td>
+                <td class="text-nowrap">
+                  <button class="btn btn-sm btn-kuning" data-hadir="${x.id}"><i class="fas fa-user-check"></i> Kehadiran</button>
+                  <button class="btn btn-sm btn-outline-dark" data-ganti="${x.id}"><i class="fas fa-upload"></i> File</button>
+                  <button class="btn btn-sm btn-outline-danger" data-hapus="${x.id}"><i class="fas fa-trash"></i></button>
+                </td>
+              </tr>`).join("")}
+            </tbody>
+          </table>`
+          : '<p class="text-muted p-3 mb-0">Belum ada sesi MAWAS di semester ini.</p>';
+
+        $("sTabel").querySelectorAll("[data-lihat]").forEach(b => b.onclick = () => {
+          const s = sesi.find(x => x.id === Number(b.dataset.lihat));
+          if (s && s.file_path) lihatFile(s.file_path);
+        });
+        $("sTabel").querySelectorAll("[data-hadir]").forEach(b => b.onclick = () => bukaKehadiran(Number(b.dataset.hadir)));
+        $("sTabel").querySelectorAll("[data-ganti]").forEach(b => b.onclick = () => gantiFile(Number(b.dataset.ganti)));
+        $("sTabel").querySelectorAll("[data-hapus]").forEach(b => b.onclick = () => hapusSesi(Number(b.dataset.hapus)));
+      }
+
+      async function tambahSesi() {
+        const tgl = $("sTgl").value;
+        const tema = $("sTema").value.trim();
+        const pemateri = $("sPemateri").value.trim();
+        const f = $("sFile").files[0];
+        if (!tgl) return peringatan("Isi tanggal MAWAS.");
+        if (!tema) return peringatan("Isi judul atau tema kajian.");
+        if (!pemateri) return peringatan("Isi nama pemateri.");
+        const errFile = cekFile(f);
+        if (errFile) return peringatan(errFile);
+
+        $("sTambah").disabled = true;
+        try {
+          const { data: baru, error } = await sb.from("mawas_sesi").insert({
+            semester_id: sem.id, tanggal: tgl, tema, pemateri, dibuat_oleh: me.id
+          }).select("id").single();
+          if (error) throw new Error(error.message);
+
+          if (f) await unggahFile(baru.id, f, null);
+
+          $("sTema").value = "";
+          $("sPemateri").value = "";
+          $("sFile").value = "";
+          toast("Sesi MAWAS ditambahkan.");
+          muatSesi();
+        } catch (e) {
+          peringatan(e.message);
+        } finally {
+          $("sTambah").disabled = false;
+        }
+      }
+
+      // Ganti file kehadiran sesi yang sudah ada
+      function gantiFile(id) {
+        const s = sesi.find(x => x.id === id);
+        const inp = document.createElement("input");
+        inp.type = "file";
+        inp.accept = "image/jpeg,image/png,application/pdf";
+        inp.onchange = async () => {
+          const f = inp.files[0];
+          const err = cekFile(f);
+          if (err) return peringatan(err);
+          try {
+            await unggahFile(id, f, s ? s.file_path : null);
+            toast("File kehadiran diperbarui.");
+            muatSesi();
+          } catch (e) {
+            peringatan(e.message);
+          }
+        };
+        inp.click();
+      }
+
+      async function hapusSesi(id) {
+        const s = sesi.find(x => x.id === id);
+        if (!(await konfirmasi("Hapus sesi " + tglIndo(s.tanggal) + "?",
+          "Data kehadiran sesi ini ikut terhapus dan tidak bisa dikembalikan."))) return;
+
+        if (s.file_path) await sb.storage.from(BUCKET).remove([s.file_path]);
+        const { error } = await sb.from("mawas_sesi").delete().eq("id", id);
+        if (error) return gagal(error);
+        if (aktifSesi && aktifSesi.id === id) $("kPanel").style.display = "none";
+        toast("Sesi dihapus.");
+        muatSesi();
+      }
+
+      function bukaKehadiran(id) {
+        aktifSesi = sesi.find(x => x.id === id);
+        $("kJudul").textContent = "Kehadiran: " + aktifSesi.tema + " (" + tglIndo(aktifSesi.tanggal) + ")";
+        $("kRombel").innerHTML = `<option value="">-- pilih kelas --</option>` +
+          rombelTA.map(r => `<option value="${r.id}">${esc(r.nama)}</option>`).join("");
+        $("kTabel").innerHTML = "";
+        $("kSimpan").style.display = "none";
+        $("kPanel").style.display = "";
+        $("kPanel").scrollIntoView({ behavior: "smooth" });
+      }
+
+      async function muatKehadiran() {
+        const rid = Number($("kRombel").value);
+        if (!rid || !aktifSesi) {
+          $("kTabel").innerHTML = "";
+          $("kSimpan").style.display = "none";
+          return;
+        }
+
+        const [kr, hr] = await Promise.all([
+          sb.from("keanggotaan_rombel").select("santri:santri_id(id, nis, nama_lengkap)")
+            .eq("rombel_id", rid).eq("tahun_ajaran_id", sem.tahun_ajaran_id),
+          sb.from("mawas_hadir").select("santri_id, ayah, bunda").eq("sesi_id", aktifSesi.id)
+        ]);
+        if (kr.error) return gagal(kr.error);
+        if (hr.error) return gagal(hr.error);
+
+        const santri = (kr.data || []).map(x => x.santri).filter(Boolean)
+          .sort((a, b) => a.nama_lengkap.localeCompare(b.nama_lengkap));
+        const hadir = {};
+        (hr.data || []).forEach(h => hadir[h.santri_id] = h);
+        kIds = santri.map(s => s.id);
+
+        if (!santri.length) {
+          $("kTabel").innerHTML = '<p class="text-muted">Belum ada santri di kelas ini.</p>';
+          $("kSimpan").style.display = "none";
+          return;
+        }
+
+        $("kTabel").innerHTML = `
+          <table class="table table-sm mb-0">
+            <thead><tr><th>No</th><th>Nama</th><th class="text-center">Ayah</th><th class="text-center">Bunda</th></tr></thead>
+            <tbody>
+              ${santri.map((s, i) => {
+                const h = hadir[s.id] || {};
+                return `<tr>
+                  <td>${i + 1}</td>
+                  <td>${esc(s.nama_lengkap)}</td>
+                  <td class="text-center"><input type="checkbox" data-ayah="${s.id}" ${h.ayah ? "checked" : ""}></td>
+                  <td class="text-center"><input type="checkbox" data-bunda="${s.id}" ${h.bunda ? "checked" : ""}></td>
+                </tr>`;
+              }).join("")}
+            </tbody>
+          </table>`;
+        $("kSimpan").style.display = "";
+      }
+
+      async function simpanKehadiran() {
+        const rows = kIds.map(id => ({
+          sesi_id: aktifSesi.id,
+          santri_id: id,
+          ayah: $("kTabel").querySelector(`[data-ayah="${id}"]`).checked,
+          bunda: $("kTabel").querySelector(`[data-bunda="${id}"]`).checked
+        }));
+        if (!rows.length) return peringatan("Tidak ada santri untuk disimpan.");
+
+        $("kSimpan").disabled = true;
+        const { error } = await sb.from("mawas_hadir").upsert(rows, { onConflict: "sesi_id,santri_id" });
+        $("kSimpan").disabled = false;
+        if (error) return gagal(error);
+        toast("Kehadiran tersimpan untuk " + rows.length + " santri.");
+      }
+
+      async function tampilRekap() {
+        const rid = Number($("rRombel").value);
+        if (!rid) return;
+
+        const { data: kr, error } = await sb.from("keanggotaan_rombel")
+          .select("santri:santri_id(id, nis, nama_lengkap)")
+          .eq("rombel_id", rid).eq("tahun_ajaran_id", sem.tahun_ajaran_id);
+        if (error) return gagal(error);
+
+        const santri = (kr || []).map(x => x.santri).filter(Boolean)
+          .sort((a, b) => a.nama_lengkap.localeCompare(b.nama_lengkap));
+        if (!santri.length) {
+          $("rTabel").innerHTML = '<p class="text-muted p-3 mb-0">Belum ada santri di kelas ini.</p>';
+          return;
+        }
+
+        const hasil = await Promise.all(santri.map(s =>
+          sb.rpc("mawas_ringkasan", { p_santri: s.id, p_semester: sem.id })));
+        const gagalAmbil = hasil.find(h => h.error);
+        if (gagalAmbil) return gagal(gagalAmbil.error);
+
+        $("rTabel").innerHTML = `
+          <table class="table table-sm mb-0">
+            <thead><tr>
+              <th>No</th><th>Nama</th><th>Kegiatan</th>
+              <th>Hadir ayah</th><th>% ayah</th><th>Hadir bunda</th><th>% bunda</th>
+            </tr></thead>
+            <tbody>
+              ${santri.map((s, i) => {
+                const r = (hasil[i].data || [])[0] || { total: 0, ayah: 0, bunda: 0, pct_ayah: 0, pct_bunda: 0 };
+                return `<tr>
+                  <td>${i + 1}</td>
+                  <td>${esc(s.nama_lengkap)}</td>
+                  <td class="text-center">${r.total}</td>
+                  <td class="text-center">${r.ayah}</td>
+                  <td class="text-center font-weight-bold">${r.pct_ayah}%</td>
+                  <td class="text-center">${r.bunda}</td>
+                  <td class="text-center font-weight-bold">${r.pct_bunda}%</td>
+                </tr>`;
+              }).join("")}
+            </tbody>
+          </table>`;
+      }
+
+      function setTab(t) {
+        konten.querySelectorAll("[data-tab]").forEach(a => a.classList.toggle("active", a.dataset.tab === t));
+        $("pSesi").style.display = t === "sesi" ? "" : "none";
+        $("pRekap").style.display = t === "rekap" ? "" : "none";
+        if (t === "rekap") $("rTabel").innerHTML = "";
+      }
+
+      konten.querySelectorAll("[data-tab]").forEach(a => a.onclick = e => {
+        e.preventDefault();
+        setTab(a.dataset.tab);
+      });
+
+      $("sTambah").onclick = tambahSesi;
+      $("kRombel").onchange = muatKehadiran;
+      $("kSimpan").onclick = simpanKehadiran;
+      $("rTampil").onclick = tampilRekap;
+
+      await muatSesi();
+    }
+  });
+</script>
+</body>
+</html>
