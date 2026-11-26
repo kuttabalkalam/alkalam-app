@@ -28,7 +28,6 @@
 <script src="https://cdn.jsdelivr.net/npm/admin-lte@3.2.0/dist/js/adminlte.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="ui.js"></script>
-<script src="ekspor.js"></script>
 
 <script>
   const esc = KUTTAB.esc;
@@ -219,15 +218,9 @@
             </div>
             <div class="col-4"><button class="btn btn-kuning" id="dTampil"><i class="fas fa-search"></i> Tampilkan</button></div>
           </div>`;
-                panel("daftar").innerHTML = pilihKelas +
-          `<div class="d-flex justify-content-between align-items-center mb-2">
-             <p class="text-muted small mb-0" id="dInfo"></p>
-             <button class="btn btn-sm btn-outline-dark" onclick="EKSPOR.unduh('Daftar Santri', document.querySelector('#dTabel table'), 'daftar-santri')">
-               <i class="fas fa-file-export"></i> Ekspor
-             </button>
-           </div>
-           <div class="tabel-wrap" id="dTabel"></div>`;
-        
+        panel("daftar").innerHTML = pilihKelas +
+          `<p class="text-muted small mb-2" id="dInfo"></p><div class="tabel-wrap" id="dTabel"></div>`;
+
         if (!staf) {
           if (!rombelTampil.length) {
             document.getElementById("dTabel").innerHTML = '<p class="text-muted">Anda belum punya kelas di tahun ajaran ini.</p>';
@@ -378,7 +371,7 @@
               ${bagian("Pendaftaran")}
               ${baris("Mendaftar untuk", namaTingkat(s.tingkat_masuk))}
               ${baris("Jenis pendaftaran", s.jenis_pendaftaran)}
-              ${baris("Tahun ajaran masuk", s.tahun_ajaran_masuk)}
+              ${baris("Tahun ajaran tujuan", s.tahun_ajaran_masuk)}
               ${baris("Tahap", s.tahap_calon)}
               ${baris("Jadwal interview", s.jadwal_interview)}
               ${baris("Batas pelunasan", tglLengkap(s.batas_pelunasan))}
@@ -402,16 +395,54 @@
         if (r.isDenied) bukaBukti(s.bukti_bayar_path);
       }
 
+      // ===== TA TUJUAN CALON =====
+      async function ubahTa(s, taDaftar) {
+        const r = await Swal.fire({
+          title: "Tahun ajaran calon",
+          html: `
+            <p class="small text-muted text-left">Pilih tahun ajaran untuk ${esc(s.nama_lengkap)}.</p>
+            <div class="text-left">
+              <div class="custom-control custom-radio mb-2">
+                <input class="custom-control-input" type="radio" name="swTa" id="swBerjalan" value="berjalan"
+                  ${s.tahun_ajaran_masuk === taKode ? "checked" : ""}>
+                <label class="custom-control-label" for="swBerjalan">
+                  TA berjalan (${esc(taKode)}), bisa langsung bergabung setelah diterima
+                </label>
+              </div>
+              <div class="custom-control custom-radio">
+                <input class="custom-control-input" type="radio" name="swTa" id="swDaftar" value="pendaftaran"
+                  ${s.tahun_ajaran_masuk !== taKode ? "checked" : ""}>
+                <label class="custom-control-label" for="swDaftar">
+                  TA pendaftaran (${esc(taDaftar || "-")})
+                </label>
+              </div>
+            </div>`,
+          showCancelButton: true,
+          confirmButtonText: "Simpan",
+          cancelButtonText: "Batal",
+          confirmButtonColor: "#1a1a1a",
+          preConfirm: () => document.querySelector('input[name="swTa"]:checked').value
+        });
+        if (!r.isConfirmed) return;
+
+        const { error } = await sb.rpc("set_ta_calon", { p_santri: s.id, p_mode: r.value });
+        if (error) return gagal(error);
+        toast("Tahun ajaran calon diperbarui.");
+        loadCalon();
+      }
+
       // ===== CALON SANTRI: DAFTAR, JADWAL, TERIMA, PENGUMUMAN, AKTIVASI =====
       async function loadCalon() {
-        const [calon, peng] = await Promise.all([
+        const [calon, peng, tp] = await Promise.all([
           sb.from("santri")
             .select("id, nama_lengkap, nik, tingkat_masuk, tahun_ajaran_masuk, jenis_pendaftaran, bukti_bayar_path, tahap_calon, jadwal_interview, batas_pelunasan, hp_ayah, hp_ibu, wa_diumumkan_at, created_at")
             .eq("status", "Calon Santri").order("created_at"),
-          sb.from("pengaturan").select("nilai").eq("kunci", "tingkat_tertinggi_dibuka").maybeSingle()
+          sb.from("pengaturan").select("nilai").eq("kunci", "tingkat_tertinggi_dibuka").maybeSingle(),
+          sb.rpc("tahun_pendaftaran")
         ]);
         if (calon.error) return gagal(calon.error);
         if (peng.error) return gagal(peng.error);
+        const taDaftar = tp.data || null;
 
         const semua = calon.data || [];
         const belum = semua.filter(s => s.tahap_calon !== "Diterima");
@@ -432,38 +463,44 @@
                    : '<span class="badge badge-success">ada</span>')
           : '<span class="badge badge-warning">belum</span>';
 
+        const badgeTa = s => s.tahun_ajaran_masuk === taKode
+          ? `<span class="badge badge-success">TA berjalan</span><br><small>${esc(s.tahun_ajaran_masuk)}</small>`
+          : `<span class="badge badge-secondary">TA pendaftaran</span><br><small>${esc(s.tahun_ajaran_masuk)}</small>`;
+
         const statusWa = s => s.wa_diumumkan_at
           ? `<span class="badge badge-success"><i class="fab fa-whatsapp"></i> Terkirim</span><br><small class="text-muted">${esc(waktuIndo(s.wa_diumumkan_at))}</small>`
           : '<span class="badge badge-warning">Belum dikirim</span>';
 
         panel("calon").innerHTML = `
           <h6 class="font-weight-bold">Terdaftar dan interview (${belum.length})</h6>
-          <p class="text-muted small mb-2">Periksa data dan bukti bayar. Atur jadwal interview, lalu terima setelah interview.</p>
+          <p class="text-muted small mb-2">Periksa data dan bukti bayar. Atur TA tujuan, jadwal interview, lalu terima setelah interview.</p>
           <div class="tabel-wrap mb-4">
             <table class="table table-sm table-bordered bg-white">
-              <thead><tr><th>No</th><th>Nama</th><th>Jenis</th><th>Bukti</th><th>Tahap</th><th>Jadwal</th><th>Aksi</th></tr></thead>
+              <thead><tr><th>No</th><th>Nama</th><th>Jenis</th><th>TA tujuan</th><th>Bukti</th><th>Tahap</th><th>Jadwal</th><th>Aksi</th></tr></thead>
               <tbody>
                 ${belum.length ? belum.map((s, i) => `<tr>
                   <td>${i + 1}</td>
                   <td>${esc(s.nama_lengkap)}<br><small class="text-muted">${esc(s.nik || "")}</small></td>
                   <td>${esc(s.jenis_pendaftaran || "-")}</td>
+                  <td>${badgeTa(s)}</td>
                   <td>${bukti(s)}</td>
                   <td><span class="badge badge-${BADGE[s.tahap_calon] || "secondary"}">${esc(s.tahap_calon)}</span></td>
                   <td>${esc(s.jadwal_interview || "-")}</td>
-                  <td>
+                  <td class="text-nowrap">
                     <button class="btn btn-sm btn-outline-secondary" data-detail="${s.id}"><i class="fas fa-eye"></i> Detail</button>
                     ${!admin ? "" : `
+                      <button class="btn btn-sm btn-outline-secondary ml-1" data-ta="${s.id}"><i class="fas fa-exchange-alt"></i> TA</button>
                       <button class="btn btn-sm btn-outline-dark ml-1" data-jadwal="${s.id}"><i class="fas fa-calendar"></i> Jadwal</button>
                       ${s.tahap_calon === "Terjadwal" ? `<button class="btn btn-sm btn-kuning ml-1" data-terima="${s.id}"><i class="fas fa-user-check"></i> Terima</button>` : ""}`}
                   </td>
-                </tr>`).join("") : '<tr><td colspan="7" class="text-muted">Belum ada calon.</td></tr>'}
+                </tr>`).join("") : '<tr><td colspan="8" class="text-muted">Belum ada calon.</td></tr>'}
               </tbody>
             </table>
           </div>
 
           <h6 class="font-weight-bold">Diterima (${diterima.length})</h6>
           <p class="text-muted small mb-2">
-            Centang untuk diaktifkan ke kelas. Calon hanya bisa diaktifkan setelah tahun ajarannya aktif.
+            Centang untuk diaktifkan ke kelas. Calon TA berjalan bisa langsung diaktifkan; calon TA pendaftaran menunggu TA tersebut aktif.
           </p>
           ${admin ? `
             <div class="form-row align-items-end mb-2">
@@ -477,7 +514,7 @@
             <table class="table table-sm table-bordered bg-white">
               <thead><tr>
                 ${admin ? '<th><input type="checkbox" id="cAll"></th>' : ""}
-                <th>No</th><th>Nama</th><th>Jenjang</th><th>TA masuk</th><th>Batas pelunasan</th><th>Status WA</th><th>Aksi</th>
+                <th>No</th><th>Nama</th><th>Jenjang</th><th>TA tujuan</th><th>Batas pelunasan</th><th>Status WA</th><th>Aksi</th>
               </tr></thead>
               <tbody>
                 ${diterima.length ? diterima.map((s, i) => {
@@ -488,10 +525,10 @@
                     <td>${i + 1}</td>
                     <td>${esc(s.nama_lengkap)}</td>
                     <td>${esc(namaTingkat(s.tingkat_masuk))}</td>
-                    <td>${esc(s.tahun_ajaran_masuk)}${bisa ? "" : ' <span class="badge badge-secondary">menunggu TA aktif</span>'}</td>
+                    <td>${esc(s.tahun_ajaran_masuk)}${bisa ? ' <span class="badge badge-success">berjalan</span>' : ' <span class="badge badge-secondary">menunggu TA aktif</span>'}</td>
                     <td>${tglIndoSingkat(s.batas_pelunasan)}</td>
                     <td>${statusWa(s)}</td>
-                    <td>
+                    <td class="text-nowrap">
                       <button class="btn btn-sm btn-outline-secondary" data-detail="${s.id}"><i class="fas fa-eye"></i> Detail</button>
                       ${admin && adaHp ? `
                         <button class="btn btn-sm btn-outline-success ml-1" data-wa="${s.id}" title="${s.wa_diumumkan_at ? "Kirim ulang pengumuman" : "Kirim pengumuman"}">
@@ -521,7 +558,7 @@
             kelas.map(x => `<option value="${x.id}">${esc(x.nama)}</option>`).join("");
         };
 
-        // Tombol detail tersedia untuk admin dan staf
+        // Detail tersedia untuk admin dan staf
         p.querySelectorAll("[data-detail]").forEach(b => b.onclick = () => lihatDetail(Number(b.dataset.detail)));
 
         if (admin) {
@@ -532,17 +569,12 @@
           p.querySelectorAll(".cPilih").forEach(c => c.onchange = isiKelas);
           document.getElementById("cAktif").onclick = aktifkanTerpilih;
 
+          p.querySelectorAll("[data-ta]").forEach(b => b.onclick = () => ubahTa(byId[Number(b.dataset.ta)], taDaftar));
           p.querySelectorAll("[data-jadwal]").forEach(b => b.onclick = () => aturJadwal(byId[Number(b.dataset.jadwal)]));
           p.querySelectorAll("[data-terima]").forEach(b => b.onclick = () => terimaCalon(byId[Number(b.dataset.terima)], batas));
           p.querySelectorAll("[data-wa]").forEach(b => b.onclick = () => kirimUlang(byId[Number(b.dataset.wa)]));
           p.querySelectorAll("[data-bukti]").forEach(b => b.onclick = () => bukaBukti(byId[Number(b.dataset.bukti)].bukti_bayar_path));
         }
-      }
-
-      function statusWa(s) {
-        return s.wa_diumumkan_at
-          ? `<span class="badge badge-success"><i class="fab fa-whatsapp"></i> Terkirim</span><br><small class="text-muted">${esc(waktuIndo(s.wa_diumumkan_at))}</small>`
-          : '<span class="badge badge-warning">Belum dikirim</span>';
       }
 
       async function kirimUlang(s) {
@@ -593,7 +625,14 @@
 
       async function terimaCalon(s, batas) {
         if (!s) return;
-        const opsi = Array.from({ length: batas }, (_, i) => `<option value="${i}">${esc(namaTingkat(i))}</option>`).join("");
+
+        // TA berjalan: jenjang mengikuti rombel yang sudah ada. TA lain: sesuai aturan jenjang terbuka.
+        const tingkatList = s.tahun_ajaran_masuk === taKode
+          ? [...new Set(rombelAll.map(x => Number(x.tingkat_kode)))].sort((a, b) => a - b)
+          : Array.from({ length: batas }, (_, i) => i);
+        if (!tingkatList.length) return peringatan("Belum ada rombel di tahun ajaran berjalan.");
+
+        const opsi = tingkatList.map(i => `<option value="${i}">${esc(namaTingkat(i))}</option>`).join("");
         const besok3 = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
         const r = await Swal.fire({
           title: "Terima " + s.nama_lengkap + "?",
@@ -626,7 +665,7 @@
           toast("Diterima. Pengumuman WhatsApp terkirim.");
         } else {
           peringatan("Calon sudah diterima, tetapi WhatsApp belum terkirim: " + kirim.pesan +
-            ". Gunakan tombol Kirim di tabel Diterima.");
+            ". Gunakan tombol Kirim ulang di tabel Diterima.");
         }
         loadCalon();
       }
