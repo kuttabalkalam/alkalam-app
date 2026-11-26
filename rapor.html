@@ -47,35 +47,23 @@
   .ttd > div { text-align: center; }
   .ttd .tgl { margin-bottom: 4mm; }
 
-    /* ===== Cetak: hanya halaman rapor yang keluar, mulai dari pojok kiri atas ===== */
+      /* ===== Cetak: area rapor dipindah ke body, semua layout disembunyikan ===== */
   @media print {
     @page { size: A4; margin: 0; }
-
-    html, body { background: #fff !important; margin: 0 !important; padding: 0 !important; height: auto !important; }
-
-    /* Sembunyikan semua, lalu tampilkan hanya area rapor */
-    body * { visibility: hidden !important; }
-    #cetak, #cetak * { visibility: visible !important; }
-
-    /* Lepas dari layout AdminLTE agar tidak ikut padding atau margin */
-    .wrapper, .content-wrapper, .content, .container-fluid, .card, .card-body {
-      position: static !important; margin: 0 !important; padding: 0 !important;
-      background: #fff !important; border: 0 !important; box-shadow: none !important;
-      min-height: 0 !important; overflow: visible !important;
-    }
-
+    html, body { width: 210mm !important; margin: 0 !important; padding: 0 !important; background: #fff !important; }
+    body > *:not(#cetak) { display: none !important; }
     #cetak {
-      position: absolute !important; left: 0 !important; top: 0 !important;
-      width: 210mm !important; background: #fff !important; padding: 0 !important;
-      overflow: visible !important;
+      display: block !important; width: 210mm !important; margin: 0 !important; padding: 0 !important;
+      background: #fff !important; border: 0 !important; box-shadow: none !important; overflow: visible !important;
     }
-
+    .pratinjau { overflow: visible !important; background: #fff !important; padding: 0 !important; }
     .page {
-      width: 210mm !important; margin: 0 !important; padding-bottom: 8mm;
-      border: none !important; box-shadow: none !important; page-break-after: always;
+      width: 210mm !important; max-width: 210mm !important; margin: 0 !important; padding-bottom: 8mm;
+      border: 0 !important; box-shadow: none !important; overflow: hidden; page-break-after: always;
     }
     .page:last-child { page-break-after: auto; }
-    .page.lampiran, .page.mawas { border-top: none !important; }
+    .page.lampiran, .page.mawas { border-top: 0 !important; }
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   }
 </style>
 </head>
@@ -412,7 +400,22 @@
 
       $("taSel").onchange = async () => { isiSemester(); await muatRombel(); };
       $("tampil").onclick = tampilkan;
-      $("cetakBtn").onclick = () => window.print();
+            // Cetak: area rapor dipindah ke body sementara, lalu dikembalikan setelah dialog cetak ditutup
+      function cetakRapor() {
+        const area = $("cetak");
+        const asal = area.parentElement;
+        const posisi = area.nextSibling;
+        document.body.appendChild(area);
+
+        const selesai = () => {
+          if (posisi && posisi.parentNode === asal) asal.insertBefore(area, posisi);
+          else asal.appendChild(area);
+          window.removeEventListener("afterprint", selesai);
+        };
+        window.addEventListener("afterprint", selesai);
+        window.print();
+      }
+      $("cetakBtn").onclick = cetakRapor;
 
       isiSemester();
       await muatRombel();
