@@ -15,7 +15,7 @@
     width: 210mm; margin: 0 auto 14px; padding-bottom: 8mm; box-sizing: border-box;
     background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.12);
   }
-  .page.lampiran, .page.mawas { border-top: 1px dashed #ccc; }
+  .page.lampiran, .page.mawas, .page.identitas { border-top: 1px dashed #ccc; }
   .kop { display: block; width: 100%; margin: 0; }
   .isi { padding: 0 12mm; color: #111; font-size: 12px; }
   h3.judul { text-align: center; font-size: 14px; font-weight: bold; margin: 8mm 0 5mm; line-height: 1.5; }
@@ -42,12 +42,29 @@
 
   .kesimpulan { margin-top: 5mm; font-size: 12px; line-height: 1.7; }
 
-  /* Tanda tangan: tanggal di atas Guru Kelas, Orang Tua dan Guru Kelas sejajar */
+  /* Tanda tangan rapor dan lampiran: tanggal di atas Guru Kelas, Orang Tua dan Guru Kelas sejajar */
   .ttd { display: grid; grid-template-columns: 1fr 1fr; column-gap: 8mm; margin-top: 10mm; }
   .ttd > div { text-align: center; }
   .ttd .tgl { margin-bottom: 4mm; }
 
-      /* ===== Cetak: area rapor dipindah ke body, semua layout disembunyikan ===== */
+  /* Tanda tangan MAWAS: orang tua di kiri, kepala di kanan */
+  .ttd-kepala { display: grid; grid-template-columns: 1fr 70mm; column-gap: 8mm; margin-top: 10mm; font-size: 12px; }
+  .ttd-kepala > div { text-align: center; }
+
+  /* Halaman identitas santri */
+  .judul-id { text-align: center; font-size: 14px; font-weight: bold; margin: 14mm 0 10mm; }
+  .id-tabel { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .id-tabel td { padding: 2px 4px; vertical-align: top; line-height: 1.7; }
+  .id-tabel td.no { width: 7%; }
+  .id-tabel td.lbl { width: 38%; }
+  .id-tabel td.lbl.sisip { padding-left: 18px; }
+  .id-tabel td.colon { width: 3%; }
+  .id-tabel td.val { width: 52%; }
+  .id-bawah { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 10mm; font-size: 12px; }
+  .id-foto { width: 30mm; height: 40mm; border: 1px solid #000; }
+  .id-ttd { width: 70mm; text-align: center; }
+
+  /* ===== Cetak: hanya halaman rapor yang keluar, mulai dari pojok kiri atas ===== */
   @media print {
     @page { size: A4; margin: 0; }
     html, body { width: 210mm !important; margin: 0 !important; padding: 0 !important; background: #fff !important; }
@@ -56,13 +73,12 @@
       display: block !important; width: 210mm !important; margin: 0 !important; padding: 0 !important;
       background: #fff !important; border: 0 !important; box-shadow: none !important; overflow: visible !important;
     }
-    .pratinjau { overflow: visible !important; background: #fff !important; padding: 0 !important; }
     .page {
       width: 210mm !important; max-width: 210mm !important; margin: 0 !important; padding-bottom: 8mm;
       border: 0 !important; box-shadow: none !important; overflow: hidden; page-break-after: always;
     }
     .page:last-child { page-break-after: auto; }
-    .page.lampiran, .page.mawas { border-top: 0 !important; }
+    .page.lampiran, .page.mawas, .page.identitas { border-top: 0 !important; }
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   }
 </style>
@@ -81,8 +97,9 @@
     aktif: "rapor",
     judul: "Rapor",
     roles: ["admin", "kepala"],
-    render: async ({ sb, konten, gagal, esc }) => {
+    render: async ({ sb, me, konten, gagal, esc }) => {
       const $ = id => document.getElementById(id);
+      const admin = me.peran === "admin";
 
       const pesan = (t, tipe = "info") => {
         const el = $("pesan");
@@ -107,6 +124,8 @@
       const BULAN = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
       const tglIndo = iso => { if (!iso) return "-"; const [y, m, d] = iso.split("-"); return Number(d) + " " + BULAN[Number(m) - 1] + " " + y; };
       const teksAman = v => v == null || v === "" ? "-" : esc(v);
+
+      const SANTRI_IDENT = "id, nis, nama_lengkap, jenis_kelamin, tempat_lahir, tanggal_lahir, agama, alamat, alamat_dom_rt, alamat_dom_rw, alamat_dom_desa, alamat_dom_kecamatan, alamat_dom_kodepos, hp_orang_tua, nama_ayah, nama_ibu, pekerjaan_ayah, pekerjaan_ibu, tanggal_aktif, tanggal_diterima, identitas_cetak_at";
 
       // Struktur: kelompok > mapel > sub-komponen (anak). Mapel tanpa anak adalah baris tunggal.
       const STRUKTUR = [
@@ -151,10 +170,12 @@
           <div>Guru Kelas Kuttab Al Kalam<br><br><br><br><b><u>${esc(ctx.waliLabel || "........................")}</u></b></div>
         </div>`;
       }
-      // Tanda tangan kepala kuttab (satu kolom, di kanan)
+
+      // Tanda tangan MAWAS: orang tua di kiri, kepala kuttab di kanan
       function htmlTtdKepala(ctx) {
-        return `<div style="margin-top:10mm;display:flex;justify-content:flex-end;">
-          <div style="width:70mm;text-align:center;">
+        return `<div class="ttd-kepala">
+          <div>Orang Tua / Wali<br><br><br><br>( ........................................ )</div>
+          <div>
             <div style="margin-bottom:4mm;">Tangerang Selatan, ${tglIndo(ctx.tanggal)}</div>
             <div>Kepala Kuttab Al Kalam</div>
             <div style="height:18mm;"></div>
@@ -162,6 +183,7 @@
           </div>
         </div>`;
       }
+
       function htmlRapor(s, ctx, nilaiMap, absenMap) {
         const n = nilaiMap[s.id] || {};
         const ab = absenMap[s.id];
@@ -278,7 +300,7 @@
         </section>`;
       }
 
-               // Kehadiran orang tua dalam MAWAS. Persentase dihitung dari seluruh sesi di semester.
+      // Kehadiran orang tua dalam MAWAS. Persentase dihitung dari seluruh sesi di semester.
       function htmlMawas(s, ctx, sesi, hadirMap) {
         const h = hadirMap[s.id] || {};
         const total = sesi.length;
@@ -320,6 +342,60 @@
         </section>`;
       }
 
+      // Identitas santri: hanya data yang ada di database. Dicetak sekali, kecuali admin memilih cetak ulang.
+      function htmlIdentitasSantri(s, ctx) {
+        const jk = s.jenis_kelamin === "L" ? "Laki-laki" : s.jenis_kelamin === "P" ? "Perempuan" : "-";
+        const alamat = [
+          s.alamat,
+          s.alamat_dom_rt ? "RT " + s.alamat_dom_rt : "",
+          s.alamat_dom_rw ? "RW " + s.alamat_dom_rw : "",
+          s.alamat_dom_desa, s.alamat_dom_kecamatan, s.alamat_dom_kodepos
+        ].filter(Boolean).join(", ");
+        const ttl = [s.tempat_lahir, s.tanggal_lahir ? tglIndo(s.tanggal_lahir) : ""].filter(Boolean).join(", ");
+        const tglMasuk = s.tanggal_aktif || s.tanggal_diterima;
+
+        const isi = (no, label, nilai) =>
+          `<tr><td class="no">${no}</td><td class="lbl">${esc(label)}</td><td class="colon">:</td><td class="val">${teksAman(nilai)}</td></tr>`;
+        const judul = (no, label) =>
+          `<tr><td class="no">${no}</td><td class="lbl" colspan="3">${esc(label)}</td></tr>`;
+        const sisip = (label, nilai) =>
+          `<tr><td></td><td class="lbl sisip">${esc(label)}</td><td class="colon">:</td><td class="val">${teksAman(nilai)}</td></tr>`;
+
+        return `<section class="page identitas">
+          <div class="isi">
+            <h3 class="judul-id">IDENTITAS SANTRI KUTTAB AL KALAM</h3>
+            <table class="id-tabel">
+              ${isi(1, "Nama Santri", s.nama_lengkap)}
+              ${isi(2, "Nomor Induk Santri", s.nis)}
+              ${isi(3, "Tempat, Tanggal Lahir", ttl)}
+              ${isi(4, "Agama", s.agama)}
+              ${isi(5, "Jenis Kelamin", jk)}
+              ${isi(6, "Alamat Santri", alamat)}
+              ${isi(7, "Nomor Telepon", s.hp_orang_tua)}
+              ${judul(8, "Diterima di sekolah ini")}
+              ${sisip("Di kelas", ctx.rombel.nama)}
+              ${sisip("Pada tanggal", tglMasuk ? tglIndo(tglMasuk) : "-")}
+              ${sisip("Semester", ctx.sem.nomor === 1 ? "Ganjil" : "Genap")}
+              ${judul(9, "Nama Orang Tua")}
+              ${sisip("a. Ayah", s.nama_ayah)}
+              ${sisip("b. Ibu", s.nama_ibu)}
+              ${judul(10, "Pekerjaan Orang Tua")}
+              ${sisip("a. Ayah", s.pekerjaan_ayah)}
+              ${sisip("b. Ibu", s.pekerjaan_ibu)}
+            </table>
+            <div class="id-bawah">
+              <div class="id-foto"></div>
+              <div class="id-ttd">
+                <div style="margin-bottom:4mm;">Tangerang Selatan, ${tglIndo(ctx.tanggal)}</div>
+                <div>Kepala Kuttab Al Kalam</div>
+                <div style="height:18mm;"></div>
+                <div><b><u>${esc(ctx.kepalaLabel || "........................")}</u></b></div>
+              </div>
+            </div>
+          </div>
+        </section>`;
+      }
+
       // ===== Data =====
       const [tas, sems] = await Promise.all([
         sb.from("tahun_ajaran").select("id, kode, aktif").order("kode"),
@@ -331,6 +407,7 @@
       const taList = tas.data || [];
       const semList = sems.data || [];
       let rombelList = [];
+      let identitasIds = [];
 
       // ===== Kerangka halaman =====
       konten.innerHTML = `
@@ -361,6 +438,15 @@
               <input class="custom-control-input" type="checkbox" id="lampiranChk" checked>
               <label class="custom-control-label" for="lampiranChk">Sertakan lampiran deskripsi (semester ganjil)</label>
             </div>
+            ${admin ? `
+            <div class="custom-control custom-checkbox mt-2">
+              <input class="custom-control-input" type="checkbox" id="identitasChk" checked>
+              <label class="custom-control-label" for="identitasChk">Sertakan halaman identitas santri (hanya yang belum pernah dicetak)</label>
+            </div>
+            <div class="custom-control custom-checkbox">
+              <input class="custom-control-input" type="checkbox" id="identitasUlang">
+              <label class="custom-control-label" for="identitasUlang">Cetak ulang identitas untuk semua santri</label>
+            </div>` : ""}
           </div>
           <div class="card-footer">
             <button class="btn btn-kuning" id="tampil"><i class="fas fa-search"></i> Tampilkan</button>
@@ -408,9 +494,7 @@
         if (def) $("semSel").value = String(def.id);
       }
 
-      $("taSel").onchange = async () => { isiSemester(); await muatRombel(); };
-      $("tampil").onclick = tampilkan;
-            // Cetak lewat jendela baru yang hanya berisi rapor, bebas dari layout AdminLTE
+      // Cetak: rapor dibuka di jendela baru yang hanya berisi halaman rapor
       function cetakRapor() {
         const area = $("cetak");
         if (!area.querySelector(".page")) return pesan("Tampilkan rapor terlebih dahulu.", "error");
@@ -421,29 +505,62 @@
 
         w.document.open();
         w.document.write(`<!DOCTYPE html>
-          <html lang="id">
-          <head>
-          <meta charset="UTF-8">
-          <title>Rapor</title>
-          <base href="${location.href}">
-          <style>
-          ${css}
-          @page { size: A4; margin: 0; }
-          html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; width: 210mm !important; }
-          #cetak { display: block !important; width: 210mm !important; margin: 0 !important; padding: 0 !important; }
-          .page { width: 210mm !important; margin: 0 !important; box-shadow: none !important; border: 0 !important; page-break-after: always; }
-          .page:last-child { page-break-after: auto; }
-          .page.lampiran, .page.mawas { border-top: 0 !important; }
-          </style>
-          </head>
-          <body>
-          <div id="cetak">${area.innerHTML}</div>
-          </body>
-          </html>`);
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Rapor</title>
+<base href="${location.href}">
+<style>
+${css}
+@page { size: A4; margin: 0; }
+html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; width: 210mm !important; }
+#cetak { display: block !important; width: 210mm !important; margin: 0 !important; padding: 0 !important; }
+.page { width: 210mm !important; margin: 0 !important; box-shadow: none !important; border: 0 !important; page-break-after: always; }
+.page:last-child { page-break-after: auto; }
+.page.lampiran, .page.mawas, .page.identitas { border-top: 0 !important; }
+</style>
+</head>
+<body>
+<div id="cetak">${area.innerHTML}</div>
+</body>
+</html>`);
         w.document.close();
         w.addEventListener("load", () => setTimeout(() => w.print(), 300));
       }
-      $("cetakBtn").onclick = cetakRapor;
+
+      // Admin menandai identitas sebagai sudah dicetak sebelum cetak dijalankan
+      async function cetakKlik() {
+        if (!$("cetak").querySelector(".page")) return pesan("Tampilkan rapor terlebih dahulu.", "error");
+
+        if (identitasIds.length) {
+          const r = await Swal.fire({
+            icon: "question",
+            title: "Tandai identitas sebagai sudah dicetak?",
+            text: "Halaman identitas " + identitasIds.length + " santri akan ditandai sudah dicetak. " +
+              "Status ini tidak berubah jika cetakan dibatalkan.",
+            showCancelButton: true,
+            confirmButtonText: "Lanjutkan cetak",
+            cancelButtonText: "Batal",
+            confirmButtonColor: "#1a1a1a"
+          });
+          if (!r.isConfirmed) return;
+
+          const { error } = await sb.rpc("tandai_identitas_cetak", { p_ids: identitasIds });
+          if (error) return gagal(error);
+        }
+        cetakRapor();
+      }
+
+      $("taSel").onchange = async () => { isiSemester(); await muatRombel(); };
+      $("tampil").onclick = tampilkan;
+      $("cetakBtn").onclick = cetakKlik;
+
+      // Perubahan pilihan identitas langsung memperbarui pratinjau
+      if (admin) {
+        const ulangPratinjau = () => { if ($("cetak").querySelector(".page")) tampilkan(); };
+        $("identitasChk").onchange = ulangPratinjau;
+        $("identitasUlang").onchange = ulangPratinjau;
+      }
 
       isiSemester();
       await muatRombel();
@@ -514,7 +631,15 @@
           (hr.data || []).forEach(h => ((hadirMap[h.santri_id] ||= {})[h.sesi_id] = h));
         }
 
-               // Wali kelas dengan gelar (untuk rapor dan lampiran)
+        // Data identitas (hanya untuk admin)
+        let detailSantri = {};
+        if (admin) {
+          const { data: dd, error: eD } = await sb.from("santri").select(SANTRI_IDENT).in("id", ids);
+          if (eD) return gagal(eD);
+          (dd || []).forEach(x => detailSantri[x.id] = x);
+        }
+
+        // Wali kelas dengan gelar (untuk rapor dan lampiran)
         let waliLabel = "";
         if (rombel.wali_kelas_id) {
           const { data: w } = await sb.from("pegawai")
@@ -522,7 +647,7 @@
           if (w) waliLabel = w.nama_lengkap + (w.gelar_belakang ? ", " + w.gelar_belakang : "");
         }
 
-        // Kepala kuttab dengan gelar (untuk tanda tangan MAWAS)
+        // Kepala kuttab dengan gelar (untuk tanda tangan MAWAS dan identitas)
         const { data: kep } = await sb.from("pegawai")
           .select("nama_lengkap, gelar_belakang").eq("peran", "kepala").eq("status_aktif", true)
           .order("id").limit(1).maybeSingle();
@@ -533,13 +658,28 @@
           tanggal: $("tanggal").value || new Date().toLocaleDateString("sv-SE")
         };
 
-        $("cetak").innerHTML = santri.map(s =>
-          htmlRapor(s, ctx, nilaiMap, absenMap) +
-          (adaLampiran ? htmlLampiran(s, ctx, deskMap, aspekByKode) : "") +
-          htmlMawas(s, ctx, sesiList, hadirMap)
-        ).join("");
+        // Identitas: hanya jika admin memilih, dan santri belum pernah dicetak (kecuali cetak ulang)
+        const chk = $("identitasChk");
+        const ikut = !!(chk && chk.checked);
+        const ulang = !!($("identitasUlang") && $("identitasUlang").checked);
+        identitasIds = [];
 
-        pesan("Siap dicetak: " + santri.length + " santri.", "ok");
+        let html = "";
+        santri.forEach(s => {
+          const d = { ...s, ...(detailSantri[s.id] || {}) };
+          const perluIdentitas = ikut && (ulang || !d.identitas_cetak_at);
+          if (perluIdentitas) identitasIds.push(s.id);
+
+          html += (perluIdentitas ? htmlIdentitasSantri(d, ctx) : "") +
+            htmlRapor(s, ctx, nilaiMap, absenMap) +
+            (adaLampiran ? htmlLampiran(s, ctx, deskMap, aspekByKode) : "") +
+            htmlMawas(s, ctx, sesiList, hadirMap);
+        });
+        $("cetak").innerHTML = html;
+
+        const skip = ikut ? santri.length - identitasIds.length : 0;
+        pesan("Siap dicetak: " + santri.length + " santri." +
+          (ikut ? " Identitas: " + identitasIds.length + " akan dicetak, " + skip + " sudah pernah dicetak." : ""), "ok");
       }
     }
   });
