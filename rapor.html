@@ -151,7 +151,17 @@
           <div>Guru Kelas Kuttab Al Kalam<br><br><br><br><b><u>${esc(ctx.waliLabel || "........................")}</u></b></div>
         </div>`;
       }
-
+      // Tanda tangan kepala kuttab (satu kolom, di kanan)
+      function htmlTtdKepala(ctx) {
+        return `<div style="margin-top:10mm;display:flex;justify-content:flex-end;">
+          <div style="width:70mm;text-align:center;">
+            <div style="margin-bottom:4mm;">Tangerang Selatan, ${tglIndo(ctx.tanggal)}</div>
+            <div>Kepala Kuttab Al Kalam</div>
+            <div style="height:18mm;"></div>
+            <div><b><u>${esc(ctx.kepalaLabel || "........................")}</u></b></div>
+          </div>
+        </div>`;
+      }
       function htmlRapor(s, ctx, nilaiMap, absenMap) {
         const n = nilaiMap[s.id] || {};
         const ab = absenMap[s.id];
@@ -268,7 +278,7 @@
         </section>`;
       }
 
-            // Kehadiran orang tua dalam MAWAS. Persentase dihitung dari seluruh sesi di semester.
+               // Kehadiran orang tua dalam MAWAS. Persentase dihitung dari seluruh sesi di semester.
       function htmlMawas(s, ctx, sesi, hadirMap) {
         const h = hadirMap[s.id] || {};
         const total = sesi.length;
@@ -305,7 +315,7 @@
               Ayah: <b>${pa}%</b> (${a} dari ${total} kegiatan)<br>
               Ibu/Bunda: <b>${pb}%</b> (${b} dari ${total} kegiatan)
             </div>
-            ${htmlTtd(ctx)}
+            ${htmlTtdKepala(ctx)}
           </div>
         </section>`;
       }
@@ -504,7 +514,7 @@
           (hr.data || []).forEach(h => ((hadirMap[h.santri_id] ||= {})[h.sesi_id] = h));
         }
 
-        // Wali kelas dengan gelar
+               // Wali kelas dengan gelar (untuk rapor dan lampiran)
         let waliLabel = "";
         if (rombel.wali_kelas_id) {
           const { data: w } = await sb.from("pegawai")
@@ -512,8 +522,14 @@
           if (w) waliLabel = w.nama_lengkap + (w.gelar_belakang ? ", " + w.gelar_belakang : "");
         }
 
+        // Kepala kuttab dengan gelar (untuk tanda tangan MAWAS)
+        const { data: kep } = await sb.from("pegawai")
+          .select("nama_lengkap, gelar_belakang").eq("peran", "kepala").eq("status_aktif", true)
+          .order("id").limit(1).maybeSingle();
+        const kepalaLabel = kep ? kep.nama_lengkap + (kep.gelar_belakang ? ", " + kep.gelar_belakang : "") : "";
+
         const ctx = {
-          ta, sem, rombel, waliLabel, adaLampiran,
+          ta, sem, rombel, waliLabel, kepalaLabel, adaLampiran,
           tanggal: $("tanggal").value || new Date().toLocaleDateString("sv-SE")
         };
 
