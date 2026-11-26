@@ -47,9 +47,10 @@
   .ttd > div { text-align: center; }
   .ttd .tgl { margin-bottom: 4mm; }
 
-  /* Tanda tangan MAWAS: orang tua di kiri, kepala di kanan */
-  .ttd-kepala { display: grid; grid-template-columns: 1fr 70mm; column-gap: 8mm; margin-top: 10mm; font-size: 12px; }
+  /* Tanda tangan MAWAS: orang tua dan kepala sejajar, masing-masing setengah lebar */
+  .ttd-kepala { display: grid; grid-template-columns: 1fr 1fr; column-gap: 8mm; margin-top: 10mm; font-size: 12px; }
   .ttd-kepala > div { text-align: center; }
+  .ttd-kepala .tgl { margin-bottom: 4mm; }
 
   /* Halaman identitas santri */
   .judul-id { text-align: center; font-size: 14px; font-weight: bold; margin: 14mm 0 10mm; }
@@ -171,15 +172,16 @@
         </div>`;
       }
 
-      // Tanda tangan MAWAS: orang tua di kiri, kepala kuttab di kanan
+      // Tanda tangan MAWAS: orang tua di kiri dan kepala kuttab di kanan, sejajar seperti rapor
       function htmlTtdKepala(ctx) {
         return `<div class="ttd-kepala">
-          <div>Orang Tua / Wali<br><br><br><br>( ........................................ )</div>
           <div>
-            <div style="margin-bottom:4mm;">Tangerang Selatan, ${tglIndo(ctx.tanggal)}</div>
-            <div>Kepala Kuttab Al Kalam</div>
-            <div style="height:18mm;"></div>
-            <div><b><u>${esc(ctx.kepalaLabel || "........................")}</u></b></div>
+            <div class="tgl">&nbsp;</div>
+            <div>Orang Tua / Wali<br><br><br><br>( ........................................ )</div>
+          </div>
+          <div>
+            <div class="tgl">Tangerang Selatan, ${tglIndo(ctx.tanggal)}</div>
+            <div>Kepala Kuttab Al Kalam<br><br><br><br><b><u>${esc(ctx.kepalaLabel || "........................")}</u></b></div>
           </div>
         </div>`;
       }
