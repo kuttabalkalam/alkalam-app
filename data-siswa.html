@@ -43,7 +43,7 @@
   const BULAN_SINGKAT = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
   const HARI_ID = ["Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"];
 
-  const FIELD = [
+   const FIELD = [
     ["nama_lengkap", "Nama lengkap (sesuai akta) *", "text"],
     ["nama_panggilan", "Nama panggilan", "text"],
     ["jenis_kelamin", "Jenis kelamin *", "select", [["L", "Laki-laki"], ["P", "Perempuan"]]],
@@ -53,6 +53,9 @@
     ["tanggal_lahir", "Tanggal lahir", "date"],
     ["no_registrasi_akta", "No. registrasi akta", "text"],
     ["agama", "Agama", "text"],
+    ["anak_ke", "Anak ke *", "anak"],
+    ["status_dalam_keluarga", "Status dalam keluarga *", "select", [["Anak kandung", "Anak kandung"], ["Anak tiri (dari ayah)", "Anak tiri (dari ayah)"], ["Anak angkat", "Anak angkat"]]],
+    ["sekolah_asal", "Sekolah asal (opsional)", "text"],
     ["alamat_kk", "Alamat sesuai KK", "textarea"],
     ["rt_kk", "RT (KK)", "text"],
     ["rw_kk", "RW (KK)", "text"],
@@ -67,6 +70,10 @@
     ["nik_ibu", "NIK ibu", "text"],
     ["hp_orang_tua", "No. HP orang tua", "text"],
     ["email_ortu", "Email orang tua", "text"],
+    ["wali_nama", "Nama wali (opsional)", "text"],
+    ["wali_alamat", "Alamat wali (opsional)", "textarea"],
+    ["wali_telp", "No. telp wali (opsional)", "text"],
+    ["wali_pekerjaan", "Pekerjaan wali (opsional)", "text"],
     ["tingkat_masuk", "Mendaftar untuk tingkat", "select", TINGKAT],
     ["jenis_pendaftaran", "Jenis pendaftaran", "select", [["Siswa Baru", "Siswa Baru"], ["Pindahan", "Pindahan"]]]
   ];
@@ -104,9 +111,21 @@
   // Menggabungkan bagian alamat yang terisi
   const gabung = (...x) => x.filter(v => v && String(v).trim()).join(", ") || null;
 
-  function inputHtml(k, t, o, row) {
+    function inputHtml(k, t, o, row) {
     const v = row && row[k] != null ? row[k] : "";
     const id = "f_" + k;
+    if (t === "anak") {
+      const angka = ["1", "2", "3", "4", "5"];
+      const pilih = angka.includes(String(v)) ? String(v) : (v ? "lainnya" : "");
+      return `<select id="${id}" class="form-control form-control-sm"
+          onchange="document.getElementById('${id}_lain').classList.toggle('d-none', this.value !== 'lainnya')">
+        <option value="">-- pilih --</option>
+        ${angka.map(a => `<option value="${a}" ${pilih === a ? "selected" : ""}>${a}</option>`).join("")}
+        <option value="lainnya" ${pilih === "lainnya" ? "selected" : ""}>Lainnya</option>
+      </select>
+      <input id="${id}_lain" type="number" min="1" class="form-control form-control-sm mt-1 ${pilih === "lainnya" ? "" : "d-none"}"
+        placeholder="Tulis angka" value="${pilih === "lainnya" ? esc(v) : ""}">`;
+    }
     if (t === "select") {
       return `<select id="${id}" class="form-control form-control-sm">
         <option value="">-- pilih --</option>
@@ -488,6 +507,7 @@
                   <td>${esc(s.jadwal_interview || "-")}</td>
                   <td class="text-nowrap">
                     <button class="btn btn-sm btn-outline-secondary" data-detail="${s.id}"><i class="fas fa-eye"></i> Detail</button>
+                    ${s.jadwal_interview ? `<button class="btn btn-sm btn-outline-dark ml-1" data-perjanjian="${s.id}"><i class="fas fa-print"></i> Perjanjian</button>` : ""}
                     ${!admin ? "" : `
                       <button class="btn btn-sm btn-outline-secondary ml-1" data-ta="${s.id}"><i class="fas fa-exchange-alt"></i> TA</button>
                       <button class="btn btn-sm btn-outline-dark ml-1" data-jadwal="${s.id}"><i class="fas fa-calendar"></i> Jadwal</button>
@@ -530,6 +550,7 @@
                     <td>${statusWa(s)}</td>
                     <td class="text-nowrap">
                       <button class="btn btn-sm btn-outline-secondary" data-detail="${s.id}"><i class="fas fa-eye"></i> Detail</button>
+                      ${s.jadwal_interview ? `<button class="btn btn-sm btn-outline-dark ml-1" data-perjanjian="${s.id}"><i class="fas fa-print"></i> Perjanjian</button>` : ""}
                       ${admin && adaHp ? `
                         <button class="btn btn-sm btn-outline-success ml-1" data-wa="${s.id}" title="${s.wa_diumumkan_at ? "Kirim ulang pengumuman" : "Kirim pengumuman"}">
                           <i class="fab fa-whatsapp"></i> ${s.wa_diumumkan_at ? "Kirim ulang" : "Kirim"}
@@ -560,6 +581,8 @@
 
         // Detail tersedia untuk admin dan staf
         p.querySelectorAll("[data-detail]").forEach(b => b.onclick = () => lihatDetail(Number(b.dataset.detail)));
+        p.querySelectorAll("[data-perjanjian]").forEach(b => b.onclick = () =>
+          window.open("perjanjian.html?id=" + b.dataset.perjanjian + "&embed=1", "_blank"));
 
         if (admin) {
           document.getElementById("cAll").onchange = e => {
@@ -737,9 +760,10 @@
       async function simpanForm(e) {
         e.preventDefault();
         const d = {};
-        FIELD.forEach(([k]) => {
+        FIELD.forEach(([k, , t]) => {
           const el = document.getElementById("f_" + k);
-          const v = el ? el.value.trim() : "";
+          let v = el ? el.value.trim() : "";
+          if (t === "anak" && v === "lainnya") v = document.getElementById("f_" + k + "_lain").value.trim();
           d[k] = v === "" ? null : v;
         });
 
