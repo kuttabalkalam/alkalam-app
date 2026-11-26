@@ -280,7 +280,7 @@
         </section>`;
       }
 
-      // Kehadiran orang tua dalam MAWAS. Persentase dihitung dari seluruh sesi di semester.
+            // Kehadiran orang tua dalam MAWAS. Persentase dihitung dari seluruh sesi di semester.
       function htmlMawas(s, ctx, sesi, hadirMap) {
         const h = hadirMap[s.id] || {};
         const total = sesi.length;
@@ -317,6 +317,7 @@
               Ayah: <b>${pa}%</b> (${a} dari ${total} kegiatan)<br>
               Ibu/Bunda: <b>${pb}%</b> (${b} dari ${total} kegiatan)
             </div>
+            ${htmlTtd(ctx)}
           </div>
         </section>`;
       }
