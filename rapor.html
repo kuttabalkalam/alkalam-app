@@ -47,20 +47,35 @@
   .ttd > div { text-align: center; }
   .ttd .tgl { margin-bottom: 4mm; }
 
-  /* ===== Cetak: hanya halaman rapor yang keluar ===== */
+    /* ===== Cetak: hanya halaman rapor yang keluar, mulai dari pojok kiri atas ===== */
   @media print {
     @page { size: A4; margin: 0; }
-    body, .wrapper, .content-wrapper, .content, .container-fluid {
-      background: #fff !important; margin: 0 !important; padding: 0 !important; min-height: 0 !important;
+
+    html, body { background: #fff !important; margin: 0 !important; padding: 0 !important; height: auto !important; }
+
+    /* Sembunyikan semua, lalu tampilkan hanya area rapor */
+    body * { visibility: hidden !important; }
+    #cetak, #cetak * { visibility: visible !important; }
+
+    /* Lepas dari layout AdminLTE agar tidak ikut padding atau margin */
+    .wrapper, .content-wrapper, .content, .container-fluid, .card, .card-body {
+      position: static !important; margin: 0 !important; padding: 0 !important;
+      background: #fff !important; border: 0 !important; box-shadow: none !important;
+      min-height: 0 !important; overflow: visible !important;
     }
-    .main-header, .main-sidebar, .content-header, .main-footer, .no-print { display: none !important; }
-    .content-wrapper { margin-left: 0 !important; }
-    .card { border: 0 !important; box-shadow: none !important; background: transparent !important; }
-    .card-body { padding: 0 !important; }
-    .pratinjau { overflow: visible !important; background: #fff !important; padding: 0 !important; }
-    .page { width: 210mm; margin: 0; padding-bottom: 8mm; border: none; box-shadow: none; page-break-after: always; }
+
+    #cetak {
+      position: absolute !important; left: 0 !important; top: 0 !important;
+      width: 210mm !important; background: #fff !important; padding: 0 !important;
+      overflow: visible !important;
+    }
+
+    .page {
+      width: 210mm !important; margin: 0 !important; padding-bottom: 8mm;
+      border: none !important; box-shadow: none !important; page-break-after: always;
+    }
     .page:last-child { page-break-after: auto; }
-    .page.lampiran, .page.mawas { border-top: none; }
+    .page.lampiran, .page.mawas { border-top: none !important; }
   }
 </style>
 </head>
