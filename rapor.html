@@ -400,20 +400,38 @@
 
       $("taSel").onchange = async () => { isiSemester(); await muatRombel(); };
       $("tampil").onclick = tampilkan;
-            // Cetak: area rapor dipindah ke body sementara, lalu dikembalikan setelah dialog cetak ditutup
+            // Cetak lewat jendela baru yang hanya berisi rapor, bebas dari layout AdminLTE
       function cetakRapor() {
         const area = $("cetak");
-        const asal = area.parentElement;
-        const posisi = area.nextSibling;
-        document.body.appendChild(area);
+        if (!area.querySelector(".page")) return pesan("Tampilkan rapor terlebih dahulu.", "error");
 
-        const selesai = () => {
-          if (posisi && posisi.parentNode === asal) asal.insertBefore(area, posisi);
-          else asal.appendChild(area);
-          window.removeEventListener("afterprint", selesai);
-        };
-        window.addEventListener("afterprint", selesai);
-        window.print();
+        const css = [...document.querySelectorAll("style")].map(s => s.textContent).join("\n");
+        const w = window.open("", "_blank");
+        if (!w) return pesan("Jendela cetak diblokir browser. Izinkan pop-up untuk situs ini.", "error");
+
+        w.document.open();
+        w.document.write(`<!DOCTYPE html>
+          <html lang="id">
+          <head>
+          <meta charset="UTF-8">
+          <title>Rapor</title>
+          <base href="${location.href}">
+          <style>
+          ${css}
+          @page { size: A4; margin: 0; }
+          html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; width: 210mm !important; }
+          #cetak { display: block !important; width: 210mm !important; margin: 0 !important; padding: 0 !important; }
+          .page { width: 210mm !important; margin: 0 !important; box-shadow: none !important; border: 0 !important; page-break-after: always; }
+          .page:last-child { page-break-after: auto; }
+          .page.lampiran, .page.mawas { border-top: 0 !important; }
+          </style>
+          </head>
+          <body>
+          <div id="cetak">${area.innerHTML}</div>
+          </body>
+          </html>`);
+        w.document.close();
+        w.addEventListener("load", () => setTimeout(() => w.print(), 300));
       }
       $("cetakBtn").onclick = cetakRapor;
 
