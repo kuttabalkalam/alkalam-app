@@ -19,10 +19,10 @@
   .card-header { background: #bfe3f5; font-weight: 600; }
   .btn-kuning { background: var(--kuning); color: var(--hitam); border: none; font-weight: 600; }
   .btn-kuning:hover { background: #e0b53a; color: var(--hitam); }
+  .btn-kuning:disabled { background: #cfcfcf; color: #666; }
   .bagian { font-weight: 700; color: var(--hitam); border-bottom: 1px solid #ddd; margin: 14px 0 10px; padding-bottom: 4px; }
   .biaya { background: #fff8e1; border: 1px solid var(--kuning); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
   .honeypot { position: absolute; left: -9999px; }
-  .hint { font-size: 12px; color: #6c757d; margin-bottom: 6px; }
 </style>
 </head>
 <body>
@@ -34,9 +34,7 @@
 </div>
 
 <div class="wrap">
-  <div class="alert alert-warning d-none" id="tutup">
-    Pendaftaran belum dibuka. Silakan hubungi admin untuk informasi lebih lanjut.
-  </div>
+  <div class="alert alert-warning d-none" id="tutup"></div>
 
   <div id="sukses" class="card d-none">
     <div class="card-body text-center">
@@ -85,7 +83,24 @@
         <div class="col-md-6 form-group"><label class="small mb-1">Tanggal lahir *</label>
           <input id="tanggal_lahir" type="date" class="form-control" required></div>
         <div class="col-md-6 form-group"><label class="small mb-1">Nama panggilan *</label>
-          <input id="panggilan" class="form-control" placeholder="Contoh: Fauzan" required></div>
+          <input id="panggilan" class="form-control" placeholder="Contoh: FAUZAN" required></div>
+        <div class="col-md-6 form-group"><label class="small mb-1">Anak ke *</label>
+          <select id="anak_ke" class="form-control" required>
+            <option value="">-- pilih --</option>
+            <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+            <option value="4">4</option><option value="5">5</option>
+            <option value="lainnya">Lainnya</option>
+          </select>
+          <input id="anak_ke_lain" type="number" min="1" max="99" inputmode="numeric" class="form-control mt-1 d-none" placeholder="Tulis angka"></div>
+        <div class="col-md-6 form-group"><label class="small mb-1">Status dalam keluarga *</label>
+          <select id="status_keluarga" class="form-control" required>
+            <option value="">-- pilih --</option>
+            <option value="Anak kandung">Anak kandung</option>
+            <option value="Anak tiri (dari ayah)">Anak tiri (dari ayah)</option>
+            <option value="Anak angkat">Anak angkat</option>
+          </select></div>
+        <div class="col-md-12 form-group"><label class="small mb-1">Sekolah asal (opsional)</label>
+          <input id="sekolah_asal" class="form-control" placeholder="Nama sekolah sebelumnya"></div>
       </div>
 
       <div class="bagian">Alamat Domisili (tempat tinggal saat ini)</div>
@@ -99,7 +114,6 @@
         <div class="col-4 form-group"><label class="small mb-1">Kode pos *</label>
           <input id="alamat_dom_kodepos" class="form-control" maxlength="5" inputmode="numeric" placeholder="Contoh: 15415" required></div>
       </div>
-      <div class="hint">Pilih provinsi dan kota/kabupaten untuk mempersempit daftar. Keduanya hanya untuk memilih wilayah dan tidak disimpan.</div>
       <div id="domWil"></div>
 
       <div class="bagian">Alamat Sesuai KK</div>
@@ -146,10 +160,22 @@
           <input id="hp_ibu" type="tel" class="form-control" placeholder="Contoh: 081234567890" required></div>
         <div class="col-md-6 form-group"><label class="small mb-1">Pekerjaan ibu *</label>
           <select id="pekerjaan_ibu" class="form-control" required></select></div>
-        <div class="col-md-6 form-group"><label class="small mb-1"> ibu *</label>
+        <div class="col-md-6 form-group"><label class="small mb-1">Penghasilan ibu *</label>
           <select id="penghasilan_ibu" class="form-control" required></select></div>
         <div class="col-md-12 form-group"><label class="small mb-1">Email orang tua *</label>
           <input id="email_ortu" type="email" class="form-control" placeholder="Contoh: nama@email.com" required></div>
+      </div>
+
+      <div class="bagian">Wali Santri (opsional)</div>
+      <div class="form-row">
+        <div class="col-md-6 form-group"><label class="small mb-1">Nama wali</label>
+          <input id="wali_nama" class="form-control"></div>
+        <div class="col-md-6 form-group"><label class="small mb-1">No. telp wali</label>
+          <input id="wali_telp" type="tel" class="form-control" placeholder="Contoh: 081234567890"></div>
+        <div class="col-md-6 form-group"><label class="small mb-1">Pekerjaan wali</label>
+          <input id="wali_pekerjaan" class="form-control"></div>
+        <div class="col-md-6 form-group"><label class="small mb-1">Alamat wali</label>
+          <input id="wali_alamat" class="form-control"></div>
       </div>
 
       <div class="bagian">Biaya dan Bukti Pembayaran</div>
@@ -174,331 +200,6 @@
   </form>
 </div>
 
-<script>
-  const SUPABASE_URL = "https://epynlmuqxumuwcjsrnsz.supabase.co";
-  const SUPABASE_KEY = "sb_publishable_Oq_to1zgHLnachvWYLV_yA_DoOTGI3s";
-  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
-  });
-
-  const TIPE = { "application/pdf": "pdf", "image/jpeg": "jpg", "image/png": "png" };
-  const MAKS = 2 * 1024 * 1024;
-  const PEKERJAAN = ["PNS / ASN","Karyawan Swasta","Wirausaha / Dagang","Pekerja Lepas / Freelance","Tidak Bekerja"];
-  const PENGHASILAN = ["Tidak Ada","s/d 3 juta","s/d 5 juta","s/d 10 juta","s/d 15 juta",">20 juta"];
-
-  // Wilayah dari layanan publik. Default: Banten, Kota Tangerang Selatan
-  const WIL = "https://emsifa.github.io/api-wilayah-indonesia/api/";
-  const DEF_PROV = "36";
-  const DEF_KOTA = "3674";
-  const LAIN = "__lain";
-  const NAMA = { prov: "provinsi", kota: "kota/kabupaten", kec: "kecamatan", desa: "desa/kelurahan" };
-  const URUT = ["prov", "kota", "kec", "desa"];
-
-  const $ = id => document.getElementById(id);
-  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
-  const upper = s => (s || "").trim().toUpperCase();
-  const titleCase = s => (s || "").trim().toLowerCase().replace(/(^|\s)\S/g, m => m.toUpperCase());
-  const cleanNik = s => (s || "").replace(/\s/g, "");
-  const val = id => $(id).value.trim();
-
-  function normHp(v) {
-    let b = (v || "").replace(/[\s\-()]/g, "");
-    if (b.startsWith("+")) b = b.slice(1);
-    if (b.startsWith("0")) b = "62" + b.slice(1);
-    return /^62[0-9]{8,13}$/.test(b) ? b : null;
-  }
-
-  const pesan = t => { $("pesan").textContent = t; };
-  const status = t => { $("status").textContent = t; };
-
-  function isiSelect(id, list) {
-    $(id).innerHTML = `<option value="">-- pilih --</option>` +
-      list.map(x => `<option value="${x}">${x}</option>`).join("");
-  }
-
-  function cekBerkas(f) {
-    if (!f) return "Unggah bukti transfer terlebih dahulu.";
-    if (!TIPE[f.type]) return "Bukti transfer harus berupa JPG, PNG, atau PDF.";
-    if (f.size > MAKS) return "Ukuran bukti transfer maksimal 2 MB.";
-    return null;
-  }
-
-  // Berkas diunggah ke folder pending/ dulu, lalu dikaitkan saat data disimpan
-  async function unggahBukti(f) {
-    const path = "pending/" + crypto.randomUUID() + "/bukti." + TIPE[f.type];
-    const { error } = await sb.storage.from("bukti-bayar")
-      .upload(path, f, { contentType: f.type, upsert: false });
-    if (error) throw new Error("Gagal mengunggah bukti transfer. Periksa koneksi lalu coba lagi.");
-    return path;
-  }
-
-  // ===== WILAYAH: provinsi > kota/kabupaten > kecamatan > desa/kelurahan =====
-  function blokWilayah(p) {
-    return `
-      <div class="form-row">
-        <div class="col-md-6 form-group">
-          <label class="small mb-1">Provinsi</label>
-          <select id="${p}_prov" class="form-control" disabled><option value="">Memuat...</option></select>
-        </div>
-        <div class="col-md-6 form-group">
-          <label class="small mb-1">Kota/Kabupaten</label>
-          <select id="${p}_kota" class="form-control" disabled><option value="">-- pilih provinsi dulu --</option></select>
-        </div>
-        <div class="col-md-6 form-group">
-          <label class="small mb-1">Kecamatan *</label>
-          <select id="${p}_kec" class="form-control" disabled><option value="">-- pilih kota dulu --</option></select>
-          <input id="${p}_kec_lain" class="form-control mt-1 d-none" placeholder="Tulis nama kecamatan">
-        </div>
-        <div class="col-md-6 form-group">
-          <label class="small mb-1">Desa / Kelurahan *</label>
-          <select id="${p}_desa" class="form-control" disabled><option value="">-- pilih kecamatan dulu --</option></select>
-          <input id="${p}_desa_lain" class="form-control mt-1 d-none" placeholder="Tulis nama desa/kelurahan">
-        </div>
-      </div>
-      <div class="small text-danger d-none" id="${p}_err">
-        Daftar wilayah belum bisa dimuat. <a href="#" id="${p}_retry">Muat ulang</a>.
-      </div>`;
-  }
-
-      let CACHE_WILAYAH = null;
-
-  // Data wilayah dibaca dari berkas wilayah.json di repositori (tidak butuh layanan luar)
-  async function muatWilayah() {
-    if (CACHE_WILAYAH) return CACHE_WILAYAH;
-    const r = await fetch("wilayah.json?v=1");
-    if (!r.ok) throw new Error("gagal");
-    CACHE_WILAYAH = await r.json();
-    return CACHE_WILAYAH;
-  }
-
-  async function ambil(path) {
-    const d = await muatWilayah();
-    const [jenis, id] = path.replace(".json", "").split("/");
-    if (jenis === "provinces") return d.provinsi;
-    if (jenis === "regencies") return d.kota[id] || [];
-    if (jenis === "districts") return d.kecamatan[id] || [];
-    if (jenis === "villages") return d.desa[id] || [];
-    return [];
-  }
-
-  function opsi(list, kosong, bolehLain) {
-    return `<option value="">${kosong}</option>` +
-      list.map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join("") +
-      (bolehLain ? `<option value="${LAIN}">Lainnya (ketik manual)</option>` : "");
-  }
-
-  function setErr(p, on) { $(p + "_err").classList.toggle("d-none", !on); }
-
-  // Mengisi satu level. Jika gagal, tampilkan pesan dan tombol muat ulang
-  async function isiLevel(p, lv, path, kosong, bolehLain) {
-    const sel = $(p + "_" + lv);
-    sel.disabled = true;
-    sel.innerHTML = `<option value="">Memuat...</option>`;
-    try {
-      const list = await ambil(path);
-      sel.innerHTML = opsi(list, kosong, bolehLain);
-      sel.disabled = false;
-      setErr(p, false);
-      return true;
-    } catch (e) {
-      sel.innerHTML = `<option value="">-- gagal memuat --</option>` +
-        (bolehLain ? `<option value="${LAIN}">Lainnya (ketik manual)</option>` : "");
-      sel.disabled = false;
-      setErr(p, true);
-      return false;
-    }
-  }
-
-  // Mengosongkan level dari lv ke bawah
-  function resetDari(p, lv) {
-    URUT.slice(URUT.indexOf(lv)).forEach(x => {
-      const sel = $(p + "_" + x);
-      sel.innerHTML = `<option value="">-- pilih ${NAMA[URUT[URUT.indexOf(x) - 1]] || "provinsi"} dulu --</option>`;
-      sel.value = "";
-      sel.disabled = true;
-      if (x === "kec" || x === "desa") $(p + "_" + x + "_lain").classList.add("d-none");
-    });
-  }
-
-  async function muatKota(p, provId) {
-    resetDari(p, "kota");
-    if (!provId) return;
-    await isiLevel(p, "kota", "regencies/" + provId + ".json", "-- pilih kota/kabupaten --", false);
-  }
-
-  async function muatKec(p, kotaId) {
-    resetDari(p, "kec");
-    if (!kotaId) return;
-    await isiLevel(p, "kec", "districts/" + kotaId + ".json", "-- pilih kecamatan --", true);
-  }
-
-  async function muatDesa(p, kecId) {
-    resetDari(p, "desa");
-    if (!kecId) return;
-    if (kecId === LAIN) return desaManual(p);
-    await isiLevel(p, "desa", "villages/" + kecId + ".json", "-- pilih desa/kelurahan --", true);
-  }
-
-  function desaManual(p) {
-    const sel = $(p + "_desa");
-    sel.innerHTML = `<option value="${LAIN}">Lainnya (ketik manual)</option>`;
-    sel.value = LAIN;
-    sel.disabled = true;
-    $(p + "_desa_lain").classList.remove("d-none");
-  }
-
-  // Memuat seluruh rantai dari provinsi, dengan default Banten > Tangerang Selatan
-  async function initWilayah(p) {
-    setErr(p, false);
-    const ok = await isiLevel(p, "prov", "provinces.json", "-- pilih provinsi --", false);
-    if (!ok) return;
-    $(p + "_prov").value = DEF_PROV;
-    await muatKota(p, DEF_PROV);
-    if ($(p + "_kota").querySelector(`option[value="${DEF_KOTA}"]`)) {
-      $(p + "_kota").value = DEF_KOTA;
-      await muatKec(p, DEF_KOTA);
-    }
-  }
-
-  function pasangWilayah(p) {
-    $(p + "_retry").onclick = e => { e.preventDefault(); initWilayah(p); };
-    $(p + "_prov").onchange = () => muatKota(p, $(p + "_prov").value);
-    $(p + "_kota").onchange = () => muatKec(p, $(p + "_kota").value);
-    $(p + "_kec").onchange = () => {
-      const v = $(p + "_kec").value;
-      $(p + "_kec_lain").classList.toggle("d-none", v !== LAIN);
-      muatDesa(p, v);
-    };
-    $(p + "_desa").onchange = () =>
-      $(p + "_desa_lain").classList.toggle("d-none", $(p + "_desa").value !== LAIN);
-  }
-
-  // Hanya nama kecamatan dan desa yang disimpan, dari daftar atau isian manual
-  function wilayahDari(p) {
-    const kecSel = $(p + "_kec"), desaSel = $(p + "_desa");
-    const kec = kecSel.value === LAIN ? val(p + "_kec_lain")
-      : (kecSel.value ? kecSel.selectedOptions[0].textContent.trim() : "");
-    const desa = desaSel.value === LAIN ? val(p + "_desa_lain")
-      : (desaSel.value ? desaSel.selectedOptions[0].textContent.trim() : "");
-    return { kec, desa };
-  }
-
-  function atursama() {
-    const beda = $("sama").value === "tidak";
-    $("kkBox").classList.toggle("d-none", !beda);
-    ["alamat_kk","rt_kk","rw_kk","kode_pos"].forEach(id => $(id).required = beda);
-  }
-
-  async function init() {
-    isiSelect("pekerjaan_ayah", PEKERJAAN);
-    isiSelect("pekerjaan_ibu", PEKERJAAN);
-    isiSelect("penghasilan_ayah", PENGHASILAN);
-    isiSelect("penghasilan_ibu", PENGHASILAN);
-    $("sama").onchange = atursama;
-    atursama();
-
-    $("domWil").innerHTML = blokWilayah("dom");
-    $("kkWil").innerHTML = blokWilayah("kk");
-    pasangWilayah("dom");
-    pasangWilayah("kk");
-    initWilayah("dom");
-    initWilayah("kk");
-
-    const [b, t] = await Promise.all([sb.rpc("pendaftaran_buka"), sb.rpc("tahun_pendaftaran")]);
-    if (t.data) $("tahunLabel").textContent = "Tahun ajaran " + t.data.replace("-", "/");
-    if (!(b.data === true && t.data)) {
-      $("tutup").classList.remove("d-none");
-      $("formDaftar").classList.add("d-none");
-    }
-  }
-
-  $("formDaftar").addEventListener("submit", async e => {
-    e.preventDefault();
-    if ($("website").value) return;
-    pesan("");
-
-    if (!$("formDaftar").checkValidity()) { $("formDaftar").reportValidity(); return; }
-
-    const nik = cleanNik($("nik").value);
-    const nikAyah = cleanNik($("nik_ayah").value);
-    const nikIbu = cleanNik($("nik_ibu").value);
-    if (!/^\d{16}$/.test(nik)) return pesan("NIK santri harus 16 digit angka.");
-    if (!/^\d{16}$/.test(nikAyah) || !/^\d{16}$/.test(nikIbu)) return pesan("NIK ayah dan ibu harus 16 digit angka.");
-
-    const hpIbu = normHp($("hp_ibu").value);
-    const hpAyah = normHp($("hp_ayah").value);
-    if (!hpAyah) return pesan("Nomor HP ayah tidak valid. Contoh: 081234567890");
-    if (!hpIbu) return pesan("Nomor HP ibu tidak valid. Contoh: 081234567890");
-
-    const dom = wilayahDari("dom");
-    if (!dom.kec || !dom.desa) return pesan("Pilih kecamatan dan desa/kelurahan domisili.");
-
-    const sama = $("sama").value === "ya";
-    const kk = sama ? null : wilayahDari("kk");
-    if (kk && (!kk.kec || !kk.desa)) return pesan("Pilih kecamatan dan desa/kelurahan sesuai KK.");
-
-    const f = $("bukti").files[0];
-    const errBerkas = cekBerkas(f);
-    if (errBerkas) return pesan(errBerkas);
-
-    $("btnKirim").disabled = true;
-    try {
-      status("Mengunggah bukti transfer...");
-      const buktiPath = await unggahBukti(f);
-
-      status("Menyimpan data pendaftaran...");
-      const { error } = await sb.rpc("daftar_umum", {
-        p: {
-          nama_lengkap: titleCase($("nama_lengkap").value),
-          jenis_kelamin: $("jenis_kelamin").value,
-          jenis_pendaftaran: $("jenis_pendaftaran").value,
-          nik,
-          nisn: val("nisn") || null,
-          no_registrasi_akta: val("akta"),
-          nama_panggilan: val("panggilan"),
-          tempat_lahir: upper($("tempat_lahir").value),
-          tanggal_lahir: $("tanggal_lahir").value,
-          alamat: $("alamat").value,
-          alamat_dom_rt: val("alamat_dom_rt"),
-          alamat_dom_rw: val("alamat_dom_rw"),
-          alamat_dom_desa: dom.desa,
-          alamat_dom_kecamatan: dom.kec,
-          alamat_dom_kodepos: val("alamat_dom_kodepos"),
-          alamat_sama: sama,
-          alamat_kk: sama ? null : val("alamat_kk"),
-          rt_kk: sama ? null : val("rt_kk"),
-          rw_kk: sama ? null : val("rw_kk"),
-          kode_pos: sama ? null : val("kode_pos"),
-          desa_kelurahan: sama ? null : kk.desa,
-          kecamatan: sama ? null : kk.kec,
-          nama_ayah: $("nama_ayah").value,
-          nik_ayah: nikAyah,
-          hp_ayah: hpAyah,
-          pekerjaan_ayah: $("pekerjaan_ayah").value,
-          penghasilan_ayah: $("penghasilan_ayah").value,
-          nama_ibu: $("nama_ibu").value,
-          nik_ibu: nikIbu,
-          hp_ibu: hpIbu,
-          pekerjaan_ibu: $("pekerjaan_ibu").value,
-          penghasilan_ibu: $("penghasilan_ibu").value,
-          email_ortu: val("email_ortu"),
-          bukti_path: buktiPath
-        }
-      });
-      if (error) throw new Error(error.message);
-
-      $("formDaftar").classList.add("d-none");
-      $("sukses").classList.remove("d-none");
-      window.scrollTo(0, 0);
-    } catch (err) {
-      pesan(err.message);
-    } finally {
-      $("btnKirim").disabled = false;
-      status("");
-    }
-  });
-
-  init();
-</script>
+<script src="pendaftaran.js"></script>
 </body>
 </html>
