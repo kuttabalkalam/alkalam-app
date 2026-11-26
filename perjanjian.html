@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Perjanjian Calon Santri - Kuttab Al-Kalam</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.4/css/all.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2.0/dist/css/adminlte.min.css">
+<link rel="stylesheet" href="ui.css">
+<style>
+  @page { size: A4; margin: 0; }
+  .page { width: 210mm; margin: 0 auto; padding-bottom: 8mm; background: #fff; box-sizing: border-box; color: #111; font-size: 12px; line-height: 1.6; }
+  .kop { display: block; width: 100%; margin: 0; }
+  .isi { padding: 0 12mm; }
+  .baris { display: flex; margin: 1.5mm 0; }
+  .baris .lbl { width: 45mm; }
+  .baris .sep { width: 4mm; }
+  .baris .val { flex: 1; min-height: 16px; border-bottom: 1px dotted #555; padding-left: 2px; }
+  .soal { margin-top: 6mm; }
+  .soal .pertanyaan { font-weight: 600; margin-bottom: 2mm; }
+  .garis { border-bottom: 1px solid #888; height: 8mm; }
+  .pernyataan { margin-top: 8mm; font-weight: 700; }
+  .pernyataan ol { padding-left: 6mm; margin: 2mm 0 0; font-weight: 400; }
+  .pernyataan li { margin-bottom: 1.5mm; text-align: justify; }
+  .ttd { margin-top: 10mm; display: flex; justify-content: flex-end; }
+  .ttd .blok { width: 80mm; text-align: center; }
+  .materai { margin: 6mm 0 16mm; }
+  @media print {
+    .no-print { display: none !important; }
+    body { margin: 0 !important; }
+    .page { margin: 0 !important; }
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  }
+</style>
+</head>
+<body class="hold-transition sidebar-mini">
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/admin-lte@3.2.0/dist/js/adminlte.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="ui.js"></script>
+
+<script>
+  KUTTAB.halaman({
+    aktif: "perjanjian",
+    judul: "Perjanjian",
+    roles: ["admin", "staf"],
+    render: async ({ sb, konten, gagal, esc }) => {
+      const id = Number(new URLSearchParams(location.search).get("id"));
+      if (!id) { konten.innerHTML = '<p class="p-3">Calon tidak ditemukan.</p>'; return; }
+
+      const { data: s, error } = await sb.from("santri")
+        .select("nama_lengkap, anak_ke, status_dalam_keluarga, sekolah_asal, wali_nama, wali_al
