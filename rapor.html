@@ -126,8 +126,7 @@
       const tglIndo = iso => { if (!iso) return "-"; const [y, m, d] = iso.split("-"); return Number(d) + " " + BULAN[Number(m) - 1] + " " + y; };
       const teksAman = v => v == null || v === "" ? "-" : esc(v);
 
-      const SANTRI_IDENT = "id, nis, nama_lengkap, jenis_kelamin, tempat_lahir, tanggal_lahir, agama, alamat, alamat_dom_rt, alamat_dom_rw, alamat_dom_desa, alamat_dom_kecamatan, alamat_dom_kodepos, hp_orang_tua, nama_ayah, nama_ibu, pekerjaan_ayah, pekerjaan_ibu, tanggal_aktif, tanggal_diterima, identitas_cetak_at";
-
+      const SANTRI_IDENT = "id, nis, nama_lengkap, jenis_kelamin, tempat_lahir, tanggal_lahir, agama, alamat, alamat_dom_rt, alamat_dom_rw, alamat_dom_desa, alamat_dom_kecamatan, alamat_dom_kodepos, hp_orang_tua, nama_ayah, nama_ibu, pekerjaan_ayah, pekerjaan_ibu, tanggal_aktif, tanggal_diterima, identitas_cetak_at, anak_ke, status_dalam_keluarga, sekolah_asal, wali_nama, wali_alamat, wali_telp, wali_pekerjaan";
       // Struktur: kelompok > mapel > sub-komponen (anak). Mapel tanpa anak adalah baris tunggal.
       const STRUKTUR = [
         { kelompok: "I. Muatan Khusus", mapel: [
@@ -344,7 +343,9 @@
         </section>`;
       }
 
-      // Identitas santri: hanya data yang ada di database. Dicetak sekali, kecuali admin memilih cetak ulang.
+            // Identitas santri: data dari database. Kolom yang belum diisi dibiarkan kosong, tanpa strip.
+      const teksKosong = v => (v == null || String(v).trim() === "") ? "" : esc(String(v));
+
       function htmlIdentitasSantri(s, ctx) {
         const jk = s.jenis_kelamin === "L" ? "Laki-laki" : s.jenis_kelamin === "P" ? "Perempuan" : "-";
         const alamat = [
@@ -358,10 +359,14 @@
 
         const isi = (no, label, nilai) =>
           `<tr><td class="no">${no}</td><td class="lbl">${esc(label)}</td><td class="colon">:</td><td class="val">${teksAman(nilai)}</td></tr>`;
+        const isiKosong = (no, label, nilai) =>
+          `<tr><td class="no">${no}</td><td class="lbl">${esc(label)}</td><td class="colon">:</td><td class="val">${teksKosong(nilai)}</td></tr>`;
         const judul = (no, label) =>
           `<tr><td class="no">${no}</td><td class="lbl" colspan="3">${esc(label)}</td></tr>`;
         const sisip = (label, nilai) =>
           `<tr><td></td><td class="lbl sisip">${esc(label)}</td><td class="colon">:</td><td class="val">${teksAman(nilai)}</td></tr>`;
+        const sisipKosong = (label, nilai) =>
+          `<tr><td></td><td class="lbl sisip">${esc(label)}</td><td class="colon">:</td><td class="val">${teksKosong(nilai)}</td></tr>`;
 
         return `<section class="page identitas">
           <div class="isi">
@@ -372,18 +377,26 @@
               ${isi(3, "Tempat, Tanggal Lahir", ttl)}
               ${isi(4, "Agama", s.agama)}
               ${isi(5, "Jenis Kelamin", jk)}
-              ${isi(6, "Alamat Santri", alamat)}
-              ${isi(7, "Nomor Telepon", s.hp_orang_tua)}
-              ${judul(8, "Diterima di sekolah ini")}
+              ${isiKosong(6, "Anak ke", s.anak_ke)}
+              ${isiKosong(7, "Status dalam keluarga", s.status_dalam_keluarga)}
+              ${isi(8, "Alamat Santri", alamat)}
+              ${isi(9, "Nomor Telepon", s.hp_orang_tua)}
+              ${judul(10, "Diterima di sekolah ini")}
               ${sisip("Di kelas", ctx.rombel.nama)}
               ${sisip("Pada tanggal", tglMasuk ? tglIndo(tglMasuk) : "-")}
               ${sisip("Semester", ctx.sem.nomor === 1 ? "Ganjil" : "Genap")}
-              ${judul(9, "Nama Orang Tua")}
+              ${isiKosong(11, "Sekolah Asal", s.sekolah_asal)}
+              ${judul(12, "Nama Orang Tua")}
               ${sisip("a. Ayah", s.nama_ayah)}
               ${sisip("b. Ibu", s.nama_ibu)}
-              ${judul(10, "Pekerjaan Orang Tua")}
+              ${judul(13, "Pekerjaan Orang Tua")}
               ${sisip("a. Ayah", s.pekerjaan_ayah)}
               ${sisip("b. Ibu", s.pekerjaan_ibu)}
+              ${judul(14, "Wali Santri")}
+              ${sisipKosong("Nama", s.wali_nama)}
+              ${sisipKosong("Alamat", s.wali_alamat)}
+              ${sisipKosong("Nomor Telepon", s.wali_telp)}
+              ${sisipKosong("Pekerjaan", s.wali_pekerjaan)}
             </table>
             <div class="id-bawah">
               <div class="id-foto"></div>
