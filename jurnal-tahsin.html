@@ -129,11 +129,14 @@
               <input type="date" id="tanggal" class="form-control">
             </div>
             <div class="col-6 col-md-5 mb-2">
-              <label class="small mb-1">Kitab</label>
+              <label class="small mb-1">Jenis</label>
               <div class="btn-group d-flex" role="group">
-                <button type="button" class="btn btn-outline-dark kitab-btn active" data-kitab="tilawati">Tilawati</button>
-                <button type="button" class="btn btn-outline-dark kitab-btn" data-kitab="quran">Quran</button>
-                <button type="button" class="btn btn-outline-dark kitab-btn" data-kitab="tahfidz">Tahfidz</button>
+                <button type="button" class="btn btn-outline-dark grup-btn active" data-grup="tahsin">Tahsin</button>
+                <button type="button" class="btn btn-outline-dark grup-btn" data-grup="tahfidz">Tahfidz</button>
+              </div>
+              <div class="btn-group d-flex mt-2" id="subTahsin" role="group">
+                <button type="button" class="btn btn-outline-dark sub-btn active" data-kitab="tilawati">Tilawati</button>
+                <button type="button" class="btn btn-outline-dark sub-btn" data-kitab="quran">Quran</button>
               </div>
             </div>
           </div>
@@ -171,7 +174,7 @@
       const tgl = () => $("tanggal").value;
       const rid = () => Number($("rombel").value);
 
-      let tab = "jurnal", kitab = "tilawati";
+      let tab = "jurnal", kitab = "tilawati", grup = "tahsin";
       let santri = [], jurnalRaw = [];
       let lastMap = {}, lastKitab = {}, todayMap = {}, catatanMap = {};
 
@@ -193,8 +196,9 @@
 
       function ringkas(j) {
         const lbl = LABEL[j.kitab] || LABEL.tilawati;
+        const rentang = j.sampai != null && j.sampai !== j.halaman ? "–" + j.sampai : "";
         return `<span class="badge badge-kitab">${esc(KITAB[j.kitab] || j.kitab)}</span>
-          ${esc(namaUnit(j.kitab, j.unit))} · ${lbl.angka} ${j.halaman} · <strong>${esc(j.keterangan)}</strong> · ${tglIndo(j.tanggal)}`;
+          ${esc(namaUnit(j.kitab, j.unit))} · ${lbl.angka} ${j.halaman}${rentang} · <strong>${esc(j.keterangan)}</strong> · ${tglIndo(j.tanggal)}`;
       }
 
       function renderJurnal() {
@@ -237,7 +241,7 @@
           b.onclick = () => daftarUjian(Number(b.dataset.daftar)));
       }
 
-      function bukaForm(sid) {
+           function bukaForm(sid) {
         const box = $("form-" + sid);
         if (box.style.display !== "none") { box.style.display = "none"; return; }
         document.querySelectorAll(".form-jurnal").forEach(f => f.style.display = "none");
@@ -254,11 +258,15 @@
                   `<option value="${v}" ${String(hari.unit ?? "") === v ? "selected" : ""}>${esc(t)}</option>`).join("")}
               </select>
             </div>
-            <div class="col-12 col-md-3 mb-2">
-              <label class="small mb-1">${lbl.angka}</label>
-              <input type="number" min="0" step="1" class="form-control f-angka" value="${hari.halaman ?? ""}">
+            <div class="col-6 col-md-3 mb-2">
+              <label class="small mb-1">${lbl.angka} dari</label>
+              <input type="number" min="0" step="1" class="form-control f-dari" value="${hari.halaman ?? ""}">
             </div>
-            <div class="col-12 col-md-3 mb-2">
+            <div class="col-6 col-md-3 mb-2">
+              <label class="small mb-1">sampai (opsional)</label>
+              <input type="number" min="0" step="1" class="form-control f-sampai" value="${hari.sampai ?? ""}">
+            </div>
+            <div class="col-12 mb-2">
               <label class="small mb-1">Keterangan</label>
               <div class="btn-group btn-group-sm d-flex" data-ket="${esc(hari.keterangan || "")}">
                 ${["L", "CL", "TL"].map(v =>
@@ -279,21 +287,25 @@
 
       async function simpanJurnal(sid, box) {
         const unit = box.querySelector(".f-unit").value;
-        const angkaStr = box.querySelector(".f-angka").value.trim();
-        const angka = Number(angkaStr);
+        const dariStr = box.querySelector(".f-dari").value.trim();
+        const sampaiStr = box.querySelector(".f-sampai").value.trim();
+        const dari = Number(dariStr);
+        const sampai = sampaiStr === "" ? null : Number(sampaiStr);
         const ket = box.querySelector(".btn-group").dataset.ket;
         const lbl = LABEL[kitab];
 
         if (!unit) return peringatan("Pilih " + lbl.unit.toLowerCase() + " terlebih dahulu.");
-        if (angkaStr === "" || !Number.isInteger(angka) || angka < 0)
-          return peringatan("Isi " + lbl.angka.toLowerCase() + " dengan angka 0 atau lebih.");
+        if (dariStr === "" || !Number.isInteger(dari) || dari < 0)
+          return peringatan("Isi " + lbl.angka.toLowerCase() + " dari dengan angka 0 atau lebih.");
+        if (sampai !== null && (!Number.isInteger(sampai) || sampai < dari))
+          return peringatan("Kolom sampai harus angka yang sama atau lebih besar dari kolom dari.");
         if (!ket) return peringatan("Pilih L, CL, atau TL.");
 
         const btn = box.querySelector(".f-simpan");
         btn.disabled = true;
         const { error } = await sb.from("jurnal_tahsin").upsert({
           santri_id: sid, rombel_id: rid(), semester_id: sem.id,
-          tanggal: tgl(), kitab, unit, halaman: angka, keterangan: ket,
+          tanggal: tgl(), kitab, unit, halaman: dari, sampai, keterangan: ket,
           diisi_oleh: me.id, updated_at: new Date().toISOString()
         }, { onConflict: "santri_id,tanggal,kitab" });
         btn.disabled = false;
@@ -376,7 +388,7 @@
         const [kr, jr] = await Promise.all([
           sb.from("keanggotaan_rombel").select("santri:santri_id(id, nis, nama_lengkap)")
             .eq("rombel_id", id).eq("tahun_ajaran_id", sem.tahun_ajaran_id),
-          sb.from("jurnal_tahsin").select("santri_id, kitab, unit, halaman, keterangan, tanggal, updated_at")
+          sb.from("jurnal_tahsin").select("santri_id, kitab, unit, halaman, sampai, keterangan, tanggal, updated_at")
             .eq("rombel_id", id).eq("semester_id", sem.id)
             .order("tanggal", { ascending: false })
             .order("updated_at", { ascending: false })
@@ -460,12 +472,22 @@
         setTab(a.dataset.tab);
       });
 
-      konten.querySelectorAll("[data-kitab]").forEach(b => b.onclick = () => {
-        kitab = b.dataset.kitab;
-        konten.querySelectorAll("[data-kitab]").forEach(x => x.classList.toggle("active", x === b));
+     function setKitab(k) {
+        kitab = k;
+        konten.querySelectorAll(".sub-btn").forEach(x => x.classList.toggle("active", x.dataset.kitab === k));
         hitungMap();
         renderJurnal();
-      });
+      }
+
+      function setGrup(g) {
+        grup = g;
+        konten.querySelectorAll(".grup-btn").forEach(x => x.classList.toggle("active", x.dataset.grup === g));
+        $("subTahsin").style.display = g === "tahsin" ? "" : "none";
+        setKitab(g === "tahsin" ? "tilawati" : "tahfidz");
+      }
+
+      konten.querySelectorAll(".grup-btn").forEach(b => b.onclick = () => setGrup(b.dataset.grup));
+      konten.querySelectorAll(".sub-btn").forEach(b => b.onclick = () => setKitab(b.dataset.kitab));
 
       $("rombel").onchange = muat;
       $("tanggal").onchange = () => { hitungMap(); renderJurnal(); };
