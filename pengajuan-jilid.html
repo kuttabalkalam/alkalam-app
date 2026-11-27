@@ -438,30 +438,60 @@
         muatDaftar();
       }
 
-      // ===== PENGUJI (ADMIN) =====
+            // ===== PENGUJI (ADMIN): centang = boleh jadi penguji, pilihan Default = penguji default =====
       async function muatPengujiTab() {
         const [pg, pj] = await Promise.all([
           sb.from("pegawai").select("id, nama_lengkap, peran").eq("status_aktif", true).order("nama_lengkap"),
-          sb.from("penguji_jilid").select("pegawai_id").eq("aktif", true)
+          sb.from("penguji_jilid").select("pegawai_id, default_penguji").eq("aktif", true)
         ]);
         if (pg.error) return gagal(pg.error);
-        const set = new Set((pj.data || []).map(x => x.pegawai_id));
-        $("pList").innerHTML = (pg.data || []).map(p =>
-          `<div class="custom-control custom-checkbox mb-1">
-             <input class="custom-control-input" type="checkbox" id="pg-${p.id}" data-id="${p.id}" ${set.has(p.id) ? "checked" : ""}>
-             <label class="custom-control-label" for="pg-${p.id}">${esc(p.nama_lengkap)} <span class="text-muted small">(${esc(p.peran)})</span></label>
-           </div>`).join("");
+        if (pj.error) return gagal(pj.error);
 
-        $("pList").querySelectorAll("input[type=checkbox]").forEach(cb => cb.onchange = async () => {
+        const dicentang = new Set((pj.data || []).map(x => x.pegawai_id));
+        const defaultRow = (pj.data || []).find(x => x.default_penguji);
+        const defaultId = defaultRow ? defaultRow.pegawai_id : null;
+
+        $("pList").innerHTML = `
+          <div class="small mb-2 ${defaultId ? "text-success" : "text-danger"}">
+            ${defaultId ? "Penguji default sudah dipilih." : "Belum ada penguji default. Pilih salah satu di kolom Default."}
+          </div>
+          ${(pg.data || []).map(p => {
+            const on = dicentang.has(p.id);
+            return `<div class="d-flex align-items-center mb-1">
+              <div class="custom-control custom-checkbox mr-4" style="min-width:340px">
+                <input class="custom-control-input" type="checkbox" id="pg-${p.id}" data-id="${p.id}" ${on ? "checked" : ""}>
+                <label class="custom-control-label" for="pg-${p.id}">${esc(p.nama_lengkap)} <span class="text-muted small">(${esc(p.peran)})</span></label>
+              </div>
+              <div class="custom-control custom-radio">
+                <input class="custom-control-input" type="radio" name="pdef" id="pd-${p.id}" value="${p.id}"
+                  ${defaultId === p.id ? "checked" : ""} ${on ? "" : "disabled"}>
+                <label class="custom-control-label small" for="pd-${p.id}">Default</label>
+              </div>
+            </div>`;
+          }).join("")}`;
+
+        // Centang atau hapus centang: menambah atau menghapus penguji
+        $("pList").querySelectorAll('input[type="checkbox"]').forEach(cb => cb.onchange = async () => {
           const id = Number(cb.dataset.id);
           let error;
           if (cb.checked) {
-            ({ error } = await sb.from("penguji_jilid").upsert({ pegawai_id: id, aktif: true }, { onConflict: "pegawai_id" }));
+            ({ error } = await sb.from("penguji_jilid").upsert(
+              { pegawai_id: id, aktif: true, default_penguji: false }, { onConflict: "pegawai_id" }));
           } else {
             ({ error } = await sb.from("penguji_jilid").delete().eq("pegawai_id", id));
           }
           if (error) { cb.checked = !cb.checked; return gagal(error); }
-          toast("Daftar penguji diperbarui.");
+          toast(cb.checked ? "Penguji ditambahkan." : "Penguji dihapus dari daftar.");
+          await muatPengujiTab();
+          await muatPenguji();
+        });
+
+        // Pilihan Default: hanya satu penguji default
+        $("pList").querySelectorAll('input[type="radio"]').forEach(rd => rd.onchange = async () => {
+          const { error } = await sb.rpc("set_penguji_default", { p_pegawai: Number(rd.value) });
+          if (error) return gagal(error);
+          toast("Penguji default diperbarui. Muat ulang halaman Ajukan agar berlaku.");
+          await muatPengujiTab();
           await muatPenguji();
         });
       }
