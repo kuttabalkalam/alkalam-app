@@ -18,7 +18,7 @@ const KUTTAB = (() => {
     { key: "jurnal-tahsin", label: "Jurnal Tahsin", href: "jurnal-tahsin.html", icon: "fa-book-open", roles: ["admin","guru"], quranSaja: true },
     { key: "mawas", label: "MAWAS", href: "mawas.html", icon: "fa-users-cog", roles: ["admin"] },
     { key: "jurnal-grafik", label: "Grafik Jurnal", href: "jurnal-grafik.html", icon: "fa-chart-line", roles: ["admin","guru"], quranSaja: true },
-    { key: "pengajuan-jilid", label: "Pengajuan Ujian Jilid", href: "pengajuan-jilid.html", icon: "fa-certificate", roles: ["admin","kepala","guru"], quranSaja: true },
+    { key: "pengajuan-jilid", label: "Pengajuan Ujian Quran", href: "pengajuan-jilid.html", icon: "fa-certificate", roles: ["admin","kepala","guru"], quranSaja: true },
     { key: "rkk", label: "RKK", href: "rkk.html", icon: "fa-clipboard-list", roles: ["admin","kepala","guru"] },
     { key: "pegawai", label: "Data Pegawai", href: "pegawai.html", icon: "fa-users", roles: ["admin"] },
     { key: "pengaturan", label: "Pengaturan", href: "pengaturan.html", icon: "fa-cogs", roles: ["admin"] },
