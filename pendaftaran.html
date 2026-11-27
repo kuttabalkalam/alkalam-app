@@ -456,7 +456,7 @@
 
   async function init() {
     isiSelect("pekerjaan_ayah", PEKERJAAN);
-    isiSelect("pekerjaan_ibu", PEKERJAAN);
+    isiSelect("pekerjaan_ibu", [...PEKERJAAN, "Ibu Rumah Tangga"]);
     isiSelect("penghasilan_ayah", PENGHASILAN);
     isiSelect("penghasilan_ibu", PENGHASILAN);
     $("sama").onchange = atursama;
