@@ -51,6 +51,7 @@
   const labelStatusKeluarga = v => (STATUS_KELUARGA.find(x => x[0] === v) || [])[1] || v || "";
 
   const PEKERJAAN = ["PNS / ASN", "Karyawan Swasta", "Wirausaha / Dagang", "Pekerja Lepas / Freelance", "Tidak Bekerja"];
+  const PEKERJAAN_IBU = [...PEKERJAAN, "Ibu Rumah Tangga"];
   const PENGHASILAN = ["Tidak Ada", "s/d 3 juta", "s/d 5 juta", "s/d 10 juta", "s/d 15 juta", ">20 juta"];
   const EKONOMI_OPSI = ["Rumah Pribadi", "Mobil", "Motor", "Tempat Usaha"];
   const listOpsi = arr => arr.map(x => [x, x]);
@@ -83,7 +84,7 @@
     ["nama_ibu", "Nama ibu kandung", "text"],
     ["nik_ibu", "NIK ibu", "text"],
     ["hp_ibu", "No. HP ibu", "text"],
-    ["pekerjaan_ibu", "Pekerjaan ibu", "select", listOpsi(PEKERJAAN)],
+    ["pekerjaan_ibu", "Pekerjaan ibu", "select", listOpsi(PEKERJAAN_IBU)],
     ["penghasilan_ibu", "Penghasilan ibu", "select", listOpsi(PENGHASILAN)],
     ["email_ortu", "Email orang tua", "text"],
     ["status_ekonomi", "Status ekonomi (kepemilikan)", "ekonomi"],
@@ -189,7 +190,7 @@
     if (error) KUTTAB.gagal(error);
   }
 
-  // ===== CETAK: PROFIL DAN SURAT PERNYATAAN ORANG TUA =====
+    // ===== CETAK: PROFIL DAN SURAT PERNYATAAN ORANG TUA =====
   const CSS_CETAK = `
     @page { size: A4; margin: 0; }
     html, body { margin: 0; padding: 0; background: #fff; font-family: Arial, sans-serif; color: #111; width: 210mm; }
@@ -200,12 +201,12 @@
     .judul { text-align: center; font-size: 14px; font-weight: bold; margin: 8mm 0 5mm; }
     .seg { margin-top: 4mm; }
     .seg-judul { font-weight: bold; border-bottom: 1px solid #111; padding-bottom: 1mm; margin-bottom: 1.5mm; }
-    .tbl { width: 100%; border-collapse: collapse; }
-    .tbl td { padding: 0.8px 2px; vertical-align: top; }
-    .tbl td.no { width: 8mm; }
-    .tbl td.lbl { width: 58mm; }
-    .tbl td.sep { width: 3mm; }
-    .tbl td.lbl.sub { padding-left: 6mm; }
+    .tbl { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .tbl td { padding: 0.8px 2px; vertical-align: top; word-wrap: break-word; }
+    .ind { display: inline-block; width: 6mm; }
+    .cek { display: inline-block; margin-right: 5mm; white-space: nowrap; }
+    .cb { display: inline-block; width: 3mm; height: 3mm; border: 1px solid #111; margin-right: 1.5mm;
+          text-align: center; line-height: 3mm; font-size: 9px; font-weight: bold; vertical-align: -0.5mm; }
     .perj-q { margin: 5mm 0 2mm; font-size: 12px; line-height: 1.6; }
     .garis { border-bottom: 1px solid #555; height: 8mm; }
     .perj-sub { font-weight: bold; margin: 10mm 0 3mm; font-size: 12px; }
@@ -221,6 +222,9 @@
     .ttd-nama { text-align: center; margin-top: 14mm; }
   `;
 
+  // Lebar kolom dikunci agar titik dua sejajar di semua segmen
+  const COLS_PROFIL = `<colgroup><col style="width:9mm"><col style="width:62mm"><col style="width:4mm"><col></colgroup>`;
+
   function htmlProfil(s) {
     const jk = s.jenis_kelamin === "L" ? "Laki-laki" : s.jenis_kelamin === "P" ? "Perempuan" : "";
     const ttl = [s.tempat_lahir, s.tanggal_lahir ? tglLengkap(s.tanggal_lahir) : ""].filter(Boolean).join(", ");
@@ -233,18 +237,20 @@
           s.desa_kelurahan, s.kecamatan, s.kode_pos);
     const adaWali = [s.wali_nama, s.wali_alamat, s.wali_telp, s.wali_pekerjaan]
       .some(v => v && String(v).trim() !== "");
-    const kepemilikan = (s.status_ekonomi || []).map(x =>
-      x === "Tempat Usaha" && s.bidang_usaha ? "Tempat Usaha (" + s.bidang_usaha + ")" : x).join(", ");
 
-    // Item: [label, nilai] = baris bernomor; { head } = judul bernomor; { sub: [huruf, label, nilai] } = sub-baris
+    // Checklist: semua pilihan tampil, yang dipilih diberi tanda X. Belum diisi = kotak kosong.
+    const cek = (opsi, dipilih) => opsi.map(([v, l]) =>
+      `<span class="cek"><span class="cb">${dipilih.includes(v) ? "X" : ""}</span>${esc(l)}</span>`).join("");
+
     const bagian = (judul, items) => {
       let n = 0;
       const rows = items.map(it => {
-        if (it.head) return `<tr><td class="no">${++n}.</td><td class="lbl" colspan="3">${esc(it.head)}</td></tr>`;
-        if (it.sub) return `<tr><td class="no"></td><td class="lbl sub">${it.sub[0]}. ${esc(it.sub[1])}</td><td class="sep">:</td><td class="val">${teksKosong(it.sub[2])}</td></tr>`;
-        return `<tr><td class="no">${++n}.</td><td class="lbl">${esc(it[0])}</td><td class="sep">:</td><td class="val">${teksKosong(it[1])}</td></tr>`;
+        if (it.checklist) return `<tr><td>${++n}.</td><td>${esc(it.label)}</td><td>:</td><td>${it.checklist}</td></tr>`;
+        if (it.head) return `<tr><td>${++n}.</td><td colspan="3"><b>${esc(it.head)}</b></td></tr>`;
+        if (it.sub) return `<tr><td></td><td><span class="ind"></span>${it.sub[0]}. ${esc(it.sub[1])}</td><td>:</td><td>${teksKosong(it.sub[2])}</td></tr>`;
+        return `<tr><td>${++n}.</td><td>${esc(it[0])}</td><td>:</td><td>${teksKosong(it[1])}</td></tr>`;
       }).join("");
-      return `<div class="seg"><div class="seg-judul">${esc(judul)}</div><table class="tbl">${rows}</table></div>`;
+      return `<div class="seg"><div class="seg-judul">${esc(judul)}</div><table class="tbl">${COLS_PROFIL}${rows}</table></div>`;
     };
 
     const dataSantri = [
@@ -253,15 +259,13 @@
       ["Jenis kelamin", jk],
       ["NIK", s.nik],
       ["NISN", s.nisn],
-      ["Nomor Induk Santri", s.nis],
       ["Tempat, tanggal lahir", ttl],
       ["Nomor registrasi akta lahir", s.no_registrasi_akta],
       ["Agama", s.agama],
       ["Anak ke", s.anak_ke],
-      ["Status dalam keluarga", labelStatusKeluarga(s.status_dalam_keluarga)],
+      { label: "Status dalam keluarga", checklist: cek(STATUS_KELUARGA, s.status_dalam_keluarga ? [s.status_dalam_keluarga] : []) },
       ["Sekolah asal", s.sekolah_asal],
       ["Tahun ajaran tujuan", s.tahun_ajaran_masuk],
-      ["Mendaftar untuk tingkat", s.tingkat_masuk != null ? namaTingkat(s.tingkat_masuk) : ""],
       ["Jenis pendaftaran", s.jenis_pendaftaran],
       ["Alamat domisili", alamat],
       ["Alamat sesuai KK", alamatKk]
@@ -294,7 +298,12 @@
     const statusEkonomi = [
       ["Penghasilan ayah", s.penghasilan_ayah],
       ["Penghasilan ibu", s.penghasilan_ibu],
-      ["Kepemilikan", kepemilikan]
+      {
+        label: "Kepemilikan",
+        checklist: cek(EKONOMI_OPSI.map(x => [x, x]), s.status_ekonomi || []) +
+          (s.status_ekonomi && s.status_ekonomi.includes("Tempat Usaha") && s.bidang_usaha
+            ? `<br>Bidang usaha: ${esc(s.bidang_usaha)}` : "")
+      }
     ];
 
     return `<section class="page">
@@ -318,7 +327,7 @@
     const pernyataan = [
       "Data yang diisi adalah benar dan dapat dipertanggungjawabkan.",
       "Bersungguh-sungguh mendidik calon santri (anak) sepenuh jiwa sesuai dengan tuntunan Rasulullah ﷺ.",
-      "Bersedia mengikuti semua peraturan dan hasil musyawarah antara sekolah dan orang tua/wali santri.",
+      "Bersedia mengikuti semua peraturan Kuttab.",
       "Berkomitmen untuk senantiasa mengikuti MAWAS (Majelis Ilmu Wali Santri) sebagai bagian dari peran aktif dalam pendidikan anak.",
       "Apabila terjadi hal-hal yang tidak diinginkan (selama tidak membahayakan keselamatan) tidak menuntut pihak Kuttab. Dan akan diselesaikan sesuai syariat"
     ];
