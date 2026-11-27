@@ -11,7 +11,7 @@
 <style>
   .nav-tabs .nav-link { color: #1a1a1a; }
   .nav-tabs .nav-link.active { background: #f2c94c; border-color: #d4a52a; color: #1a1a1a; font-weight: 600; }
-  .kitab-btn.active { background: #1a1a1a; color: #f2c94c; border-color: #1a1a1a; }
+  .grup-btn.active, .sub-btn.active { background: #1a1a1a; color: #f2c94c; border-color: #1a1a1a; }
   .btn-ket.L.active { background: #28a745; color: #fff; border-color: #28a745; }
   .btn-ket.CL.active { background: #f0ad4e; color: #fff; border-color: #f0ad4e; }
   .btn-ket.TL.active { background: #dc3545; color: #fff; border-color: #dc3545; }
@@ -27,6 +27,7 @@
 <script src="https://cdn.jsdelivr.net/npm/admin-lte@3.2.0/dist/js/adminlte.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="ui.js"></script>
+<script src="wa.js"></script>
 
 <script>
   const KITAB = { tilawati: "Tilawati", quran: "Quran", tahfidz: "Tahfidz" };
@@ -35,6 +36,8 @@
     quran:    { unit: "Juz",   angka: "Halaman" },
     tahfidz:  { unit: "Surat", angka: "Ayat" }
   };
+  // Kitab di dalam tiap jenis. Tahsin = Tilawati atau Quran, Tahfidz = surat
+  const GRUP = { tahsin: ["tilawati", "quran"], tahfidz: ["tahfidz"] };
   const SURAH = [
     "Al-Fatihah","Al-Baqarah","Ali Imran","An-Nisa","Al-Ma'idah","Al-An'am","Al-A'raf","Al-Anfal","At-Taubah","Yunus",
     "Hud","Yusuf","Ar-Ra'd","Ibrahim","Al-Hijr","An-Nahl","Al-Isra","Al-Kahf","Maryam","Taha",
@@ -56,6 +59,13 @@
   };
   const KODE_QURAN = ["tilawah", "tahfidz", "kitabah"];
   const BULAN = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+  const JAM_UJIAN = (() => {
+    const out = [];
+    for (let m = 7 * 60 + 30; m <= 11 * 60 + 30; m += 30) {
+      out.push(String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"));
+    }
+    return out;
+  })();
 
   const fmt = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
   const tglIndo = iso => { const d = new Date(iso + "T00:00:00"); return d.getDate() + " " + BULAN[d.getMonth()] + " " + d.getFullYear(); };
@@ -90,29 +100,29 @@
         return;
       }
 
-      const [rb, pm] = await Promise.all([
+      const $ = id => document.getElementById(id);
+      const admin = me.peran === "admin";
+
+      const [rb, pm, pd] = await Promise.all([
         sb.from("rombel").select("id, nama").eq("tahun_ajaran_id", sem.tahun_ajaran_id).order("nama"),
-        sb.from("penugasan_mapel").select("rombel_id, pegawai_id, mapel:mapel_id(kode)")
+        sb.from("penugasan_mapel").select("rombel_id, pegawai_id, mapel:mapel_id(kode)"),
+        sb.rpc("penguji_default")
       ]);
       if (rb.error) return gagal(rb.error);
       if (pm.error) return gagal(pm.error);
 
+      const pengujiDefault = (!pd.error && pd.data && pd.data.length)
+        ? { id: pd.data[0].id, nama: pd.data[0].nama } : null;
+
       const quranSet = new Set((pm.data || [])
-        .filter(x => me.peran === "admin" || x.pegawai_id === me.id)
+        .filter(x => admin || x.pegawai_id === me.id)
         .filter(x => KODE_QURAN.includes(x.mapel?.kode))
         .map(x => x.rombel_id));
-      const rombelList = (rb.data || []).filter(r => me.peran === "admin" || quranSet.has(r.id));
+      const rombelList = (rb.data || []).filter(r => admin || quranSet.has(r.id));
 
       if (!rombelList.length) {
         konten.innerHTML = '<div class="alert alert-info">Jurnal tahsin hanya tersedia untuk guru Quran di kelas tahun ajaran ini.</div>';
         return;
-      }
-
-      // Penguji default untuk pendaftaran ujian jilid
-      let pengujiDefault = null;
-      const pd = await sb.rpc("penguji_default");
-      if (!pd.error && pd.data && pd.data.length) {
-        pengujiDefault = { id: pd.data[0].id, nama: pd.data[0].nama };
       }
 
       konten.innerHTML = `
@@ -133,10 +143,6 @@
               <div class="btn-group d-flex" role="group">
                 <button type="button" class="btn btn-outline-dark grup-btn active" data-grup="tahsin">Tahsin</button>
                 <button type="button" class="btn btn-outline-dark grup-btn" data-grup="tahfidz">Tahfidz</button>
-              </div>
-              <div class="btn-group d-flex mt-2" id="subTahsin" role="group">
-                <button type="button" class="btn btn-outline-dark sub-btn active" data-kitab="tilawati">Tilawati</button>
-                <button type="button" class="btn btn-outline-dark sub-btn" data-kitab="quran">Quran</button>
               </div>
             </div>
           </div>
@@ -170,27 +176,26 @@
           <button class="btn btn-kuning" id="cSimpan" style="display:none"><i class="fas fa-save"></i> Simpan Catatan</button>
         </div>`;
 
-      const $ = id => document.getElementById(id);
       const tgl = () => $("tanggal").value;
       const rid = () => Number($("rombel").value);
 
-      let tab = "jurnal", kitab = "tilawati", grup = "tahsin";
+      let tab = "jurnal", grup = "tahsin";
       let santri = [], jurnalRaw = [];
-      let lastMap = {}, lastKitab = {}, todayMap = {}, catatanMap = {};
+      let lastGrup = {}, lastTahsin = {}, todayGrup = {}, catatanMap = {};
 
       $("tanggal").value = fmt(new Date());
       $("cTanggal").value = fmt(new Date());
 
-      // lastMap: jurnal terakhir per santri (semua kitab)
-      // lastKitab: jurnal terakhir per santri per kitab (dipakai untuk jilid/juz/surat)
-      // todayMap: jurnal hari ini untuk kitab yang dipilih
+      // lastGrup: jurnal terakhir santri di jenis yang sedang dipilih
+      // lastTahsin: jurnal tahsin terakhir (tilawati atau quran), dipakai untuk pendaftaran ujian
+      // todayGrup: jurnal santri di tanggal yang dipilih, untuk jenis yang sedang dipilih
       function hitungMap() {
-        lastMap = {}; lastKitab = {}; todayMap = {};
+        lastGrup = {}; lastTahsin = {}; todayGrup = {};
+        const kitabGrup = GRUP[grup];
         jurnalRaw.forEach(j => {
-          if (!lastMap[j.santri_id]) lastMap[j.santri_id] = j;
-          const kk = j.santri_id + "|" + j.kitab;
-          if (!lastKitab[kk]) lastKitab[kk] = j;
-          if (j.kitab === kitab && j.tanggal === tgl() && !todayMap[j.santri_id]) todayMap[j.santri_id] = j;
+          if (kitabGrup.includes(j.kitab) && !lastGrup[j.santri_id]) lastGrup[j.santri_id] = j;
+          if (GRUP.tahsin.includes(j.kitab) && !lastTahsin[j.santri_id]) lastTahsin[j.santri_id] = j;
+          if (kitabGrup.includes(j.kitab) && j.tanggal === tgl() && !todayGrup[j.santri_id]) todayGrup[j.santri_id] = j;
         });
       }
 
@@ -202,17 +207,15 @@
       }
 
       function renderJurnal() {
-        const lbl = LABEL[kitab];
         if (!santri.length) {
           $("panelJurnal").innerHTML = '<div class="alert alert-light">Belum ada santri di kelas ini.</div>';
           return;
         }
-        const bisaDaftar = kitab === "tilawati" || kitab === "quran";
+        const namaGrup = grup === "tahsin" ? "tahsin" : "tahfidz";
 
         $("panelJurnal").innerHTML = santri.map((s, i) => {
-          const hari = todayMap[s.id];
-          const last = lastMap[s.id];
-          const lastK = lastKitab[s.id + "|" + kitab];
+          const hari = todayGrup[s.id];
+          const last = lastGrup[s.id];
           return `<div class="card mb-2">
             <div class="card-body py-2">
               <div class="d-flex justify-content-between align-items-start">
@@ -222,13 +225,13 @@
                 </div>
                 ${hari ? '<span class="badge badge-success">sudah hari ini</span>' : ""}
               </div>
-              <div class="small mt-1">${last ? ringkas(last) : '<span class="text-muted">Belum ada jurnal</span>'}</div>
+              <div class="small mt-1">${last ? ringkas(last) : '<span class="text-muted">Belum ada jurnal ' + namaGrup + '</span>'}</div>
               <button class="btn btn-sm btn-kuning mt-2" data-buka="${s.id}">
-                <i class="fas fa-pen"></i> ${hari ? "Ubah" : "Isi"} ${esc(lbl.angka.toLowerCase())} ${esc(KITAB[kitab])}
+                <i class="fas fa-pen"></i> ${hari ? "Ubah" : "Isi"} jurnal ${esc(namaGrup)}
               </button>
-              ${bisaDaftar && lastK ? `
+              ${grup === "tahsin" && lastTahsin[s.id] ? `
               <button class="btn btn-sm btn-outline-dark mt-2 ml-1" data-daftar="${s.id}">
-                <i class="fas fa-award"></i> Daftarkan ujian ${esc(KITAB[kitab])}
+                <i class="fas fa-award"></i> Daftarkan ujian
               </button>` : ""}
               <div class="form-jurnal mt-2" id="form-${s.id}" style="display:none"></div>
             </div>
@@ -241,16 +244,23 @@
           b.onclick = () => daftarUjian(Number(b.dataset.daftar)));
       }
 
-           function bukaForm(sid) {
-        const box = $("form-" + sid);
-        if (box.style.display !== "none") { box.style.display = "none"; return; }
-        document.querySelectorAll(".form-jurnal").forEach(f => f.style.display = "none");
-
-        const hari = todayMap[sid] || {};
+      // Form isi jurnal. Untuk Tahsin, pilihan Tilawati atau Quran ada di dalam form.
+      function isiForm(box, sid, kitab) {
+        box.dataset.kitab = kitab;
+        const hari = todayGrup[sid] && todayGrup[sid].kitab === kitab ? todayGrup[sid] : {};
         const lbl = LABEL[kitab];
+
         box.innerHTML = `
           <div class="form-row">
-            <div class="col-12 col-md-6 mb-2">
+            ${grup === "tahsin" ? `
+            <div class="col-12 col-md-4 mb-2">
+              <label class="small mb-1">Kitab</label>
+              <select class="form-control f-kitab">
+                <option value="tilawati" ${kitab === "tilawati" ? "selected" : ""}>Tilawati</option>
+                <option value="quran" ${kitab === "quran" ? "selected" : ""}>Quran</option>
+              </select>
+            </div>` : ""}
+            <div class="col-12 ${grup === "tahsin" ? "col-md-8" : ""} mb-2">
               <label class="small mb-1">${lbl.unit}</label>
               <select class="form-control f-unit">
                 <option value="">-- pilih ${esc(lbl.unit.toLowerCase())} --</option>
@@ -268,31 +278,49 @@
             </div>
             <div class="col-12 mb-2">
               <label class="small mb-1">Keterangan</label>
-              <div class="btn-group btn-group-sm d-flex" data-ket="${esc(hari.keterangan || "")}">
+              <div class="btn-group btn-group-sm d-flex ket-grp" data-ket="${esc(hari.keterangan || "")}">
                 ${["L", "CL", "TL"].map(v =>
                   `<button type="button" class="btn btn-outline-dark btn-ket ${v} ${hari.keterangan === v ? "active" : ""}" data-v="${v}">${v}</button>`).join("")}
               </div>
             </div>
           </div>
           <button class="btn btn-kuning btn-sm f-simpan"><i class="fas fa-save"></i> Simpan</button>`;
-        box.style.display = "block";
+
+        const kitabSel = box.querySelector(".f-kitab");
+        if (kitabSel) kitabSel.onchange = () => isiForm(box, sid, kitabSel.value);
 
         box.querySelectorAll(".btn-ket").forEach(b => b.onclick = () => {
           box.querySelectorAll(".btn-ket").forEach(x => x.classList.remove("active"));
           b.classList.add("active");
-          box.querySelector(".btn-group").dataset.ket = b.dataset.v;
+          box.querySelector(".ket-grp").dataset.ket = b.dataset.v;
         });
         box.querySelector(".f-simpan").onclick = () => simpanJurnal(sid, box);
       }
 
+      function bukaForm(sid) {
+        const box = $("form-" + sid);
+        if (box.style.display !== "none") { box.style.display = "none"; return; }
+        document.querySelectorAll(".form-jurnal").forEach(f => f.style.display = "none");
+
+        // Kitab awal: dari jurnal hari ini, lalu jurnal terakhir, lalu default
+        let kitab = grup === "tahfidz" ? "tahfidz" : "tilawati";
+        if (grup === "tahsin") {
+          const ref = todayGrup[sid] || lastTahsin[sid];
+          if (ref && GRUP.tahsin.includes(ref.kitab)) kitab = ref.kitab;
+        }
+        isiForm(box, sid, kitab);
+        box.style.display = "block";
+      }
+
       async function simpanJurnal(sid, box) {
+        const kitab = box.dataset.kitab;
+        const lbl = LABEL[kitab];
         const unit = box.querySelector(".f-unit").value;
         const dariStr = box.querySelector(".f-dari").value.trim();
         const sampaiStr = box.querySelector(".f-sampai").value.trim();
         const dari = Number(dariStr);
         const sampai = sampaiStr === "" ? null : Number(sampaiStr);
-        const ket = box.querySelector(".btn-group").dataset.ket;
-        const lbl = LABEL[kitab];
+        const ket = box.querySelector(".ket-grp").dataset.ket;
 
         if (!unit) return peringatan("Pilih " + lbl.unit.toLowerCase() + " terlebih dahulu.");
         if (dariStr === "" || !Number.isInteger(dari) || dari < 0)
@@ -316,17 +344,17 @@
         await muat();
       }
 
-      // ===== PENDAFTARAN UJIAN JILID DARI JURNAL =====
-            async function daftarUjian(sid) {
+      // ===== PENDAFTARAN UJIAN JILID DARI JURNAL TAHSIN =====
+      async function daftarUjian(sid) {
         const sk = santri.find(s => s.id === sid);
         if (!sk) return;
 
-        const terakhir = lastKitab[sid + "|" + kitab];
-        if (!terakhir) return peringatan("Belum ada jurnal " + KITAB[kitab] + " untuk " + sk.nama_lengkap + ".");
+        const terakhir = lastTahsin[sid];
+        if (!terakhir) return peringatan("Belum ada jurnal tahsin untuk " + sk.nama_lengkap + ".");
         if (!pengujiDefault) return peringatan("Belum ada penguji default. Hubungi admin.");
 
-        const jenis = kitab === "quran" ? "Quran" : "Tilawati";
-        const jilid = namaUnit(kitab, terakhir.unit);
+        const jenis = terakhir.kitab === "quran" ? "Quran" : "Tilawati";
+        const jilid = namaUnit(terakhir.kitab, terakhir.unit);
 
         const { data: aktif, error: e1 } = await sb.from("pengajuan_jilid")
           .select("id, status, jilid_juz")
@@ -338,11 +366,6 @@
         }
 
         const hariIni = fmt(new Date());
-        const jamOpsi = [];
-        for (let m = 7 * 60 + 30; m <= 11 * 60 + 30; m += 30) {
-          jamOpsi.push(String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"));
-        }
-
         const r = await Swal.fire({
           title: "Daftarkan ujian " + jenis + "?",
           html: `
@@ -352,7 +375,7 @@
             <input id="swTgl" type="date" class="swal2-input" min="${hariIni}" value="${hariIni}">
             <label class="small mb-1 mt-2">Jam ujian</label>
             <select id="swJam" class="swal2-select">
-              ${jamOpsi.map(j => `<option value="${j}">${j}</option>`).join("")}
+              ${JAM_UJIAN.map(j => `<option value="${j}">${j}</option>`).join("")}
             </select>
             <p class="small text-muted mt-2">Penguji akan menyetujui, mengubah jadwal, atau menolak.</p>`,
           showCancelButton: true,
@@ -360,10 +383,10 @@
           cancelButtonText: "Batal",
           confirmButtonColor: "#1a1a1a",
           preConfirm: () => {
-            const tgl = document.getElementById("swTgl").value;
-            const jam = document.getElementById("swJam").value;
-            if (!tgl) { Swal.showValidationMessage("Pilih tanggal ujian."); return false; }
-            return { tgl, jam };
+            const t = document.getElementById("swTgl").value;
+            const j = document.getElementById("swJam").value;
+            if (!t) { Swal.showValidationMessage("Pilih tanggal ujian."); return false; }
+            return { tgl: t, jam: j };
           }
         });
         if (!r.isConfirmed) return;
@@ -381,7 +404,8 @@
         if (w.ok) toast("Ujian " + jenis + " " + sk.nama_lengkap + " didaftarkan. Penguji sudah diberi tahu.");
         else peringatan("Ujian didaftarkan, tetapi WhatsApp ke penguji belum terkirim: " + w.pesan);
       }
-      
+
+      // ===== DATA =====
       async function muat() {
         const id = rid();
         if (!id) return;
@@ -467,27 +491,18 @@
         if (t === "catatan") muatCatatan();
       }
 
-      konten.querySelectorAll("[data-tab]").forEach(a => a.onclick = e => {
-        e.preventDefault();
-        setTab(a.dataset.tab);
-      });
-
-     function setKitab(k) {
-        kitab = k;
-        konten.querySelectorAll(".sub-btn").forEach(x => x.classList.toggle("active", x.dataset.kitab === k));
+      function setGrup(g) {
+        grup = g;
+        konten.querySelectorAll(".grup-btn").forEach(x => x.classList.toggle("active", x.dataset.grup === g));
         hitungMap();
         renderJurnal();
       }
 
-      function setGrup(g) {
-        grup = g;
-        konten.querySelectorAll(".grup-btn").forEach(x => x.classList.toggle("active", x.dataset.grup === g));
-        $("subTahsin").style.display = g === "tahsin" ? "" : "none";
-        setKitab(g === "tahsin" ? "tilawati" : "tahfidz");
-      }
-
+      konten.querySelectorAll("[data-tab]").forEach(a => a.onclick = e => {
+        e.preventDefault();
+        setTab(a.dataset.tab);
+      });
       konten.querySelectorAll(".grup-btn").forEach(b => b.onclick = () => setGrup(b.dataset.grup));
-      konten.querySelectorAll(".sub-btn").forEach(b => b.onclick = () => setKitab(b.dataset.kitab));
 
       $("rombel").onchange = muat;
       $("tanggal").onchange = () => { hitungMap(); renderJurnal(); };
