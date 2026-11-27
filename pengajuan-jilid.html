@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Pengajuan Ujian Jilid - Kuttab Al-Kalam</title>
+<title>Ujian Quran - Kuttab Al-Kalam</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.4/css/all.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2.0/dist/css/adminlte.min.css">
@@ -33,7 +33,7 @@
 <script>
   KUTTAB.halaman({
     aktif: "pengajuan-jilid",
-    judul: "Pengajuan Ujian Jilid",
+    judul: "Ujian Quran",
     roles: ["admin", "kepala", "guru"],
     render: async ({ sb, me, sem, konten, toast, gagal, peringatan, konfirmasi, esc }) => {
       if (!sem) {
@@ -43,9 +43,11 @@
 
       const $ = id => document.getElementById(id);
       const KODE_QURAN = ["tilawah", "tahfidz", "kitabah"];
+      // Pilihan jilid atau juz untuk tiap jenis ujian
       const PILIHAN = {
         Tilawati: Array.from({ length: 4 }, (_, i) => "Jilid " + (i + 1)),
-        Quran: Array.from({ length: 30 }, (_, i) => "Juz " + (i + 1))
+        Quran: Array.from({ length: 30 }, (_, i) => "Juz " + (i + 1)),
+        Tahfidz: Array.from({ length: 30 }, (_, i) => "Juz " + (i + 1))
       };
       const JAM_UJIAN = (() => {
         const out = [];
@@ -102,7 +104,7 @@
       let penguji = [];
       let rows = [];
 
-      // ===== AJUKAN (guru tahsin menentukan tanggal dan jam) =====
+      // ===== AJUKAN =====
       if (bisaAjukan) {
         $("p-ajukan").innerHTML = `
           <div class="card card-outline card-warning"><div class="card-body">
@@ -113,20 +115,25 @@
               <div class="col-md-6 form-group"><label class="small mb-1">Santri</label>
                 <select id="aSantri" class="form-control"></select></div>
               <div class="col-md-6 form-group"><label class="small mb-1">Jenis</label>
-                <select id="aJenis" class="form-control">
+                <select id="aGrup" class="form-control">
+                  <option value="tahsin">Tahsin</option>
+                  <option value="tahfidz">Tahfidz</option>
+                </select></div>
+              <div class="col-md-6 form-group" id="aKitabBox"><label class="small mb-1">Kitab</label>
+                <select id="aKitab" class="form-control">
                   <option value="Tilawati">Tilawati</option>
                   <option value="Quran">Quran</option>
                 </select></div>
-              <div class="col-md-6 form-group"><label class="small mb-1">Jilid / Juz</label>
+              <div class="col-md-6 form-group"><label class="small mb-1" id="aJilidLbl">Jilid</label>
                 <select id="aJilid" class="form-control"></select></div>
-              <div class="col-md-4 form-group"><label class="small mb-1">Tanggal ujian</label>
+              <div class="col-md-6 form-group"><label class="small mb-1">Penguji</label>
+                <input class="form-control" value="${esc(pengujiDefault ? pengujiDefault.nama : "-")}" disabled></div>
+              <div class="col-md-6 form-group"><label class="small mb-1">Tanggal ujian</label>
                 <input type="date" id="aTgl" class="form-control" min="${hariIni()}" value="${hariIni()}"></div>
-              <div class="col-md-4 form-group"><label class="small mb-1">Jam ujian</label>
+              <div class="col-md-6 form-group"><label class="small mb-1">Jam ujian</label>
                 <select id="aJam" class="form-control">
                   ${JAM_UJIAN.map(j => `<option value="${j}">${j}</option>`).join("")}
                 </select></div>
-              <div class="col-md-4 form-group"><label class="small mb-1">Penguji</label>
-                <input class="form-control" value="${esc(pengujiDefault ? pengujiDefault.nama : "-")}" disabled></div>
             </div>
             <button class="btn btn-kuning" id="aKirim" ${pengujiDefault ? "" : "disabled"}>
               <i class="fas fa-paper-plane"></i> Ajukan
@@ -137,7 +144,8 @@
         const rombelUntukAjukan = admin ? rombelAll : rombelQuran;
         $("aRombel").innerHTML = rombelUntukAjukan.map(x => `<option value="${x.id}">${esc(x.nama)}</option>`).join("");
         $("aRombel").onchange = isiSantriAjukan;
-        $("aJenis").onchange = isiJilid;
+        $("aGrup").onchange = isiJilid;
+        $("aKitab").onchange = isiJilid;
         $("aKirim").onclick = ajukan;
       }
 
@@ -164,7 +172,7 @@
       if (admin) {
         $("p-penguji").innerHTML = `
           <div class="card card-outline card-info"><div class="card-body">
-            <p class="small text-muted">Centang pegawai yang boleh ditetapkan sebagai penguji ujian jilid.</p>
+            <p class="small text-muted">Centang pegawai yang boleh ditetapkan sebagai penguji ujian.</p>
             <div id="pList"></div>
           </div></div>`;
       }
@@ -182,8 +190,16 @@
         bukaTab(a.dataset.tab);
       });
 
+      // Jenis yang disimpan ke database: Tilawati, Quran, atau Tahfidz
+      function jenisAjuan() {
+        return $("aGrup").value === "tahfidz" ? "Tahfidz" : $("aKitab").value;
+      }
+
       function isiJilid() {
-        const jenis = $("aJenis").value;
+        const grup = $("aGrup").value;
+        $("aKitabBox").style.display = grup === "tahsin" ? "" : "none";
+        const jenis = jenisAjuan();
+        $("aJilidLbl").textContent = jenis === "Tilawati" ? "Jilid" : "Juz";
         $("aJilid").innerHTML = PILIHAN[jenis].map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join("");
       }
 
@@ -206,7 +222,8 @@
 
       async function ajukan() {
         const sid = Number($("aSantri").value), rid = Number($("aRombel").value);
-        const jilid = $("aJilid").value, jenis = $("aJenis").value;
+        const jenis = jenisAjuan();
+        const jilid = $("aJilid").value;
         const tgl = $("aTgl").value, jam = $("aJam").value;
         if (!sid || !rid) return peringatan("Pilih kelas dan santri.");
         if (!jilid) return peringatan("Pilih jilid atau juz.");
@@ -231,7 +248,7 @@
         bukaTab("daftar");
       }
 
-      // ===== DAFTAR: tombol sesuai status dan peran =====
+      // ===== DAFTAR =====
       async function muatPenguji() {
         const { data } = await sb.from("penguji_jilid")
           .select("pegawai_id, pegawai:pegawai_id(nama_lengkap)").eq("aktif", true);
@@ -355,8 +372,7 @@
         muatDaftar();
       }
 
-      // Penguji atau admin mengubah jadwal. Perubahan langsung berstatus Dijadwalkan.
-      // Hanya guru pengaju yang diberi tahu.
+      // Penguji atau admin mengubah jadwal. Hanya guru pengaju yang diberi tahu.
       async function simpanJadwal(id) {
         const box = $("form-" + id);
         const tgl = box.querySelector(".tgl").value;
