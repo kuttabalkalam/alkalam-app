@@ -170,7 +170,31 @@
         <div class="col-md-12 form-group"><label class="small mb-1">Email orang tua *</label>
           <input id="email_ortu" type="email" class="form-control" placeholder="Contoh: nama@email.com" required></div>
       </div>
-
+      <div class="bagian">Status Ekonomi (opsional)</div>
+      <div class="form-group">
+        <label class="small mb-1">Kepemilikan (boleh pilih lebih dari satu)</label>
+        <div class="custom-control custom-checkbox">
+          <input class="custom-control-input eko-cb" type="checkbox" id="eko_rumah" value="Rumah Pribadi">
+          <label class="custom-control-label" for="eko_rumah">Rumah Pribadi</label>
+        </div>
+        <div class="custom-control custom-checkbox">
+          <input class="custom-control-input eko-cb" type="checkbox" id="eko_mobil" value="Mobil">
+          <label class="custom-control-label" for="eko_mobil">Mobil</label>
+        </div>
+        <div class="custom-control custom-checkbox">
+          <input class="custom-control-input eko-cb" type="checkbox" id="eko_motor" value="Motor">
+          <label class="custom-control-label" for="eko_motor">Motor</label>
+        </div>
+        <div class="custom-control custom-checkbox">
+          <input class="custom-control-input eko-cb" type="checkbox" id="eko_usaha" value="Tempat Usaha">
+          <label class="custom-control-label" for="eko_usaha">Tempat Usaha</label>
+        </div>
+      </div>
+      <div class="form-group d-none" id="usahaBox">
+        <label class="small mb-1">Sebutkan bidang usahanya *</label>
+        <input id="bidang_usaha" class="form-control" placeholder="Contoh: Warung makan">
+      </div>
+      
       <div class="bagian">Wali Santri (opsional, jika berbeda dari orang tua)</div>
       <div class="form-row">
         <div class="col-md-6 form-group"><label class="small mb-1">Nama wali</label>
@@ -486,7 +510,9 @@
     const sama = $("sama").value === "ya";
     const kk = sama ? null : wilayahDari("kk");
     if (kk && (!kk.kec || !kk.desa)) return pesan("Pilih kecamatan dan desa/kelurahan sesuai KK.");
-
+    const ekonomi = [...document.querySelectorAll(".eko-cb:checked")].map(x => x.value);
+    const bidangUsaha = val("bidang_usaha");
+    if (ekonomi.includes("Tempat Usaha") && !bidangUsaha) return pesan("Sebutkan bidang usaha.");
     const f = $("bukti").files[0];
     const errBerkas = cekBerkas(f);
     if (errBerkas) return pesan(errBerkas);
@@ -538,6 +564,8 @@
           wali_alamat: val("wali_alamat") || null,
           wali_telp: waliTelp,
           wali_pekerjaan: val("wali_pekerjaan") || null,
+          status_ekonomi: ekonomi,
+          bidang_usaha: ekonomi.includes("Tempat Usaha") ? bidangUsaha : null,
           email_ortu: val("email_ortu"),
           bukti_path: buktiPath
         }
@@ -554,7 +582,8 @@
       cekJenis();
     }
   });
-
+  document.querySelector('.eko-cb[value="Tempat Usaha"]').onchange = () =>
+    $("usahaBox").classList.toggle("d-none", !document.querySelector('.eko-cb[value="Tempat Usaha"]').checked);
   init();
 </script>
 </body>
