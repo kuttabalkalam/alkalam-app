@@ -283,6 +283,11 @@
                   `<button type="button" class="btn btn-outline-dark btn-ket ${v} ${hari.keterangan === v ? "active" : ""}" data-v="${v}">${v}</button>`).join("")}
               </div>
             </div>
+            ${grup === "tahfidz" ? `
+            <div class="col-12 mb-2">
+              <label class="small mb-1">Catatan</label>
+              <textarea class="form-control f-catatan" rows="2" placeholder="Catatan perkembangan hari ini">${esc(hari.catatan || "")}</textarea>
+            </div>` : ""}
           </div>
           <button class="btn btn-kuning btn-sm f-simpan"><i class="fas fa-save"></i> Simpan</button>`;
 
@@ -312,7 +317,7 @@
         box.style.display = "block";
       }
 
-      async function simpanJurnal(sid, box) {
+            async function simpanJurnal(sid, box) {
         const kitab = box.dataset.kitab;
         const lbl = LABEL[kitab];
         const unit = box.querySelector(".f-unit").value;
@@ -321,6 +326,8 @@
         const dari = Number(dariStr);
         const sampai = sampaiStr === "" ? null : Number(sampaiStr);
         const ket = box.querySelector(".ket-grp").dataset.ket;
+        const catEl = box.querySelector(".f-catatan");
+        const catatan = catEl ? (catEl.value.trim() || null) : null;
 
         if (!unit) return peringatan("Pilih " + lbl.unit.toLowerCase() + " terlebih dahulu.");
         if (dariStr === "" || !Number.isInteger(dari) || dari < 0)
@@ -333,7 +340,7 @@
         btn.disabled = true;
         const { error } = await sb.from("jurnal_tahsin").upsert({
           santri_id: sid, rombel_id: rid(), semester_id: sem.id,
-          tanggal: tgl(), kitab, unit, halaman: dari, sampai, keterangan: ket,
+          tanggal: tgl(), kitab, unit, halaman: dari, sampai, keterangan: ket, catatan,
           diisi_oleh: me.id, updated_at: new Date().toISOString()
         }, { onConflict: "santri_id,tanggal,kitab" });
         btn.disabled = false;
@@ -412,7 +419,7 @@
         const [kr, jr] = await Promise.all([
           sb.from("keanggotaan_rombel").select("santri:santri_id(id, nis, nama_lengkap)")
             .eq("rombel_id", id).eq("tahun_ajaran_id", sem.tahun_ajaran_id),
-          sb.from("jurnal_tahsin").select("santri_id, kitab, unit, halaman, sampai, keterangan, tanggal, updated_at")
+          sb.from("jurnal_tahsin").select("santri_id, kitab, unit, halaman, sampai, keterangan, catatan, tanggal, updated_at")
             .eq("rombel_id", id).eq("semester_id", sem.id)
             .order("tanggal", { ascending: false })
             .order("updated_at", { ascending: false })
@@ -494,6 +501,9 @@
       function setGrup(g) {
         grup = g;
         konten.querySelectorAll(".grup-btn").forEach(x => x.classList.toggle("active", x.dataset.grup === g));
+        // Catatan pekanan/bulanan hanya untuk Tahsin. Di Tahfidz, catatan ada di dalam jurnal.
+        konten.querySelector('[data-tab="catatan"]').parentElement.style.display = g === "tahsin" ? "" : "none";
+        if (g !== "tahsin" && tab === "catatan") setTab("jurnal");
         hitungMap();
         renderJurnal();
       }
