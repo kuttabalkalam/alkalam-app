@@ -43,13 +43,17 @@
   const BULAN_SINGKAT = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
   const HARI_ID = ["Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"];
 
-  // Status dalam keluarga: nilai yang disimpan dan label yang ditampilkan
   const STATUS_KELUARGA = [
     ["Anak Kandung", "Anak Kandung"],
     ["Anak Tiri", "Anak Tiri (dari ayah)"],
     ["Anak Angkat", "Anak Angkat"]
   ];
   const labelStatusKeluarga = v => (STATUS_KELUARGA.find(x => x[0] === v) || [])[1] || v || "";
+
+  const PEKERJAAN = ["PNS / ASN", "Karyawan Swasta", "Wirausaha / Dagang", "Pekerja Lepas / Freelance", "Tidak Bekerja"];
+  const PENGHASILAN = ["Tidak Ada", "s/d 3 juta", "s/d 5 juta", "s/d 10 juta", "s/d 15 juta", ">20 juta"];
+  const EKONOMI_OPSI = ["Rumah Pribadi", "Mobil", "Motor", "Tempat Usaha"];
+  const listOpsi = arr => arr.map(x => [x, x]);
 
   const FIELD = [
     ["nama_lengkap", "Nama lengkap (sesuai akta) *", "text"],
@@ -73,11 +77,17 @@
     ["alamat", "Alamat domisili", "textarea"],
     ["nama_ayah", "Nama ayah", "text"],
     ["nik_ayah", "NIK ayah", "text"],
-    ["pekerjaan_ayah", "Pekerjaan ayah", "text"],
+    ["hp_ayah", "No. HP ayah", "text"],
+    ["pekerjaan_ayah", "Pekerjaan ayah", "select", listOpsi(PEKERJAAN)],
+    ["penghasilan_ayah", "Penghasilan ayah", "select", listOpsi(PENGHASILAN)],
     ["nama_ibu", "Nama ibu kandung", "text"],
     ["nik_ibu", "NIK ibu", "text"],
-    ["hp_orang_tua", "No. HP orang tua", "text"],
+    ["hp_ibu", "No. HP ibu", "text"],
+    ["pekerjaan_ibu", "Pekerjaan ibu", "select", listOpsi(PEKERJAAN)],
+    ["penghasilan_ibu", "Penghasilan ibu", "select", listOpsi(PENGHASILAN)],
     ["email_ortu", "Email orang tua", "text"],
+    ["status_ekonomi", "Status ekonomi (kepemilikan)", "ekonomi"],
+    ["bidang_usaha", "Bidang usaha (isi jika memilih Tempat Usaha)", "text"],
     ["wali_nama", "Nama wali (opsional)", "text"],
     ["wali_alamat", "Alamat wali (opsional)", "textarea"],
     ["wali_telp", "No. telp wali (opsional)", "text"],
@@ -101,7 +111,6 @@
     return d.getDate() + " " + BULAN_ID[d.getMonth()] + " " + d.getFullYear();
   };
 
-  // Waktu kirim: "17 Nov 2026, 14.35"
   const waktuIndo = iso => {
     if (!iso) return "";
     const d = new Date(iso);
@@ -109,14 +118,12 @@
     return d.getDate() + " " + BULAN_SINGKAT[d.getMonth()] + " " + d.getFullYear() + ", " + jam;
   };
 
-  // "2026-11-28" + "08:00" -> "Sabtu, 28 November 2026 pukul 08.00"
   function formatJadwal(tgl, jam) {
     const d = new Date(tgl + "T00:00:00");
     return HARI_ID[d.getDay()] + ", " + d.getDate() + " " + BULAN_ID[d.getMonth()] + " " +
       d.getFullYear() + " pukul " + jam.replace(":", ".");
   }
 
-  // Menggabungkan bagian alamat yang terisi
   const gabung = (...x) => x.filter(v => v && String(v).trim()).join(", ") || null;
 
   // Nilai kosong ditampilkan kosong (tanpa strip) untuk cetakan
@@ -125,6 +132,16 @@
   function inputHtml(k, t, o, row) {
     const v = row && row[k] != null ? row[k] : "";
     const id = "f_" + k;
+    if (t === "ekonomi") {
+      const pilih = Array.isArray(v) ? v : [];
+      return `<div id="${id}">
+        ${EKONOMI_OPSI.map((o2, i) => `
+          <div class="custom-control custom-checkbox">
+            <input class="custom-control-input eko-cb" type="checkbox" id="${id}_${i}" value="${esc(o2)}" ${pilih.includes(o2) ? "checked" : ""}>
+            <label class="custom-control-label" for="${id}_${i}">${esc(o2)}</label>
+          </div>`).join("")}
+      </div>`;
+    }
     if (t === "anak") {
       const angka = ["1", "2", "3", "4", "5"];
       const pilih = angka.includes(String(v)) ? String(v) : (v ? "lainnya" : "");
@@ -147,7 +164,6 @@
     return `<input id="${id}" type="${t}" class="form-control form-control-sm" value="${esc(v)}">`;
   }
 
-  // Mengirim pengumuman lewat Edge Function. Mengembalikan hasil dan alasan jika gagal.
   async function kirimNotif(body) {
     try {
       const { data: { session } } = await sb.auth.getSession();
@@ -173,98 +189,158 @@
     if (error) KUTTAB.gagal(error);
   }
 
-  // ===== CETAK DATA CALON =====
+  // ===== CETAK: PROFIL DAN SURAT PERNYATAAN ORANG TUA =====
   const CSS_CETAK = `
     @page { size: A4; margin: 0; }
     html, body { margin: 0; padding: 0; background: #fff; font-family: Arial, sans-serif; color: #111; width: 210mm; }
-    .page { width: 210mm; box-sizing: border-box; overflow: hidden; page-break-after: always; }
+    .page { width: 210mm; min-height: 297mm; box-sizing: border-box; page-break-after: always; }
     .page:last-child { page-break-after: auto; }
     .kop { display: block; width: 100%; margin: 0; }
-    .isi { padding: 0 12mm; font-size: 12px; }
-    .judul-id { text-align: center; font-size: 14px; font-weight: bold; margin: 12mm 0 8mm; }
-    .id-tabel { width: 100%; border-collapse: collapse; font-size: 12px; }
-    .id-tabel td { padding: 2px 4px; vertical-align: top; line-height: 1.8; }
-    .id-tabel td.no { width: 7%; }
-    .id-tabel td.lbl { width: 36%; }
-    .id-tabel td.lbl.sisip { padding-left: 18px; }
-    .id-tabel td.colon { width: 3%; }
-    .id-tabel td.val { width: 54%; }
-    .perj-q { font-size: 12px; margin: 6mm 0 2mm; line-height: 1.6; }
-    .garis { border-bottom: 1px solid #555; height: 8mm; margin: 0 2mm; }
-    .perj-sub { font-size: 12px; font-weight: bold; margin: 12mm 0 4mm; }
-    .perj-list p { font-size: 12px; line-height: 1.6; margin: 0 0 2mm; text-align: justify; }
-    .perj-ttd { margin-top: 10mm; width: 70mm; margin-left: auto; text-align: center; font-size: 12px; }
+    .isi { padding: 0 12mm 10mm; font-size: 11px; line-height: 1.4; }
+    .judul { text-align: center; font-size: 14px; font-weight: bold; margin: 8mm 0 5mm; }
+    .seg { margin-top: 4mm; }
+    .seg-judul { font-weight: bold; border-bottom: 1px solid #111; padding-bottom: 1mm; margin-bottom: 1.5mm; }
+    .tbl { width: 100%; border-collapse: collapse; }
+    .tbl td { padding: 0.8px 2px; vertical-align: top; }
+    .tbl td.no { width: 8mm; }
+    .tbl td.lbl { width: 58mm; }
+    .tbl td.sep { width: 3mm; }
+    .tbl td.lbl.sub { padding-left: 6mm; }
+    .perj-q { margin: 5mm 0 2mm; font-size: 12px; line-height: 1.6; }
+    .garis { border-bottom: 1px solid #555; height: 8mm; }
+    .perj-sub { font-weight: bold; margin: 10mm 0 3mm; font-size: 12px; }
+    .perj-item { display: flex; font-size: 12px; line-height: 1.6; margin-bottom: 1.5mm; }
+    .perj-item .n { flex: 0 0 8mm; }
+    .perj-item .t { flex: 1; text-align: justify; }
+    .ttd-wrap { margin-top: 10mm; display: flex; justify-content: flex-end; padding-right: 14mm; font-size: 12px; }
+    .ttd { width: 92mm; }
+    .baris-tgl { display: flex; align-items: flex-end; }
+    .tgl-lbl { white-space: nowrap; }
+    .tgl-isi { flex: 1; border-bottom: 1px dotted #111; height: 5mm; margin-left: 2mm; }
+    .meterai { height: 24mm; display: flex; align-items: center; justify-content: center; font-size: 11px; }
+    .ttd-nama { text-align: center; margin-top: 14mm; }
   `;
 
-  function htmlFormulirCalon(s) {
+  function htmlProfil(s) {
     const jk = s.jenis_kelamin === "L" ? "Laki-laki" : s.jenis_kelamin === "P" ? "Perempuan" : "";
     const ttl = [s.tempat_lahir, s.tanggal_lahir ? tglLengkap(s.tanggal_lahir) : ""].filter(Boolean).join(", ");
     const alamat = gabung(s.alamat,
       s.alamat_dom_rt && "RT " + s.alamat_dom_rt,
       s.alamat_dom_rw && "RW " + s.alamat_dom_rw,
       s.alamat_dom_desa, s.alamat_dom_kecamatan, s.alamat_dom_kodepos);
+    const alamatKk = s.alamat_sama_kk === true ? "Sama dengan alamat domisili"
+      : gabung(s.alamat_kk, s.rt_kk && "RT " + s.rt_kk, s.rw_kk && "RW " + s.rw_kk,
+          s.desa_kelurahan, s.kecamatan, s.kode_pos);
+    const adaWali = [s.wali_nama, s.wali_alamat, s.wali_telp, s.wali_pekerjaan]
+      .some(v => v && String(v).trim() !== "");
+    const kepemilikan = (s.status_ekonomi || []).map(x =>
+      x === "Tempat Usaha" && s.bidang_usaha ? "Tempat Usaha (" + s.bidang_usaha + ")" : x).join(", ");
 
-    const baris = (no, label, nilai) =>
-      `<tr><td class="no">${no}</td><td class="lbl">${esc(label)}</td><td class="colon">:</td><td class="val">${teksKosong(nilai)}</td></tr>`;
-    const judul = (no, label) =>
-      `<tr><td class="no">${no}</td><td class="lbl" colspan="3">${esc(label)}</td></tr>`;
-    const sisip = (label, nilai) =>
-      `<tr><td></td><td class="lbl sisip">${esc(label)}</td><td class="colon">:</td><td class="val">${teksKosong(nilai)}</td></tr>`;
+    // Item: [label, nilai] = baris bernomor; { head } = judul bernomor; { sub: [huruf, label, nilai] } = sub-baris
+    const bagian = (judul, items) => {
+      let n = 0;
+      const rows = items.map(it => {
+        if (it.head) return `<tr><td class="no">${++n}.</td><td class="lbl" colspan="3">${esc(it.head)}</td></tr>`;
+        if (it.sub) return `<tr><td class="no"></td><td class="lbl sub">${it.sub[0]}. ${esc(it.sub[1])}</td><td class="sep">:</td><td class="val">${teksKosong(it.sub[2])}</td></tr>`;
+        return `<tr><td class="no">${++n}.</td><td class="lbl">${esc(it[0])}</td><td class="sep">:</td><td class="val">${teksKosong(it[1])}</td></tr>`;
+      }).join("");
+      return `<div class="seg"><div class="seg-judul">${esc(judul)}</div><table class="tbl">${rows}</table></div>`;
+    };
+
+    const dataSantri = [
+      ["Nama lengkap (sesuai akta)", s.nama_lengkap],
+      ["Nama panggilan", s.nama_panggilan],
+      ["Jenis kelamin", jk],
+      ["NIK", s.nik],
+      ["NISN", s.nisn],
+      ["Nomor Induk Santri", s.nis],
+      ["Tempat, tanggal lahir", ttl],
+      ["Nomor registrasi akta lahir", s.no_registrasi_akta],
+      ["Agama", s.agama],
+      ["Anak ke", s.anak_ke],
+      ["Status dalam keluarga", labelStatusKeluarga(s.status_dalam_keluarga)],
+      ["Sekolah asal", s.sekolah_asal],
+      ["Tahun ajaran tujuan", s.tahun_ajaran_masuk],
+      ["Mendaftar untuk tingkat", s.tingkat_masuk != null ? namaTingkat(s.tingkat_masuk) : ""],
+      ["Jenis pendaftaran", s.jenis_pendaftaran],
+      ["Alamat domisili", alamat],
+      ["Alamat sesuai KK", alamatKk]
+    ];
+
+    const dataOrtu = [
+      { head: "Ayah kandung" },
+      { sub: ["a", "Nama lengkap", s.nama_ayah] },
+      { sub: ["b", "NIK", s.nik_ayah] },
+      { sub: ["c", "No. telp", s.hp_ayah] },
+      { head: "Ibu kandung" },
+      { sub: ["a", "Nama lengkap", s.nama_ibu] },
+      { sub: ["b", "NIK", s.nik_ibu] },
+      { sub: ["c", "No. telp", s.hp_ibu] },
+      ["Email orang tua", s.email_ortu],
+      ...(adaWali ? [
+        { head: "Wali santri" },
+        { sub: ["a", "Nama lengkap", s.wali_nama] },
+        { sub: ["b", "Alamat", s.wali_alamat] },
+        { sub: ["c", "No. telp", s.wali_telp] }
+      ] : [])
+    ];
+
+    const statusKerja = [
+      ["Pekerjaan ayah", s.pekerjaan_ayah],
+      ["Pekerjaan ibu", s.pekerjaan_ibu],
+      ...(s.wali_pekerjaan ? [["Pekerjaan wali", s.wali_pekerjaan]] : [])
+    ];
+
+    const statusEkonomi = [
+      ["Penghasilan ayah", s.penghasilan_ayah],
+      ["Penghasilan ibu", s.penghasilan_ibu],
+      ["Kepemilikan", kepemilikan]
+    ];
 
     return `<section class="page">
       <img class="kop" src="kop.png" alt="">
       <div class="isi">
-        <h3 class="judul-id">IDENTITAS SANTRI KUTTAB AL KALAM</h3>
-        <table class="id-tabel">
-          ${baris(1, "Nama Santri", s.nama_lengkap)}
-          ${baris(2, "Nomor Induk Santri", s.nis)}
-          ${baris(3, "Tempat, Tanggal Lahir", ttl)}
-          ${baris(4, "Agama", s.agama)}
-          ${baris(5, "Jenis Kelamin", jk)}
-          ${baris(6, "Anak ke", s.anak_ke)}
-          ${baris(7, "Status dalam keluarga", labelStatusKeluarga(s.status_dalam_keluarga))}
-          ${baris(8, "Alamat Santri", alamat)}
-          ${baris(9, "Nomor Telepon", s.hp_orang_tua)}
-          ${baris(10, "Sekolah Asal", s.sekolah_asal)}
-          ${judul(11, "Nama Orang Tua")}
-          ${sisip("a. Ayah", s.nama_ayah)}
-          ${sisip("b. Ibu", s.nama_ibu)}
-          ${judul(12, "Pekerjaan Orang Tua")}
-          ${sisip("a. Ayah", s.pekerjaan_ayah)}
-          ${sisip("b. Ibu", s.pekerjaan_ibu)}
-          ${judul(13, "Wali Santri")}
-          ${sisip("Nama", s.wali_nama)}
-          ${sisip("Alamat", s.wali_alamat)}
-          ${sisip("Nomor Telepon", s.wali_telp)}
-          ${sisip("Pekerjaan", s.wali_pekerjaan)}
-        </table>
+        <h3 class="judul">PROFIL DAN SURAT PERNYATAAN ORANG TUA</h3>
+        ${bagian("DATA SANTRI", dataSantri)}
+        ${bagian("DATA ORANG TUA SANTRI", dataOrtu)}
+        ${bagian("STATUS PEKERJAAN", statusKerja)}
+        ${bagian("STATUS EKONOMI", statusEkonomi)}
       </div>
     </section>`;
   }
 
-  function htmlPerjanjian() {
+  function htmlSurat() {
     const garis = n => Array.from({ length: n }, () => `<div class="garis"></div>`).join("");
+    const pertanyaan = [
+      "Apa yang Bapak & Ibu sudah lakukan untuk mendidik anak mempersiapkan aqil balighnya?",
+      "Kontribusi apa yang Bapak & Ibu dapat berikan untuk mendukung pengembangan Kuttab Al-Kalam?"
+    ];
+    const pernyataan = [
+      "Data yang diisi adalah benar dan dapat dipertanggungjawabkan.",
+      "Bersungguh-sungguh mendidik calon santri (anak) sepenuh jiwa sesuai dengan tuntunan Rasulullah ﷺ.",
+      "Bersedia mengikuti semua peraturan dan hasil musyawarah antara sekolah dan orang tua/wali santri.",
+      "Berkomitmen untuk senantiasa mengikuti MAWAS (Majelis Ilmu Wali Santri) sebagai bagian dari peran aktif dalam pendidikan anak.",
+      "Apabila terjadi hal-hal yang tidak diinginkan (selama tidak membahayakan keselamatan) tidak menuntut pihak Kuttab. Dan akan diselesaikan sesuai syariat"
+    ];
+
     return `<section class="page">
       <img class="kop" src="kop.png" alt="">
       <div class="isi">
-        <div class="perj-q">1. Apa yang Bapak &amp; Ibu sudah lakukan untuk mendidik anak mempersiapkan aqil balighnya?</div>
-        ${garis(2)}
-        <div class="perj-q">2. Kontribusi apa yang Bapak &amp; Ibu dapat berikan untuk mendukung pengembangan Kuttab Al-Kalam?</div>
-        ${garis(2)}
+        ${pertanyaan.map((t, i) => `
+          <div class="perj-q">${i + 1}. ${esc(t)}</div>
+          ${garis(2)}`).join("")}
         <div class="perj-sub">Dengan bersungguh-sungguh dan penuh kesadaran kami menyatakan bahwa:</div>
-        <div class="perj-list">
-          <p>1. Data yang diisi adalah benar dan dapat dipertanggungjawabkan.</p>
-          <p>2. Bersungguh-sungguh mendidik calon santri (anak) sepenuh jiwa sesuai dengan tuntunan Rasulullah ﷺ.</p>
-          <p>3. Bersedia mengikuti semua peraturan dan hasil musyawarah antara sekolah dan orang tua/wali santri.</p>
-          <p>4. Berkomitmen untuk senantiasa mengikuti MAWAS (Majelis Ilmu Wali Santri) sebagai bagian dari peran aktif dalam pendidikan anak.</p>
-          <p>5. Apabila terjadi hal-hal yang tidak diinginkan (selama tidak membahayakan keselamatan) tidak menuntut pihak Kuttab. Dan akan diselesaikan sesuai syariat</p>
-        </div>
-        <div class="perj-ttd">
-          <div>Tangerang,</div>
-          <div style="height:20mm;"></div>
-          <div>Materai Rp. 10.000</div>
-          <div style="height:14mm;"></div>
-          <div>( ........................................ )</div>
+        ${pernyataan.map((t, i) => `
+          <div class="perj-item"><div class="n">${i + 1}.</div><div class="t">${esc(t)}</div></div>`).join("")}
+        <div class="ttd-wrap">
+          <div class="ttd">
+            <div class="baris-tgl">
+              <span class="tgl-lbl">Tangerang Selatan,</span>
+              <span class="tgl-isi"></span>
+            </div>
+            <div class="meterai">Meterai Rp. 10.000</div>
+            <div class="ttd-nama">( ........................................ )</div>
+          </div>
         </div>
       </div>
     </section>`;
@@ -325,7 +401,6 @@
         cargar(k);
       });
 
-      // Membuka bukti bayar dengan tautan sementara (5 menit)
       async function bukaBukti(path) {
         if (!path) return peringatan("Bukti bayar belum ada.");
         const { data, error } = await sb.storage.from("bukti-bayar").createSignedUrl(path, 300);
@@ -467,6 +542,8 @@
               s.rt_kk && "RT " + s.rt_kk,
               s.rw_kk && "RW " + s.rw_kk,
               s.desa_kelurahan, s.kecamatan, s.kode_pos);
+        const ekonomi = (s.status_ekonomi || []).map(x =>
+          x === "Tempat Usaha" && s.bidang_usaha ? "Tempat Usaha (" + s.bidang_usaha + ")" : x).join(", ");
 
         const html = `
           <div class="table-responsive">
@@ -498,6 +575,7 @@
               ${baris("Pekerjaan ibu", s.pekerjaan_ibu)}
               ${baris("Penghasilan ibu", s.penghasilan_ibu)}
               ${baris("Email orang tua", s.email_ortu)}
+              ${baris("Status ekonomi", ekonomi)}
               ${bagian("Wali Santri")}
               ${baris("Nama wali", s.wali_nama)}
               ${baris("Alamat wali", s.wali_alamat)}
@@ -530,7 +608,7 @@
         if (r.isDenied) bukaBukti(s.bukti_bayar_path);
       }
 
-      // ===== CETAK DATA CALON: identitas + perjanjian dalam satu jendela =====
+      // ===== CETAK: profil dan surat pernyataan dalam satu jendela =====
       async function cetakDataCalon(id) {
         const { data: s, error } = await sb.from("santri").select("*").eq("id", id).maybeSingle();
         if (error) return gagal(error);
@@ -545,13 +623,13 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<title>Data Calon - ${esc(s.nama_lengkap)}</title>
+<title>Profil - ${esc(s.nama_lengkap)}</title>
 <base href="${location.href}">
 <style>${CSS_CETAK}</style>
 </head>
 <body>
-${htmlFormulirCalon(s)}
-${htmlPerjanjian()}
+${htmlProfil(s)}
+${htmlSurat()}
 </body>
 </html>`);
         w.document.close();
@@ -594,7 +672,7 @@ ${htmlPerjanjian()}
         loadCalon();
       }
 
-      // ===== CALON SANTRI: DAFTAR, TA, JADWAL, CETAK, TERIMA, PENGUMUMAN, AKTIVASI =====
+      // ===== CALON SANTRI =====
       async function loadCalon() {
         const [calon, peng, tp] = await Promise.all([
           sb.from("santri")
@@ -723,7 +801,6 @@ ${htmlPerjanjian()}
             kelas.map(x => `<option value="${x.id}">${esc(x.nama)}</option>`).join("");
         };
 
-        // Detail dan cetak tersedia untuk admin dan staf
         p.querySelectorAll("[data-detail]").forEach(b => b.onclick = () => lihatDetail(Number(b.dataset.detail)));
         p.querySelectorAll("[data-cetak]").forEach(b => b.onclick = () => cetakDataCalon(Number(b.dataset.cetak)));
 
@@ -792,7 +869,6 @@ ${htmlPerjanjian()}
       async function terimaCalon(s, batas) {
         if (!s) return;
 
-        // TA berjalan: jenjang mengikuti rombel yang sudah ada. TA lain: sesuai aturan jenjang terbuka.
         const tingkatList = s.tahun_ajaran_masuk === taKode
           ? [...new Set(rombelAll.map(x => Number(x.tingkat_kode)))].sort((a, b) => a - b)
           : Array.from({ length: batas }, (_, i) => i);
@@ -886,7 +962,7 @@ ${htmlPerjanjian()}
           <form id="fSantri">
             <div class="row">
               ${FIELD.map(([k, l, t, o]) => `
-                <div class="col-md-6 col-12 mb-2">
+                <div class="col-md-6 col-12 mb-2" id="wrap_${k}">
                   <label class="small mb-1">${esc(l)}</label>
                   ${inputHtml(k, t, o, row)}
                 </div>`).join("")}
@@ -896,6 +972,14 @@ ${htmlPerjanjian()}
           </form>`;
 
         if (!row) document.getElementById("f_agama").value = "Islam";
+
+        // Bidang usaha hanya tampil jika Tempat Usaha dicentang
+        const tu = document.querySelector('.eko-cb[value="Tempat Usaha"]');
+        const wrapUsaha = document.getElementById("wrap_bidang_usaha");
+        const sinkronUsaha = () => wrapUsaha.classList.toggle("d-none", !tu.checked);
+        tu.onchange = sinkronUsaha;
+        sinkronUsaha();
+
         document.getElementById("fBatal").onclick = () => { editId = null; buka("daftar"); };
         document.getElementById("fSantri").onsubmit = simpanForm;
       }
@@ -904,6 +988,10 @@ ${htmlPerjanjian()}
         e.preventDefault();
         const d = {};
         FIELD.forEach(([k, , t]) => {
+          if (t === "ekonomi") {
+            d[k] = [...document.querySelectorAll(".eko-cb:checked")].map(x => x.value);
+            return;
+          }
           const el = document.getElementById("f_" + k);
           let v = el ? el.value.trim() : "";
           if (t === "anak" && v === "lainnya") {
@@ -917,11 +1005,16 @@ ${htmlPerjanjian()}
         if (d.wali_telp && !/^\d{8,15}$/.test(d.wali_telp.replace(/\D/g, ""))) {
           return peringatan("No. telp wali tidak valid.");
         }
+        if (d.status_ekonomi.includes("Tempat Usaha") && !d.bidang_usaha) {
+          return peringatan("Sebutkan bidang usaha.");
+        }
+        if (!d.status_ekonomi.includes("Tempat Usaha")) d.bidang_usaha = null;
 
         d.nama_lengkap = titleCase(d.nama_lengkap);
         if (d.tingkat_masuk !== null) d.tingkat_masuk = Number(d.tingkat_masuk);
         if (d.email_ortu) d.email_ortu = d.email_ortu.toLowerCase();
         if (d.wali_telp) d.wali_telp = d.wali_telp.replace(/\D/g, "");
+        d.hp_orang_tua = d.hp_ibu || d.hp_ayah || null;
         ["nama_panggilan", "tempat_lahir", "desa_kelurahan", "kecamatan", "nama_ibu", "nama_ayah", "wali_nama"]
           .forEach(k => { if (d[k]) d[k] = d[k].toUpperCase(); });
 
